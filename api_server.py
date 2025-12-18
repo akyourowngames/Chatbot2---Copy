@@ -349,16 +349,22 @@ def get_current_user():
     return None
 
 # Legacy API key authentication (for backward compatibility)
+# HACKATHON MODE: Skip auth if no API keys configured
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Skip authentication if no API keys configured (demo mode)
+        if not API_KEYS:
+            request.user = {"name": "demo", "tier": "free"}
+            request.current_user = {"user_id": "demo", "email": "demo@hackathon.com", "role": "user"}
+            return f(*args, **kwargs)
+        
         api_key = request.headers.get('X-API-Key')
         if not api_key:
             return jsonify({"error": "API key required"}), 401
         if api_key not in API_KEYS:
             return jsonify({"error": "Invalid API key"}), 403
         request.user = API_KEYS[api_key]
-        # Set default user for backward compatibility
         request.current_user = {"user_id": "default", "email": "legacy@user.com", "role": "user"}
         return f(*args, **kwargs)
     return decorated_function
