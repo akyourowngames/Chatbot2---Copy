@@ -425,7 +425,7 @@ function showAuthModal(mode = 'login') {
 
                     <!-- Submit Button -->
                     <button type="submit" class="auth-submit" id="auth-submit">
-                        <span id="submit-text">${mode === 'login' ? 'Login to JARVIS' : 'Create Account'}</span>
+                        <span id="submit-text">${mode === 'login' ? 'Login to KAI' : 'Create Account'}</span>
                     </button>
                 </form>
 
@@ -490,7 +490,7 @@ function showAuthModal(mode = 'login') {
 
             // Update UI
             titleEl.textContent = currentMode === 'login' ? 'Welcome Back' : 'Create Account';
-            submitText.textContent = currentMode === 'login' ? 'Login to JARVIS' : 'Create Account';
+            submitText.textContent = currentMode === 'login' ? 'Login to KAI' : 'Create Account';
 
             // Hide messages
             errorDiv.style.display = 'none';
@@ -558,7 +558,7 @@ function showAuthModal(mode = 'login') {
 
             // Reset button
             submitBtn.disabled = false;
-            submitText.textContent = currentMode === 'login' ? 'Login to JARVIS' : 'Create Account';
+            submitText.textContent = currentMode === 'login' ? 'Login to KAI' : 'Create Account';
         }
     });
 }

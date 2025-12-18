@@ -666,6 +666,327 @@
         #messageInput:placeholder-shown~.command-hint {
             opacity: 1;
         }
+
+        /* ═══════════════════════════════════════════════════════════════
+           MOBILE RESPONSIVENESS - BEAST MODE
+           ═══════════════════════════════════════════════════════════════ */
+
+        /* Mobile Base Fixes */
+        @media (max-width: 768px) {
+            body {
+                height: 100dvh;
+                /* Dynamic viewport height for mobile */
+            }
+
+            /* Sidebar mobile adjustments */
+            #sidebar {
+                width: 85%;
+                max-width: 320px;
+            }
+
+            /* Messages container */
+            #messages {
+                padding: 16px !important;
+            }
+
+            /* Message bubbles */
+            .message-bubble {
+                max-width: 95% !important;
+                padding: 14px 16px !important;
+                font-size: 15px !important;
+            }
+
+            /* Input area */
+            .glass-input {
+                border-radius: 20px !important;
+                padding: 8px 12px !important;
+            }
+
+            #messageInput {
+                font-size: 16px !important;
+                /* Prevents iOS zoom */
+                padding: 12px 8px !important;
+            }
+
+            /* Quick Actions Dropdown */
+            #quickActionsDropdown {
+                width: 200px !important;
+                left: 0 !important;
+                right: auto !important;
+            }
+
+            /* Smart Suggestions */
+            .smart-suggestions {
+                gap: 6px;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                padding-bottom: 8px;
+            }
+
+            .smart-suggestions::-webkit-scrollbar {
+                display: none;
+            }
+
+            .suggestion-chip {
+                padding: 6px 12px;
+                font-size: 12px;
+                flex-shrink: 0;
+            }
+
+            /* Welcome screen */
+            .text-4xl.md\\:text-5xl {
+                font-size: 1.75rem !important;
+            }
+
+            .text-lg.md\\:text-xl {
+                font-size: 0.95rem !important;
+            }
+
+            /* Quick action buttons */
+            .quick-action-grid button {
+                padding: 12px !important;
+            }
+
+            /* Header buttons */
+            .icon-btn {
+                width: 40px;
+                height: 40px;
+                min-width: 40px;
+            }
+
+            /* Model selector */
+            #modelSelect {
+                max-width: 120px;
+                font-size: 12px;
+            }
+
+            /* Connection status */
+            #connectionStatus span:last-child {
+                display: none;
+            }
+        }
+
+        /* Extra small screens (iPhone SE, etc) */
+        @media (max-width: 375px) {
+            #sidebar {
+                width: 100%;
+                max-width: none;
+            }
+
+            .message-bubble {
+                padding: 12px 14px !important;
+                font-size: 14px !important;
+            }
+
+            #messageInput {
+                padding: 10px 6px !important;
+            }
+
+            .suggestion-chip {
+                padding: 5px 10px;
+                font-size: 11px;
+            }
+
+            #quickActionsDropdown {
+                width: 180px !important;
+            }
+        }
+
+        /* Landscape mobile */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .p-4.md\\:p-6 {
+                padding: 8px 16px !important;
+            }
+
+            #messages {
+                padding: 8px 16px !important;
+            }
+
+            .glass-input {
+                padding: 6px 10px !important;
+            }
+        }
+
+        /* Touch-friendly adjustments */
+        @media (pointer: coarse) {
+
+            button,
+            .action-chip,
+            .suggestion-chip,
+            .auth-tab {
+                min-height: 44px;
+                /* Apple HIG touch target */
+            }
+
+            .action-chip {
+                padding: 10px 14px !important;
+            }
+
+            /* Larger touch targets for message actions */
+            .message-action-btn {
+                padding: 8px 12px !important;
+            }
+        }
+
+        /* Safe area insets for notched phones */
+        @supports (padding: max(0px)) {
+            body {
+                padding-left: max(0px, env(safe-area-inset-left));
+                padding-right: max(0px, env(safe-area-inset-right));
+                padding-bottom: max(0px, env(safe-area-inset-bottom));
+            }
+
+            .p-4.md\\:p-6.pb-6 {
+                padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px)) !important;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           ADDITIONAL COOL FEATURES CSS
+           ═══════════════════════════════════════════════════════════════ */
+
+        /* Message Timestamp */
+        .message-timestamp {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Emoji Picker Button */
+        .emoji-btn {
+            padding: 8px;
+            border-radius: 8px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            opacity: 0.6;
+            transition: all 0.2s;
+        }
+
+        .emoji-btn:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.1);
+        }
+
+        /* Typing Indicator Animation */
+        @keyframes typingBounce {
+
+            0%,
+            60%,
+            100% {
+                transform: translateY(0);
+            }
+
+            30% {
+                transform: translateY(-6px);
+            }
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #a855f7;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: typingBounce 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        /* Code Block Improvements */
+        pre code {
+            border-radius: 12px !important;
+            padding: 16px !important;
+            background: #1e1e2e !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+
+        /* Scroll to Bottom Button */
+        .scroll-bottom-btn {
+            position: fixed;
+            bottom: 120px;
+            right: 24px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(139, 92, 246, 0.9);
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .scroll-bottom-btn.visible {
+            display: flex;
+        }
+
+        .scroll-bottom-btn:hover {
+            transform: scale(1.1);
+            background: rgba(139, 92, 246, 1);
+        }
+
+        /* Message Reactions */
+        .message-reactions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .reaction-btn {
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .reaction-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.1);
+        }
+
+        .reaction-btn.active {
+            background: rgba(139, 92, 246, 0.2);
+            border-color: rgba(139, 92, 246, 0.4);
+        }
+
+        /* Pulse animation for new messages */
+        @keyframes newMessagePulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(139, 92, 246, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+            }
+        }
+
+        .new-message {
+            animation: newMessagePulse 0.5s ease-out;
+        }
     </style>
 </head>
 
@@ -872,6 +1193,14 @@
             </div>
         </div>
 
+        <!-- Scroll to Bottom Button -->
+        <button id="scrollBottomBtn" class="scroll-bottom-btn" onclick="scrollToBottom()" title="Scroll to bottom">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3">
+                </path>
+            </svg>
+        </button>
+
         <!-- Input Area -->
         <div class="p-4 md:p-6 pb-6">
             <div class="max-w-3xl mx-auto w-full relative">
@@ -881,30 +1210,61 @@
                 <div class="glass-input rounded-2xl md:rounded-3xl p-2 pl-4 pr-2 flex items-end gap-2 relative z-10">
                     <!-- Quick Actions Dropdown -->
                     <div class="relative shrink-0 pb-1">
-                        <button onclick="toggleQuickActions(event)" class="p-2.5 text-yellow-400 hover:text-yellow-300 hover:bg-white/10 rounded-xl transition-colors" title="Quick Actions">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        <button onclick="toggleQuickActions(event)"
+                            class="p-2.5 text-yellow-400 hover:text-yellow-300 hover:bg-white/10 rounded-xl transition-colors"
+                            title="Quick Actions">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
                         </button>
-                        
+
                         <!-- Dropdown Menu -->
-                        <div id="quickActionsDropdown" class="hidden absolute bottom-full left-0 mb-3 w-56 bg-[#1a1c2e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-50 transform origin-bottom-left transition-all duration-200">
-                            <button onclick="quickAction('music')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
-                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg></span>
+                        <div id="quickActionsDropdown"
+                            class="hidden absolute bottom-full left-0 mb-3 w-56 bg-[#1a1c2e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-50 transform origin-bottom-left transition-all duration-200">
+                            <button onclick="quickAction('music')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-purple-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                                    </svg></span>
                                 Play Music
                             </button>
-                            <button onclick="quickAction('image')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
-                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></span>
+                            <button onclick="quickAction('image')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-pink-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg></span>
                                 Generate Image
                             </button>
-                            <button onclick="quickAction('search')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
-                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></span>
+                            <button onclick="quickAction('search')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-blue-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg></span>
                                 Web Search
                             </button>
-                            <button onclick="quickAction('translate')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
-                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg></span>
+                            <button onclick="quickAction('translate')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-green-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                    </svg></span>
                                 Translate
                             </button>
-                            <button onclick="quickAction('pdf')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
-                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg></span>
+                            <button onclick="quickAction('pdf')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-red-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg></span>
                                 Generate PDF
                             </button>
                         </div>
@@ -2344,9 +2704,111 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             updateSmartSuggestions('initial');
+            initScrollButton();
         });
 
+        // ═══════════════════════════════════════════════════════════════
+        // SCROLL TO BOTTOM BUTTON
+        // ═══════════════════════════════════════════════════════════════
+
+        function initScrollButton() {
+            const messagesDiv = document.getElementById('messages');
+            const scrollBtn = document.getElementById('scrollBottomBtn');
+
+            if (!messagesDiv || !scrollBtn) return;
+
+            messagesDiv.addEventListener('scroll', () => {
+                const isNearBottom = messagesDiv.scrollHeight - messagesDiv.scrollTop - messagesDiv.clientHeight < 200;
+                scrollBtn.classList.toggle('visible', !isNearBottom);
+            });
+        }
+
+        function scrollToBottom() {
+            const messagesDiv = document.getElementById('messages');
+            if (messagesDiv) {
+                messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // QUICK EMOJI PICKER
+        // ═══════════════════════════════════════════════════════════════
+
+        const quickEmojis = ['😊', '👍', '❤️', '🔥', '✨', '🎉', '💯', '🚀'];
+
+        function insertEmoji(emoji) {
+            const input = document.getElementById('messageInput');
+            if (input) {
+                const start = input.selectionStart;
+                const end = input.selectionEnd;
+                input.value = input.value.substring(0, start) + emoji + input.value.substring(end);
+                input.focus();
+                input.selectionStart = input.selectionEnd = start + emoji.length;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // MESSAGE TIMESTAMPS
+        // ═══════════════════════════════════════════════════════════════
+
+        function getFormattedTime() {
+            const now = new Date();
+            return now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CONFETTI CELEBRATION (for special moments)
+        // ═══════════════════════════════════════════════════════════════
+
+        function celebrateConfetti() {
+            const colors = ['#a855f7', '#3b82f6', '#22c55e', '#f59e0b', '#ec4899'];
+            const confettiCount = 50;
+
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.style.cssText = `
+                    position: fixed;
+                    width: 10px;
+                    height: 10px;
+                    background: ${colors[Math.floor(Math.random() * colors.length)]};
+                    left: ${Math.random() * 100}%;
+                    top: -10px;
+                    border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+                    pointer-events: none;
+                    z-index: 10000;
+                    animation: confettiFall ${2 + Math.random() * 2}s linear forwards;
+                `;
+                document.body.appendChild(confetti);
+                setTimeout(() => confetti.remove(), 4000);
+            }
+        }
+
+        // Add confetti animation if not exists
+        if (!document.getElementById('confetti-style')) {
+            const style = document.createElement('style');
+            style.id = 'confetti-style';
+            style.textContent = `
+                @keyframes confettiFall {
+                    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+                    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // TYPING SOUND EFFECT (optional, subtle)
+        // ═══════════════════════════════════════════════════════════════
+
+        let typingSoundEnabled = false; // Disabled by default
+
+        function toggleTypingSound() {
+            typingSoundEnabled = !typingSoundEnabled;
+            console.log(`Typing sound ${typingSoundEnabled ? 'enabled' : 'disabled'}`);
+        }
+
         console.log('🔥 KAI Beast Mode Features Loaded!');
+        console.log('💡 Tip: Press ? for keyboard shortcuts');
     </script>
 </body>
 
