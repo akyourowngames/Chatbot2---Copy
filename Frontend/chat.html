@@ -258,45 +258,112 @@
            🔥 NEW BEAST MODE FEATURES - CSS
            ═══════════════════════════════════════════════════════════════ */
 
-        /* Quick Actions Floating Dock */
-        .quick-actions-dock {
-            position: fixed;
-            bottom: 100px;
-            right: 24px;
+        /* Actions Bar (Replaces Floating Dock) */
+        .actions-bar {
             display: flex;
-            flex-direction: column;
             gap: 12px;
-            z-index: 100;
+            margin-bottom: 12px;
+            padding: 0 4px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            /* Hide scrollbar Firefox */
+            -ms-overflow-style: none;
+            /* Hide scrollbar IE/Edge */
         }
 
-        .quick-action-btn {
-            width: 48px;
-            height: 48px;
-            border-radius: 16px;
+        .actions-bar::-webkit-scrollbar {
+            display: none;
+            /* Hide scrollbar Chrome/Safari */
+        }
+
+        .action-chip {
             display: flex;
             align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #d1d5db;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .quick-action-btn:hover {
-            transform: scale(1.1) translateX(-4px);
-            box-shadow: 0 8px 30px rgba(139, 92, 246, 0.4);
+        .action-chip:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            color: white;
         }
 
-        .quick-action-btn.music {
-            background: linear-gradient(135deg, #ec4899, #8b5cf6);
+        .action-chip svg {
+            width: 16px;
+            height: 16px;
         }
 
-        .quick-action-btn.image {
-            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+        .action-chip.music:hover {
+            background: rgba(236, 72, 153, 0.2);
+            border-color: rgba(236, 72, 153, 0.4);
+            color: #f472b6;
         }
 
-        .quick-action-btn.search {
-            background: linear-gradient(135deg, #10b981, #059669);
+        .action-chip.image:hover {
+            background: rgba(6, 182, 212, 0.2);
+            border-color: rgba(6, 182, 212, 0.4);
+            color: #22d3ee;
+        }
+
+        .action-chip.search:hover {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #34d399;
+        }
+
+        .action-chip.translate:hover {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+        }
+
+        .action-chip.pdf:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.4);
+            color: #818cf8;
+        }
+
+        /* Mobile Optimizations */
+        @media (max-width: 640px) {
+            .message-bubble {
+                padding: 12px 16px !important;
+                font-size: 14px !important;
+            }
+
+            .glass-input {
+                padding: 8px !important;
+            }
+
+            #messageInput {
+                padding: 10px 0 !important;
+                font-size: 16px !important;
+                /* Prevent iOS zoom */
+            }
+
+            .actions-bar {
+                padding-bottom: 4px;
+                /* Space for scroll */
+            }
+
+            .action-chip {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            /* Adjust layout for mobile keyboard */
+            body {
+                height: 100dvh;
+            }
         }
 
         .quick-action-btn.translate {
@@ -812,6 +879,36 @@
                 <div id="smartSuggestions" class="smart-suggestions"></div>
 
                 <div class="glass-input rounded-2xl md:rounded-3xl p-2 pl-4 pr-2 flex items-end gap-2 relative z-10">
+                    <!-- Quick Actions Dropdown -->
+                    <div class="relative shrink-0 pb-1">
+                        <button onclick="toggleQuickActions(event)" class="p-2.5 text-yellow-400 hover:text-yellow-300 hover:bg-white/10 rounded-xl transition-colors" title="Quick Actions">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div id="quickActionsDropdown" class="hidden absolute bottom-full left-0 mb-3 w-56 bg-[#1a1c2e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-50 transform origin-bottom-left transition-all duration-200">
+                            <button onclick="quickAction('music')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg></span>
+                                Play Music
+                            </button>
+                            <button onclick="quickAction('image')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></span>
+                                Generate Image
+                            </button>
+                            <button onclick="quickAction('search')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></span>
+                                Web Search
+                            </button>
+                            <button onclick="quickAction('translate')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg></span>
+                                Translate
+                            </button>
+                            <button onclick="quickAction('pdf')" class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg></span>
+                                Generate PDF
+                            </button>
+                        </div>
+                    </div>
                     <button onclick="attachFile()"
                         class="p-2.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors shrink-0"
                         title="Attach file">
@@ -2051,39 +2148,7 @@
          🔥 NEW BEAST MODE FEATURES - HTML COMPONENTS
          ═══════════════════════════════════════════════════════════════ -->
 
-    <!-- Quick Actions Floating Dock -->
-    <div class="quick-actions-dock" id="quickActionsDock">
-        <button class="quick-action-btn music" onclick="quickAction('music')" title="Play Music">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-            </svg>
-        </button>
-        <button class="quick-action-btn image" onclick="quickAction('image')" title="Generate Image">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-        </button>
-        <button class="quick-action-btn search" onclick="quickAction('search')" title="Web Search">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-        </button>
-        <button class="quick-action-btn translate" onclick="quickAction('translate')" title="Translate">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-            </svg>
-        </button>
-        <button class="quick-action-btn pdf" onclick="quickAction('pdf')" title="Generate PDF">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-        </button>
-    </div>
+
 
     <!-- Image Lightbox -->
     <div class="lightbox-overlay" id="lightboxOverlay" onclick="closeLightbox()">
@@ -2123,8 +2188,30 @@
         // 🔥 BEAST MODE FEATURES - JAVASCRIPT
         // ═══════════════════════════════════════════════════════════════
 
+        // Quick Actions Dropdown
+        function toggleQuickActions(e) {
+            if (e) e.stopPropagation();
+            const dropdown = document.getElementById('quickActionsDropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('hidden');
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('quickActionsDropdown');
+            const btn = document.querySelector('button[onclick="toggleQuickActions(event)"]');
+            if (dropdown && !dropdown.classList.contains('hidden') && !dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
         // Quick Actions
         function quickAction(type) {
+            // Close dropdown
+            const dropdown = document.getElementById('quickActionsDropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+
             const input = document.getElementById('messageInput');
             const prompts = {
                 music: 'play ',
@@ -2242,7 +2329,7 @@
             let suggestions = [];
 
             if (context === 'initial') {
-                suggestions = ['Tell me a joke 🤣', 'What can you do? 🤖', 'Generate an image 🖼️', 'Play some music 🎵'];
+                return; // No initial suggestions as per user request
             } else if (context === 'assistant') {
                 suggestions = ['Explain more 🧠', 'Summarize this 📝', 'Give an example 💡', 'Another topic 🔄'];
             } else if (context === 'image') {

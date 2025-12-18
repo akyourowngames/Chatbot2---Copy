@@ -12,6 +12,7 @@ groq
 cohere
 openai
 google-generativeai
+python-pptx
 
 # ===== Media & Playback =====
 yt-dlp

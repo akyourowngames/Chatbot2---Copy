@@ -38,3 +38,4 @@ psutil>=5.9.0
 # ===== Document Generation =====
 reportlab>=4.0.0
 pillow>=10.0.0
+python-pptx>=0.6.21
