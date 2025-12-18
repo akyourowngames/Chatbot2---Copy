@@ -808,6 +808,9 @@
         <!-- Input Area -->
         <div class="p-4 md:p-6 pb-6">
             <div class="max-w-3xl mx-auto w-full relative">
+                <!-- Smart Suggestions -->
+                <div id="smartSuggestions" class="smart-suggestions"></div>
+
                 <div class="glass-input rounded-2xl md:rounded-3xl p-2 pl-4 pr-2 flex items-end gap-2 relative z-10">
                     <button onclick="attachFile()"
                         class="p-2.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors shrink-0"
@@ -1068,31 +1071,101 @@
             const messagesDiv = document.getElementById('messages');
             const messageDiv = document.createElement('div');
             // Full width container with centered content
-            messageDiv.className = `w-full animate-slide-up ${role === 'user' ? 'bg-transparent' : 'bg-transparent'}`;
+            messageDiv.className = `w-full message-animated ${role === 'user' ? 'bg-transparent' : 'bg-transparent'}`;
 
             // Inner content layout
             const innerDiv = document.createElement('div');
-            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 ${role === 'user' ? 'flex-row-reverse' : 'flex-row'}`;
+            innerDiv.className = `max-w-4xl mx-auto flex gap-4 md:gap-6 ${role === 'user' ? 'flex-row-reverse' : 'flex-row group'}`; // Added group for hover effects
 
             // Avatar
             const avatarDiv = document.createElement('div');
-            avatarDiv.className = `w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center text-sm shadow-lg ${role === 'user' ? 'bg-indigo-600 text-white' : 'bg-gradient-to-br from-accent-600 to-indigo-600 text-white'}`;
+            avatarDiv.className = `w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-sm shadow-xl ${role === 'user' ? 'bg-indigo-600 text-white' : 'bg-gradient-to-br from-accent-600 to-indigo-600 text-white shadow-accent-500/20'}`;
             avatarDiv.innerHTML = role === 'user' ?
-                '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>' :
-                '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>';
+                '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>' :
+                '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>';
 
             // Content Bubble
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = "flex-1 min-w-0";
+
             const contentDiv = document.createElement('div');
-            contentDiv.className = `flex-1 min-w-0 prose prose-invert max-w-none text-[15px] leading-relaxed ${role === 'user' ? 'bg-gray-800/50 backdrop-blur-sm px-5 py-3 rounded-2xl rounded-tr-sm border border-white/5' : 'pt-1.5'}`;
+            // Enhanced glassmorphism for both
+            contentDiv.className = `message-bubble prose prose-invert max-w-none text-[15px] leading-relaxed transition-all duration-300 ${role === 'user'
+                ? 'bg-gray-800/60 backdrop-blur-md px-6 py-4 rounded-2xl rounded-tr-sm border border-white/10 shadow-lg'
+                : 'glass-panel px-6 py-4 rounded-2xl rounded-tl-sm border border-white/5 shadow-xl bg-gray-900/40'}`;
+
             contentDiv.innerHTML = formatMessage(content);
 
+            contentWrapper.appendChild(contentDiv);
+
+            // Add Actions for Assistant
+            if (role === 'assistant') {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'message-actions animate-fade-in';
+
+                // Copy Button
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'msg-action-btn';
+                copyBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy';
+                copyBtn.onclick = function () { copyMessage(this, content); };
+
+                // Regenerate Button (dummy for now)
+                const regenBtn = document.createElement('button');
+                regenBtn.className = 'msg-action-btn';
+                regenBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Regenerate';
+                regenBtn.onclick = function () { sendQuickMessage('Regenerate that response'); };
+
+                // Speed Badge
+                const speedBadge = document.createElement('span');
+                const time = getResponseTime();
+                if (time) {
+                    speedBadge.className = 'speed-badge';
+                    speedBadge.innerText = `⚡ ${time}`;
+                    actionsDiv.appendChild(speedBadge);
+                }
+
+                actionsDiv.appendChild(copyBtn);
+                actionsDiv.appendChild(regenBtn);
+                contentWrapper.appendChild(actionsDiv);
+
+                // Update Smart Suggestions
+                setTimeout(() => updateSmartSuggestions(content.toLowerCase().includes('image') ? 'image' : 'assistant'), 500);
+            }
+
             innerDiv.appendChild(avatarDiv);
-            innerDiv.appendChild(contentDiv);
+            innerDiv.appendChild(contentWrapper);
             messageDiv.appendChild(innerDiv);
             messagesDiv.appendChild(messageDiv);
 
             // Smooth scroll to bottom
             messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        /* Updated Typing Indicator */
+        function addTypingIndicator() {
+            startResponseTimer(); // Start timing
+            const messagesDiv = document.getElementById('messages');
+            const typingDiv = document.createElement('div');
+            const id = 'typing-' + Date.now();
+            typingDiv.id = id;
+            typingDiv.className = 'w-full animate-fade-in mt-4';
+
+            typingDiv.innerHTML = `
+                <div class="max-w-4xl mx-auto flex gap-6">
+                    <div class="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-accent-600 to-indigo-600 text-white shadow-lg shadow-accent-500/20">
+                        <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <div class="glass-panel px-6 py-4 rounded-2xl rounded-tl-sm border border-white/5 shadow-xl bg-gray-900/40 flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-accent-400 animate-bounce" style="animation-delay: 0s"></div>
+                        <div class="w-2 h-2 rounded-full bg-accent-400 animate-bounce" style="animation-delay: 0.1s"></div>
+                        <div class="w-2 h-2 rounded-full bg-accent-400 animate-bounce" style="animation-delay: 0.2s"></div>
+                    </div>
+                </div>
+            `;
+
+            messagesDiv.appendChild(typingDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+            return id;
         }
 
         function addImageMessage(role, imageUrl) {
@@ -1245,30 +1318,7 @@
             messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
         }
 
-        function addTypingIndicator() {
-            const messagesDiv = document.getElementById('messages');
-            const typingDiv = document.createElement('div');
-            const id = 'typing-' + Date.now();
-            typingDiv.id = id;
-            typingDiv.className = 'w-full animate-fade-in';
 
-            typingDiv.innerHTML = `
-                <div class="max-w-3xl mx-auto flex gap-6">
-                    <div class="w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-accent-600 to-indigo-600 text-white shadow-lg">
-                        <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    </div>
-                    <div class="flex items-center gap-1.5 pt-2">
-                        <div class="typing-dot bg-gray-400"></div>
-                        <div class="typing-dot bg-gray-400"></div>
-                        <div class="typing-dot bg-gray-400"></div>
-                    </div>
-                </div>
-            `;
-
-            messagesDiv.appendChild(typingDiv);
-            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
-            return id;
-        }
 
         function removeTypingIndicator(id) {
             const el = document.getElementById(id);
@@ -2183,6 +2233,31 @@
             if (elapsed < 1000) return `${elapsed}ms`;
             return `${(elapsed / 1000).toFixed(1)}s`;
         }
+
+        // Smart Suggestions
+        function updateSmartSuggestions(context = 'initial') {
+            const container = document.getElementById('smartSuggestions');
+            if (!container) return;
+
+            let suggestions = [];
+
+            if (context === 'initial') {
+                suggestions = ['Tell me a joke 🤣', 'What can you do? 🤖', 'Generate an image 🖼️', 'Play some music 🎵'];
+            } else if (context === 'assistant') {
+                suggestions = ['Explain more 🧠', 'Summarize this 📝', 'Give an example 💡', 'Another topic 🔄'];
+            } else if (context === 'image') {
+                suggestions = ['Make it realistic 📸', 'Cyberpunk style 🌆', 'Anime style 🎨', 'Another one 🔄'];
+            }
+
+            container.innerHTML = suggestions.map(text =>
+                `<button onclick="sendQuickMessage('${text}')" class="suggestion-chip animate-fade-in">${text}</button>`
+            ).join('');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSmartSuggestions('initial');
+        });
 
         console.log('🔥 KAI Beast Mode Features Loaded!');
     </script>
