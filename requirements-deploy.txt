@@ -34,3 +34,7 @@ websockets>=11.0
 
 # ===== System =====
 psutil>=5.9.0
+
+# ===== Document Generation =====
+reportlab>=4.0.0
+pillow>=10.0.0
