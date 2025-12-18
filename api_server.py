@@ -3341,12 +3341,16 @@ def system_control():
 
 # --- FILE UPLOAD & ANALYSIS ---
 # --- VISION & FILE UPLOAD ROUTES ---
-app.add_url_rule('/api/v1/files/upload', view_func=upload_endpoint, methods=['POST'])
-app.add_url_rule('/api/v1/files', view_func=list_endpoint, methods=['GET'])
-app.add_url_rule('/api/v1/files/<path:file_id>/download', view_func=download_endpoint, methods=['GET'])
-app.add_url_rule('/api/v1/files/<path:file_id>', view_func=delete_endpoint, methods=['DELETE'])
-app.add_url_rule('/api/v1/files/<path:file_id>/analyze', view_func=analyze_endpoint, methods=['GET'])
-app.add_url_rule('/api/v1/analyze-image', view_func=analyze_image_endpoint, methods=['POST'])
+if VISION_AVAILABLE:
+    app.add_url_rule('/api/v1/files/upload', view_func=upload_endpoint, methods=['POST'])
+    app.add_url_rule('/api/v1/files', view_func=list_endpoint, methods=['GET'])
+    app.add_url_rule('/api/v1/files/<path:file_id>/download', view_func=download_endpoint, methods=['GET'])
+    app.add_url_rule('/api/v1/files/<path:file_id>', view_func=delete_endpoint, methods=['DELETE'])
+    app.add_url_rule('/api/v1/files/<path:file_id>/analyze', view_func=analyze_endpoint, methods=['GET'])
+    app.add_url_rule('/api/v1/analyze-image', view_func=analyze_image_endpoint, methods=['POST'])
+    print("[OK] Vision & File Upload routes registered")
+else:
+    print("[INFO] Vision routes disabled (cloud deployment)")
 
 
 
