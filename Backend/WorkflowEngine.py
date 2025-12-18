@@ -162,31 +162,22 @@ class WorkflowEngine:
         return results
     
     async def _execute_step(self, action: str, target: str):
-        """Execute a single workflow step"""
-        from Backend.Automation import Automation
+        """Execute a single workflow step - Web Version"""
         
         if action == "speak":
-            # Special action: speak text
-            try:
-                from Backend.TextToSpeech import TTS
-                TTS(target)
-            except:
-                logger.warning("[WORKFLOW] TTS not available")
-            return f"Spoke: {target}"
+            # Return the text instead of TTS (web mode)
+            logger.info(f"[WORKFLOW] Message: {target}")
+            return f"Message: {target}"
         
         elif action == "wait":
-            # Special action: wait
             await asyncio.sleep(float(target))
             return f"Waited {target}s"
         
         else:
-            # Regular automation command
+            # On web, automation is not available
             command = f"{action} {target}"
-            try:
-                await Automation([command])
-            except:
-                logger.warning(f"[WORKFLOW] Automation failed for: {command}")
-            return f"Executed: {command}"
+            logger.info(f"[WORKFLOW] (Web mode) Would execute: {command}")
+            return f"⚠️ '{command}' - requires desktop version"
     
     def create_workflow(self, name: str, description: str, steps: List[Dict], user_id: str = "default") -> bool:
         """

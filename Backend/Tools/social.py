@@ -1,12 +1,18 @@
+"""
+Social Media Tools - Web Version
+================================
+These features require local PC access and are not available on web deployment.
+"""
+
 from typing import Dict, Any
 from .base import Tool
-import asyncio
+
 
 class SocialTool(Tool):
     def __init__(self):
         super().__init__(
             name="social_media",
-            description="Interact with Instagram (DM, Follow, Post) and WhatsApp.",
+            description="Social media features (not available on web deployment)",
             domain="social",
             priority="LOW",
             allowed_intents=["social", "conversation"]
@@ -38,41 +44,9 @@ class SocialTool(Tool):
         }
 
     def execute(self, platform: str, action: str, target: str = "", content: str = "", **kwargs) -> str:
-        try:
-            if platform == "instagram":
-                # Lazy load to avoid startup issues if not configured
-                try:
-                    from Backend.InstagramAutomation import InstagramBot
-                    # Need singleton? or init new? 
-                    # Existing code seemed to use a global instance or context manager?
-                    # Let's assume we can instantiate.
-                    bot = InstagramBot() # Warning: This might require login flow if not cached. NOT SAFE for non-interactive?
-                    # Ideally we use the api_server's initialized instance if possible, 
-                    # but tools are isolated.
-                    # Best effort:
-                    
-                    if action == "send_message":
-                        bot.send_dm(target, content) # Hypothetical API match
-                        return f"Sent DM to {target}"
-                    elif action == "check_messages":
-                        msgs = bot.get_dms()
-                        return f"Unread messages: {msgs}"
-                    # ... other actions
-                    return f"Instagram action {action} triggered for {target}"
-                except Exception as e:
-                    return f"Instagram failed: {e}. (Make sure you are logged in)"
-
-            elif platform == "whatsapp":
-                try:
-                    from Backend.WhatsAppAutomation import send_whatsapp_message
-                    # This helper likely uses pywhatkit or selenium
-                    if action == "send_message":
-                         send_whatsapp_message(target, content)
-                         return f"Sent WhatsApp to {target}"
-                    return f"WhatsApp action {action} triggered"
-                except ImportError:
-                    return "WhatsApp module not available."
-
-            return f"Unknown platform {platform}"
-        except Exception as e:
-            return f"Social Error: {str(e)}"
+        """Social media automation is not available on web deployment."""
+        return (
+            f"⚠️ {platform.title()} automation is not available on web deployment. "
+            "This feature requires local PC access. "
+            "Please use the desktop version of KAI for social media automation."
+        )

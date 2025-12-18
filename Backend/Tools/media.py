@@ -1,16 +1,12 @@
+"""
+Media Tool - Web Version
+========================
+Image generation and media control for cloud deployment.
+"""
+
 from typing import Dict, Any
 from .base import Tool
-from Backend.Automation import PlayYoutube
-# Import dynamic handlers or use api_server globals if needed?
-# Ideally we import the core logic. 
-# Image Gen is likely in Backend.ImageGeneration or similar.
-# Let's check api_server for extraction.
-# It uses 'Backend.api.image_generation.py' or similar?
-# api_server imports `from Backend.ImageGeneration import GenerateImages` (based on log)
 
-import asyncio
-# Lazy import to avoid circular or missing dependencies during init
-import sys
 
 class MediaTool(Tool):
     def __init__(self):
@@ -43,33 +39,29 @@ class MediaTool(Tool):
     def execute(self, action: str, query: str = "", **kwargs) -> str:
         try:
             if action == "generate_image":
-                if not query: return "Please provide a description for the image."
+                if not query:
+                    return "Please provide a description for the image."
                 
-                # Import here to be safe
+                # Try to use EnhancedImageGen (works on web)
                 try:
-                    from Backend.ImageGeneration import GenerateImages
-                    # This function might print or return?
-                    # In api_server: result = GenerateImages(query) -> Returns list of paths or string?
-                    # Let's assume it returns paths or we capture output.
-                    # Based on existing code, it seems to do filesystem ops.
-                    # Let's assume it returns a list of files or single file path.
-                    
-                    # Correction: looking at logs "Generating image of..."
-                    result = GenerateImages(query)
-                    return f"Generated image: {result}"
-                except ImportError:
-                     return "Image Generation module not available."
+                    from Backend.EnhancedImageGen import enhanced_image_gen
+                    images = enhanced_image_gen.generate_with_style(query, style="realistic", num_images=1)
+                    if images:
+                        return f"✅ Generated image: {images[0]}"
+                    return "Failed to generate image."
+                except Exception as e:
+                    return f"Image generation error: {e}"
 
             elif action == "play_video":
-                if not query: return "What video should I play?"
-                PlayYoutube(query)
-                return f"Playing video for: {query}"
+                if not query:
+                    return "What video should I play?"
+                # On web, return YouTube search URL instead of opening browser
+                from urllib.parse import quote_plus
+                youtube_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
+                return f"🎬 Play video: {youtube_url}"
                 
             elif action == "stop_video":
-                # Automation didn't have a clear stop video command other than maybe key press
-                import keyboard
-                keyboard.press_and_release("k") # YouTube pause shortcut often works if focused, or media keys
-                return "Sent pause command."
+                return "⚠️ Video control is not available on web deployment."
                 
             return f"Unknown media action: {action}"
             

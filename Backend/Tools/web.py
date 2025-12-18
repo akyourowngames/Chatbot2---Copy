@@ -1,8 +1,14 @@
+"""
+Web Search Tool - Web Version
+=============================
+Web search functionality for cloud deployment.
+"""
+
 from typing import Dict, Any
 from .base import Tool
 from Backend.RealtimeSearchEngine import GoogleSearch
 from Backend.JarvisWebScraper import quick_search, scrape_markdown
-from Backend.Automation import YouTubeSearch
+
 
 class WebSearchTool(Tool):
     def __init__(self):
@@ -37,16 +43,18 @@ class WebSearchTool(Tool):
         
         try:
             if search_type in ["crypto", "stock", "news"]:
-                 # Use Jarvis Search for these specialized domains
-                 import asyncio
-                 results = asyncio.run(quick_search(f"{query} {search_type}"))
-                 if results:
-                     return f"Top Result: {results[0]['title']}\n{results[0]['link']}\n{results[0]['snippet']}"
-                 return f"No results found for {search_type} search."
+                # Use Jarvis Search for these specialized domains
+                import asyncio
+                results = asyncio.run(quick_search(f"{query} {search_type}"))
+                if results:
+                    return f"Top Result: {results[0]['title']}\n{results[0]['link']}\n{results[0]['snippet']}"
+                return f"No results found for {search_type} search."
 
             if search_type == "youtube":
-                YouTubeSearch(query)
-                return f"Opened YouTube search for: {query}"
+                # On web, return a YouTube search link instead of opening browser
+                from urllib.parse import quote_plus
+                youtube_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
+                return f"🔎 YouTube search for '{query}': {youtube_url}"
 
             # Default General Search
             result = GoogleSearch(query)
