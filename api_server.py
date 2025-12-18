@@ -1026,6 +1026,42 @@ def delete_workflow(workflow_id):
         return jsonify({"error": str(e)}), 500
 
 
+# ==================== WEB MUSIC PLAYER ENDPOINT ====================
+
+@app.route('/api/v1/music/play', methods=['POST'])
+@require_api_key
+def web_music_play():
+    """
+    Web-based music player - searches YouTube and returns embed URL.
+    The frontend handles actual playback in the browser.
+    """
+    try:
+        from Backend.WebMusicPlayer import get_music_response
+        
+        data = request.json
+        query = data.get('query', '')
+        
+        if not query:
+            return jsonify({"error": "Query required"}), 400
+        
+        result = get_music_response(query)
+        return jsonify(result), 200
+        
+    except ImportError:
+        # Fallback: Just return a YouTube search URL
+        from urllib.parse import quote_plus
+        query = request.json.get('query', 'music')
+        search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
+        return jsonify({
+            "status": "fallback",
+            "message": f"🎵 Search for: {query}",
+            "search_url": search_url,
+            "type": "music_link"
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ==================== NEW FEATURE ENDPOINTS ====================
 
 @app.route('/api/v1/image/generate', methods=['POST'])
@@ -1298,6 +1334,27 @@ def chat():
             print(f"[VISION] Failed to process image: {ve}")
 
     if not query: return jsonify({"error": "Query required"}), 400
+    
+    query_lower = query.lower().strip()
+    
+    # === WEB MUSIC PLAYER (Works in Cloud!) ===
+    music_triggers = ["play music", "play song", "play ", "listen to", "play me"]
+    if any(trigger in query_lower for trigger in music_triggers):
+        try:
+            from Backend.WebMusicPlayer import get_music_response
+            music_result = get_music_response(query)
+            if music_result.get("status") == "success":
+                return jsonify({
+                    "response": music_result["message"],
+                    "music": {
+                        "video_id": music_result.get("video_id"),
+                        "embed_url": music_result.get("embed_url"),
+                        "thumbnail": music_result.get("thumbnail")
+                    },
+                    "type": "music"
+                }), 200
+        except Exception as music_err:
+            print(f"[MUSIC] Web music error: {music_err}")
     
     try:
         # === CHAT CONTEXT FOR CONTINUOUS FLOW ===

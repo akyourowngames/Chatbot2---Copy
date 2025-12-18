@@ -708,6 +708,11 @@
                     }
                 }
 
+                // === WEB MUSIC PLAYER ===
+                if (data.type === 'music' && data.music && data.music.embed_url) {
+                    addMusicPlayer('assistant', data.music);
+                }
+
                 if (!data.command_executed) {
                     // Browser-based TTS for faster response
                     speakResponse(data.response);
@@ -809,6 +814,58 @@
             // Spacer for alignment
             const spacer = document.createElement('div');
             spacer.className = "w-8 h-8 flex-shrink-0";
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === WEB MUSIC PLAYER ===
+        function addMusicPlayer(role, musicData) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-purple-900/50 to-indigo-900/50 shadow-2xl max-w-lg backdrop-blur-sm">
+                    <div class="p-3 flex items-center gap-3 border-b border-white/10">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-semibold text-white">🎵 Now Playing</div>
+                            <div class="text-xs text-gray-400">YouTube Music</div>
+                        </div>
+                        <a href="https://www.youtube.com/watch?v=${musicData.video_id}" target="_blank" 
+                           class="p-2 text-gray-400 hover:text-white transition-colors" title="Open in YouTube">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                            </svg>
+                        </a>
+                    </div>
+                    <div class="aspect-video">
+                        <iframe 
+                            src="${musicData.embed_url}" 
+                            class="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                </div>
+            `;
 
             innerDiv.appendChild(spacer);
             innerDiv.appendChild(contentDiv);
