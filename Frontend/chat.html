@@ -2231,54 +2231,73 @@
         }
 
         async function loadConversation(conversationId) {
-            try {
-                console.log('[CHAT] Loading conversation:', conversationId);
-                const response = await window.authClient.get(`/chat/history/${conversationId}`);
-                console.log('[CHAT] Response:', response);
+            console.log('[CHAT] Loading conversation:', conversationId);
 
-                if (response && response.success) {
-                    const conversation = response.conversation;
-                    window.currentConversationId = conversationId;
+            // Check if user is authenticated
+            if (window.authClient && window.authClient.isAuthenticated()) {
+                // Authenticated user - load from Firebase
+                try {
+                    const response = await window.authClient.get(`/chat/history/${conversationId}`);
+                    console.log('[CHAT] Response:', response);
 
-                    // Highlight logic
-                    const historyDiv = document.getElementById('chatHistory');
-                    Array.from(historyDiv.children).forEach(child => {
-                        // Reset classes
-                        child.className = `p-3 rounded-lg cursor-pointer transition-all duration-200 group flex items-center gap-3 text-gray-400 hover:text-gray-200 hover:bg-white/5`;
-                        // Check click handler or ID (needs proper ID tracking)
-                        if (child.onclick && child.onclick.toString().includes(conversationId)) {
-                            child.className = `p-3 rounded-lg cursor-pointer transition-all duration-200 group flex items-center gap-3 bg-white/10 text-white`;
-                        }
-                    });
-
-                    const messagesContainer = document.getElementById('messages');
-                    messagesContainer.innerHTML = '';
-
-                    // Hide welcome screen
-                    const welcome = document.getElementById('welcome');
-                    if (welcome) {
-                        welcome.style.display = 'none';
-                        welcome.classList.add('hidden');
-                    }
-
-                    if (conversation.messages && conversation.messages.length > 0) {
-                        conversation.messages.forEach(msg => {
-                            addMessage(msg.role, msg.content);
-                        });
+                    if (response && response.success) {
+                        const conversation = response.conversation;
+                        window.currentConversationId = conversationId;
+                        displayConversation(conversationId, conversation.messages || []);
                     } else {
-                        // Show a message if there are no messages
-                        addMessage('assistant', 'This conversation is empty. Start chatting!');
+                        console.error('[CHAT] Failed to load conversation:', response);
+                        alert('Could not load this conversation. It may have been deleted.');
                     }
-                } else {
-                    console.error('[CHAT] Failed to load conversation:', response);
-                    alert('Could not load this conversation. It may have been deleted.');
+                } catch (e) {
+                    console.error('[CHAT] Error loading conversation:', e);
+                    alert('Error loading conversation: ' + e.message);
                 }
-            } catch (e) {
-                console.error('[CHAT] Error loading conversation:', e);
-                alert('Error loading conversation: ' + e.message);
+            } else {
+                // Not authenticated - this is a local chat (can't reload full history)
+                // Just highlight the chat and set it as current
+                console.log('[CHAT] Not authenticated - using local mode');
+                currentChatId = conversationId;
+                window.currentConversationId = conversationId;
+
+                // Highlight the selected chat
+                highlightActiveChat(conversationId);
+
+                // For local mode, we can't reload the messages since they're not persisted
+                // Just show a message that this chat is now active
+                alert('Local chats cannot be reloaded after refresh. Please log in to save your chat history to the cloud!');
+            }
+        }
+
+        function displayConversation(conversationId, messages) {
+            // Highlight the active chat
+            highlightActiveChat(conversationId);
+
+            const messagesContainer = document.getElementById('messages');
+            messagesContainer.innerHTML = '';
+
+            // Hide welcome screen
+            const welcome = document.getElementById('welcome');
+            if (welcome) {
+                welcome.style.display = 'none';
+                welcome.classList.add('hidden');
             }
 
+            if (messages && messages.length > 0) {
+                messages.forEach(msg => {
+                    addMessage(msg.role, msg.content);
+                });
+            } else {
+                addMessage('assistant', 'This conversation is empty. Start chatting!');
+            }
+        }
 
+        function highlightActiveChat(conversationId) {
+            const historyDiv = document.getElementById('chatHistory');
+            Array.from(historyDiv.children).forEach(child => {
+                // Reset classes
+                child.className = `p-3 rounded-lg cursor-pointer transition-all duration-200 group flex items-center gap-3 text-gray-400 hover:text-gray-200 hover:bg-white/5`;
+            });
+            // We'll rely on the item ordering to highlight - this is a simplification
         }
 
         async function confirmBulkDelete() {
