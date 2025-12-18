@@ -362,12 +362,10 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "version": "13.0",
-        "name": "JARVIS API with Firebase Auth",
+        "name": "KAI API - Production Ready",
         "modules": {
             "chat": ChatBot is not None,
             "automation": Automation is not None,
-            "vqa": vqa_service is not None,
-            "speech": enhanced_speech is not None,
             "firebase_auth": firebase_auth is not None,
             "firebase_dal": firebase_dal is not None
         }
