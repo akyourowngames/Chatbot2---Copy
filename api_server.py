@@ -104,13 +104,21 @@ except ImportError as e:
     SECURITY_ENABLED = False
     rate_limit = lambda *args, **kwargs: lambda f: f  # No-op decorator
 
-# Imports for Vision + File Upload
-from Backend.api.upload import upload_endpoint
-from Backend.api.list import list_endpoint
-from Backend.api.download import download_endpoint
-from Backend.api.delete import delete_endpoint
-from Backend.api.analyze import analyze_endpoint 
-from Backend.api.analyze_image import analyze_image_endpoint 
+# Imports for Vision + File Upload (Optional - may not be available in cloud deployment)
+try:
+    from Backend.api.upload import upload_endpoint
+    from Backend.api.list import list_endpoint
+    from Backend.api.download import download_endpoint
+    from Backend.api.delete import delete_endpoint
+    from Backend.api.analyze import analyze_endpoint 
+    from Backend.api.analyze_image import analyze_image_endpoint
+    VISION_AVAILABLE = True
+    print("[OK] Vision + File Upload modules loaded")
+except ImportError as e:
+    print(f"[WARN] Vision + File Upload not available (expected in cloud): {e}")
+    VISION_AVAILABLE = False
+    upload_endpoint = list_endpoint = download_endpoint = delete_endpoint = None
+    analyze_endpoint = analyze_image_endpoint = None
 # from Backend.Dispatcher import dispatcher # KAI Intelligence Engine (Bypassed)
 
 # ==================== HEALTH CHECK (CRITICAL) ====================
