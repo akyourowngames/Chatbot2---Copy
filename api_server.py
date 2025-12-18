@@ -54,17 +54,18 @@ def get_cors_origins() -> List[str]:
 CORS_ORIGINS = get_cors_origins()
 print(f"[CORS] Environment: {FLASK_ENV}, Allowed origins: {CORS_ORIGINS[:3]}{'...' if len(CORS_ORIGINS) > 3 else ''}")
 
-# Configure CORS with security settings
+# Configure CORS - Allow all origins for hackathon demo
+# TODO: Restrict in production after hackathon
 CORS(app, resources={
     r"/api/*": {
-        "origins": CORS_ORIGINS,
+        "origins": "*",  # Allow all for hackathon demo
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-API-Key", "X-Requested-With"],
-        "supports_credentials": True,
-        "max_age": 600,  # Cache preflight for 10 minutes
+        "supports_credentials": False,  # Must be False when origins is "*"
+        "max_age": 600,
     },
-    r"/health": {"origins": "*"},  # Health checks can be public
-    r"/data/*": {"origins": CORS_ORIGINS},
+    r"/health": {"origins": "*"},
+    r"/data/*": {"origins": "*"},
 })
 
 # ==================== SECURITY MIDDLEWARE ====================

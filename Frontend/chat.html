@@ -526,7 +526,19 @@
     </main>
 
     <script>
-        const API_URL = 'http://localhost:5000/api/v1';
+        // ========== API CONFIGURATION ==========
+        // Set to true to use Render (cloud) API, false for local development
+        const USE_CLOUD_API = true;
+
+        const API_URL = USE_CLOUD_API
+            ? 'https://kai-api-nxxv.onrender.com/api/v1'  // Cloud (Render)
+            : 'http://localhost:5000/api/v1';             // Local development
+
+        const BASE_URL = USE_CLOUD_API
+            ? 'https://kai-api-nxxv.onrender.com'
+            : 'http://localhost:5000';
+
+        console.log(`🔗 KAI API: ${USE_CLOUD_API ? 'Cloud (Render)' : 'Local'} - ${API_URL}`);
 
         // API Key Security: Use session storage instead of hardcoding
         // In production, this should be fetched via secure auth flow
@@ -551,9 +563,12 @@
         async function checkConnection() {
             const statusEl = document.getElementById('connectionStatus');
             try {
-                const res = await fetch(`${API_URL}/status`, {
-                    headers: { 'X-API-Key': API_KEY },
-                    signal: AbortSignal.timeout(5000)
+                // Use /health for cloud, /status for local
+                const healthUrl = USE_CLOUD_API ? `${BASE_URL}/health` : `${API_URL}/status`;
+                const res = await fetch(healthUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: AbortSignal.timeout(10000)  // 10s for cold start
                 });
                 if (res.ok) {
                     isConnected = true;
@@ -636,12 +651,12 @@
                             if (imgUrl.startsWith('http')) {
                                 fullUrl = imgUrl;
                             } else if (imgUrl.startsWith('/data/Images/')) {
-                                fullUrl = `http://localhost:5000${imgUrl}`;
+                                fullUrl = `${BASE_URL}${imgUrl}`;
                             } else if (imgUrl.startsWith('/data/')) {
                                 const filename = imgUrl.replace('/data/', '');
-                                fullUrl = `http://localhost:5000/data/Images/${filename}`;
+                                fullUrl = `${BASE_URL}/data/Images/${filename}`;
                             } else {
-                                fullUrl = `http://localhost:5000/data/Images/${imgUrl}`;
+                                fullUrl = `${BASE_URL}/data/Images/${imgUrl}`;
                             }
                             addImageMessage('assistant', fullUrl);
                         });
@@ -680,7 +695,7 @@
                     const imageUrl = match[1] || `/data/Images/${match[2]}` || match[0];
                     if (!foundImages.includes(imageUrl)) {
                         foundImages.push(imageUrl);
-                        const fullUrl = imageUrl.startsWith('http') ? imageUrl : `http://localhost:5000${imageUrl}`;
+                        const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
                         addImageMessage('assistant', fullUrl);
                     }
                 }
@@ -688,7 +703,7 @@
                 if (responseText.includes('✅ Generated') || responseText.includes('image!')) {
                     const pathMatch = responseText.match(/\/data\/(?:Images\/)?([^\s\)]+\.(?:jpg|jpeg|png|gif|webp))/i);
                     if (pathMatch && !foundImages.some(img => img.includes(pathMatch[0]))) {
-                        const imageUrl = `http://localhost:5000${pathMatch[0]}`;
+                        const imageUrl = `${BASE_URL}${pathMatch[0]}`;
                         addImageMessage('assistant', imageUrl);
                     }
                 }
