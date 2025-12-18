@@ -1,0 +1,11 @@
+# Additional Requirements for Advanced Features
+# Install with: pip install -r requirements_advanced.txt
+
+# Document Generation
+reportlab>=4.0.0
+python-pptx>=0.6.21
+
+# Enhanced Image Generation (already have requests)
+# Pollinations AI uses standard requests library
+
+# All other dependencies are already in Requirements.txt

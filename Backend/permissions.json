@@ -1,0 +1,9 @@
+{
+    "can_view_files": true,
+    "can_move_files": true,
+    "can_copy_files": true,
+    "can_rename_files": true,
+    "can_delete_files": false,
+    "require_confirmation": true,
+    "max_file_size_mb": 500
+}

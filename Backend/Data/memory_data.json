@@ -1,0 +1,19 @@
+{
+  "short_term_summary": {
+    "summary": "User sent a greeting"
+  },
+  "long_term_memory": {
+    "likes": [],
+    "dislikes": [],
+    "personal_info": {},
+    "identity": [],
+    "background": [],
+    "habits": [],
+    "personality_traits": [],
+    "goals": [],
+    "skills": [],
+    "preferences": [],
+    "devices": [],
+    "boundaries": []
+  }
+}

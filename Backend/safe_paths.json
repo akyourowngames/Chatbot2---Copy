@@ -1,0 +1,23 @@
+{
+    "allowed_paths": [
+        "C:/",
+        "D:/",
+        "E:/",
+        "Documents",
+        "Downloads",
+        "Desktop",
+        "Pictures",
+        "Music",
+        "Videos"
+    ],
+    "restricted_extensions": [
+        ".exe",
+        ".dll",
+        ".sys",
+        ".bat",
+        ".cmd",
+        ".sh",
+        ".py",
+        ".js"
+    ]
+}
