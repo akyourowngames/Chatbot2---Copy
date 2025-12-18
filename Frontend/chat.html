@@ -2232,7 +2232,10 @@
 
         async function loadConversation(conversationId) {
             try {
+                console.log('[CHAT] Loading conversation:', conversationId);
                 const response = await window.authClient.get(`/chat/history/${conversationId}`);
+                console.log('[CHAT] Response:', response);
+
                 if (response && response.success) {
                     const conversation = response.conversation;
                     window.currentConversationId = conversationId;
@@ -2251,15 +2254,29 @@
                     const messagesContainer = document.getElementById('messages');
                     messagesContainer.innerHTML = '';
 
-                    if (conversation.messages.length === 0) {
-                        // Show Welcome
-                    } else {
+                    // Hide welcome screen
+                    const welcome = document.getElementById('welcome');
+                    if (welcome) {
+                        welcome.style.display = 'none';
+                        welcome.classList.add('hidden');
+                    }
+
+                    if (conversation.messages && conversation.messages.length > 0) {
                         conversation.messages.forEach(msg => {
                             addMessage(msg.role, msg.content);
                         });
+                    } else {
+                        // Show a message if there are no messages
+                        addMessage('assistant', 'This conversation is empty. Start chatting!');
                     }
+                } else {
+                    console.error('[CHAT] Failed to load conversation:', response);
+                    alert('Could not load this conversation. It may have been deleted.');
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error('[CHAT] Error loading conversation:', e);
+                alert('Error loading conversation: ' + e.message);
+            }
 
 
         }

@@ -5,8 +5,25 @@
  */
 
 class AuthClient {
-    constructor(apiBaseUrl = 'http://localhost:5000/api/v1') {
-        this.apiBaseUrl = apiBaseUrl;
+    constructor(apiBaseUrl = null) {
+        // Auto-detect API URL based on current host
+        if (!apiBaseUrl) {
+            const currentHost = window.location.hostname;
+            if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+                this.apiBaseUrl = 'http://localhost:5000/api/v1';
+            } else if (window.location.protocol === 'file:') {
+                // Local file - try localhost
+                this.apiBaseUrl = 'http://localhost:5000/api/v1';
+            } else {
+                // Production - use same host as current page
+                this.apiBaseUrl = `${window.location.protocol}//${window.location.host}/api/v1`;
+            }
+        } else {
+            this.apiBaseUrl = apiBaseUrl;
+        }
+
+        console.log('[AUTH] API Base URL:', this.apiBaseUrl);
+
         this.accessToken = null;
         this.refreshToken = null;
         this.user = null;
