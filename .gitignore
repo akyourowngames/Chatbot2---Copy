@@ -92,3 +92,6 @@ Data/conversation_log.json
 Data/memory.json
 Data/user_profile.json
 Data/watch_history.json
+
+# Local-only files (desktop version - not for web deployment)
+_local_only/
