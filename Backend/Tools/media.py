@@ -57,8 +57,10 @@ class MediaTool(Tool):
                     return "What video should I play?"
                 # On web, return YouTube search URL instead of opening browser
                 from urllib.parse import quote_plus
-                youtube_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
-                return f"🎬 Play video: {youtube_url}"
+                search_query = quote_plus(query)
+                youtube_url = f"https://www.youtube.com/results?search_query={search_query}"
+                # Return structured tag for Frontend to render a card
+                return f"PLAY_YOUTUBE:{query}|{youtube_url}"
                 
             elif action == "stop_video":
                 return "⚠️ Video control is not available on web deployment."
