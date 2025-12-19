@@ -6,17 +6,14 @@
 
 class AuthClient {
     constructor(apiBaseUrl = null) {
-        // Auto-detect API URL based on current host
+        // Use Render deployment URL
         if (!apiBaseUrl) {
-            const currentHost = window.location.hostname;
-            if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+            // Always use Render for production deployment
+            this.apiBaseUrl = 'https://kai-api-nxxv.onrender.com/api/v1';
+
+            // Fallback to localhost only if explicitly on localhost
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 this.apiBaseUrl = 'http://localhost:5000/api/v1';
-            } else if (window.location.protocol === 'file:') {
-                // Local file - try localhost
-                this.apiBaseUrl = 'http://localhost:5000/api/v1';
-            } else {
-                // Production - use same host as current page
-                this.apiBaseUrl = `${window.location.protocol}//${window.location.host}/api/v1`;
             }
         } else {
             this.apiBaseUrl = apiBaseUrl;
@@ -593,9 +590,16 @@ function hideAuthModal() {
 window.authClient = new AuthClient();
 window.realtimeClient = new RealtimeSyncClient(window.authClient);
 
-// Auto-connect to WebSocket if authenticated
+// Define global API_URL for compatibility with other scripts (file-manager.js, etc.)
+window.API_URL = window.authClient.apiBaseUrl;
+window.API_KEY = 'demo_key_12345'; // Match quick-search.js
+
+// WebSocket disabled for Render free tier (doesn't support WebSockets)
+// Uncomment below to enable if using a WebSocket-compatible host
+/*
 if (window.authClient.isAuthenticated()) {
     window.realtimeClient.connect();
 }
+*/
 
 console.log('[AUTH] Authentication client initialized');
