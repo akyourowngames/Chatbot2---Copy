@@ -167,13 +167,56 @@ class SmartTrigger:
                 "keywords": ["open", "close", "launch", "start", "quit"]
             },
             
-            # Web Scraping
+            # Web Scraping - Enhanced patterns
             "scrape": {
                 "patterns": [
-                    r"(?:jarvis\s+)?(?:scrape|extract|get)\s+(?:data from\s+)?(.+)",
-                    r"(?:jarvis\s+)?(?:fetch|retrieve)\s+(?:information from\s+)?(.+)",
+                    r"(?:jarvis\s+)?(?:scrape|extract|get)\s+(?:data\s+)?(?:from\s+)?(.+)",
+                    r"(?:jarvis\s+)?(?:fetch|retrieve)\s+(?:information\s+)?(?:from\s+)?(.+)",
+                    r"(?:jarvis\s+)?(?:analyze|read|parse)\s+(?:the\s+)?(?:website|page|site)\s+(.+)",
+                    r"(?:jarvis\s+)?(?:what's on|what is on|summarize)\s+(.+\.(?:com|org|net|io|co).*)",
                 ],
-                "keywords": ["scrape", "extract", "fetch", "data", "information"]
+                "keywords": [
+                    "scrape", "scrape website", "scrape url", "scrape page",
+                    "extract data", "extract from", "get data from",
+                    "fetch website", "fetch page", "fetch url",
+                    "analyze website", "analyze page", "read website",
+                    "parse website", "parse page", "get content from"
+                ]
+            },
+            
+            # Live Streams (Radio & TV) - NEW
+            "stream": {
+                "patterns": [
+                    r"(?:jarvis\s+)?(?:play|stream|tune\s+in\s+to)\s+(?:the\s+)?(?:radio|music\s+radio|live\s+radio)\s*(.+)?",
+                    r"(?:jarvis\s+)?(?:play|watch|stream)\s+(?:live\s+)?(?:tv|news|television)\s*(.+)?",
+                    r"(?:jarvis\s+)?(?:listen\s+to|tune\s+to)\s+(.+?)(?:\s+radio|\s+stream)?",
+                    r"(?:jarvis\s+)?(?:play|stream)\s+(?:lofi|jazz|classical|ambient|focus|chill)\s*(?:music|radio|beats)?",
+                ],
+                "keywords": [
+                    "play radio", "stream radio", "live radio", "tune in",
+                    "listen to radio", "lofi radio", "jazz radio", "classical radio",
+                    "play lofi", "stream lofi", "chill beats", "focus music radio",
+                    "watch news", "live news", "stream news", "live tv",
+                    "watch tv", "stream tv", "news channel", "sky news", "bbc news",
+                    "ambient radio", "nature sounds", "rain sounds"
+                ]
+            },
+            
+            # Website Capture (PDF) - NEW
+            "capture": {
+                "patterns": [
+                    r"(?:jarvis\s+)?(?:capture|save|convert)\s+(?:the\s+)?(?:website|page|url|site)\s+(.+?)(?:\s+(?:as|to)\s+pdf)?",
+                    r"(?:jarvis\s+)?(?:save|download)\s+(.+?)\s+(?:as|to)\s+pdf",
+                    r"(?:jarvis\s+)?(?:screenshot|capture)\s+(?:and\s+save\s+)?(.+)",
+                    r"(?:jarvis\s+)?(?:make|create|generate)\s+(?:a\s+)?pdf\s+(?:of|from)\s+(.+)",
+                ],
+                "keywords": [
+                    "capture website", "capture page", "capture url",
+                    "save as pdf", "save to pdf", "convert to pdf",
+                    "website to pdf", "page to pdf", "url to pdf",
+                    "download page", "download as pdf", "pdf of website",
+                    "screenshot website", "screenshot page"
+                ]
             },
             
             # Workflows (including Smart Workflows) - STRICT PATTERNS

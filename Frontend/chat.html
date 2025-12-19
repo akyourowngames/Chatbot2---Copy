@@ -1103,6 +1103,28 @@
                                     </svg></span>
                                 Generate PDF
                             </button>
+                            <!-- NEW FEATURES -->
+                            <div class="border-t border-white/10 my-1"></div>
+                            <button onclick="quickAction('radio')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center text-lg">📻</span>
+                                Live Radio/TV
+                            </button>
+                            <button onclick="quickAction('scrape')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center text-lg">🌐</span>
+                                Scrape Website
+                            </button>
+                            <button onclick="quickAction('capture')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center text-lg">📄</span>
+                                Capture as PDF
+                            </button>
+                            <button onclick="quickAction('workflow')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center text-lg">⚡</span>
+                                Quick Workflows
+                            </button>
                         </div>
                     </div>
                     <button onclick="attachFile()"
@@ -1341,6 +1363,39 @@
                 // === WEB MUSIC PLAYER ===
                 if (data.type === 'music' && data.music && data.music.embed_url) {
                     addMusicPlayer('assistant', data.music);
+                }
+
+                // === LIVE STREAMS (Radio/TV) ===
+                if (data.type === 'stream' && data.music && data.music.embed_url) {
+                    addMusicPlayer('assistant', data.music); // Uses same player as music
+                }
+
+                // === PDF CAPTURE WITH PREVIEW ===
+                if (data.type === 'pdf_capture' && data.pdf_url) {
+                    addPDFPreview('assistant', {
+                        title: data.title,
+                        pdf_url: data.pdf_url,
+                        thumbnail_url: data.thumbnail_url,
+                        url: data.url
+                    });
+                }
+
+                // === SCREENSHOT CAPTURE ===
+                if (data.type === 'screenshot' && data.screenshot_url) {
+                    const fullUrl = data.screenshot_url.startsWith('http')
+                        ? data.screenshot_url
+                        : `${BASE_URL}${data.screenshot_url}`;
+                    addImageMessage('assistant', fullUrl);
+                }
+
+                // === VIDEO SUMMARY ===
+                if (data.type === 'video_summary') {
+                    addVideoSummary('assistant', data);
+                }
+
+                // === CODE EXECUTION ===
+                if (data.type === 'code_execution' && data.code) {
+                    addCodeExecution('assistant', data);
                 }
 
                 if (!data.command_executed) {
@@ -1616,9 +1671,191 @@
             messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
         }
 
+        // === PDF PREVIEW (Like Image Preview) ===
+        function addPDFPreview(role, pdfData) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            const thumbnailUrl = pdfData.thumbnail_url
+                ? (pdfData.thumbnail_url.startsWith('http') ? pdfData.thumbnail_url : `${BASE_URL}${pdfData.thumbnail_url}`)
+                : null;
+            const pdfUrl = pdfData.pdf_url.startsWith('http') ? pdfData.pdf_url : `${BASE_URL}${pdfData.pdf_url}`;
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-red-900/30 to-orange-900/30 shadow-2xl max-w-md backdrop-blur-sm group">
+                    <div class="p-4 flex items-start gap-4">
+                        <div class="w-16 h-20 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0 flex items-center justify-center border border-white/10">
+                            ${thumbnailUrl
+                    ? `<img src="${thumbnailUrl}" alt="PDF Preview" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<svg class=\\'w-8 h-8 text-red-400\\' fill=\\'currentColor\\' viewBox=\\'0 0 24 24\\'><path d=\\'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z\\'/><path d=\\'M14 2v6h6\\'/></svg>'">`
+                    : `<svg class="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg>`
+                }
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-semibold text-white truncate">${pdfData.title || 'Captured PDF'}</div>
+                            <div class="text-xs text-gray-400 truncate mt-1">${pdfData.url || 'Website capture'}</div>
+                            <div class="flex gap-2 mt-3">
+                                <a href="${pdfUrl}" target="_blank" download 
+                                   class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    Download
+                                </a>
+                                <a href="${pdfUrl}" target="_blank" 
+                                   class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                    </svg>
+                                    Open
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === VIDEO SUMMARY DISPLAY ===
+        function addVideoSummary(role, data) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            const keyPointsHTML = (data.key_points || []).map(point =>
+                `<li class="text-gray-300 text-sm">${point}</li>`
+            ).join('');
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-red-900/20 to-purple-900/20 shadow-2xl max-w-lg backdrop-blur-sm">
+                    <div class="relative">
+                        <img src="${data.thumbnail}" alt="${data.title}" class="w-full h-48 object-cover opacity-80">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                        <div class="absolute bottom-3 left-3 right-3">
+                            <div class="text-white font-semibold text-sm line-clamp-2">${data.title || 'Video'}</div>
+                            <div class="text-gray-400 text-xs mt-1">${data.duration || ''} • ${data.author || ''}</div>
+                        </div>
+                        <a href="${data.url}" target="_blank" class="absolute top-3 right-3 p-2 bg-red-600 rounded-full hover:bg-red-500 transition-colors">
+                            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </a>
+                    </div>
+                    <div class="p-4">
+                        <div class="text-white text-sm font-medium mb-2">📝 Summary</div>
+                        <div class="text-gray-300 text-sm leading-relaxed">${data.summary || 'No summary available.'}</div>
+                        ${keyPointsHTML ? `
+                            <div class="mt-4">
+                                <div class="text-white text-sm font-medium mb-2">✨ Key Points</div>
+                                <ul class="list-disc list-inside space-y-1">${keyPointsHTML}</ul>
+                            </div>
+                        ` : ''}
+                        ${data.target_audience ? `
+                            <div class="mt-3 text-xs text-gray-500">
+                                🎯 Best for: ${data.target_audience}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === CODE EXECUTION DISPLAY ===
+        function addCodeExecution(role, data) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            const statusIcon = data.status === 'success' ? '✅' : '❌';
+            const statusColor = data.status === 'success' ? 'green' : 'red';
+            const escapedCode = (data.code || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escapedOutput = (data.output || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const encodedCode = btoa(unescape(encodeURIComponent(data.code || '')));
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-gray-900/80 shadow-2xl max-w-lg backdrop-blur-sm">
+                    <div class="p-3 flex items-center justify-between border-b border-white/10 bg-gray-800/50">
+                        <div class="flex items-center gap-2">
+                            <span class="text-${statusColor}-400">${statusIcon}</span>
+                            <span class="text-sm font-medium text-white">Code Execution</span>
+                            <span class="text-xs text-gray-500">${data.language || 'python'}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${data.execution_time ? `<span class="text-xs text-gray-400">⚡ ${data.execution_time}s</span>` : ''}
+                            <button onclick="copyCodeBlock(this, '${encodedCode}')" class="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-3 max-h-48 overflow-auto">
+                        <pre class="text-xs text-gray-300 font-mono whitespace-pre-wrap">${escapedCode}</pre>
+                    </div>
+                    ${escapedOutput || data.error ? `
+                        <div class="border-t border-white/10 p-3 bg-gray-800/30">
+                            <div class="text-xs font-medium text-gray-400 mb-2">${data.error ? '❌ Error' : '📤 Output'}</div>
+                            <pre class="text-xs ${data.error ? 'text-red-400' : 'text-green-400'} font-mono whitespace-pre-wrap max-h-32 overflow-auto">${data.error || escapedOutput}</pre>
+                        </div>
+                    ` : ''}
+                    ${data.explanation ? `
+                        <div class="border-t border-white/10 p-3 bg-gray-800/20">
+                            <div class="text-xs text-gray-400">${data.explanation}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
 
 
         function removeTypingIndicator(id) {
+
             const el = document.getElementById(id);
             if (el) el.remove();
         }
@@ -2529,7 +2766,11 @@
                 image: 'generate an image of ',
                 search: 'search for ',
                 translate: 'translate to ',
-                pdf: 'generate a pdf about '
+                pdf: 'generate a pdf about ',
+                radio: 'play radio ',
+                scrape: 'scrape website ',
+                capture: 'capture website as pdf ',
+                workflow: 'start workflow '
             };
             input.value = prompts[type] || '';
             input.focus();

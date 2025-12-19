@@ -1793,6 +1793,143 @@ def chat():
                  print(f"[ERROR] Translation failed: {e}")
                  response_text = f"Translation failed: {str(e)}"
 
+        # 6a. LIVE STREAMS (Radio & TV) - NEW
+        elif trigger_type == "stream":
+             print(f"[SMART-TRIGGER] Stream command: {command}")
+             try:
+                 from Backend.LiveStreamPlayer import live_stream_player
+                 
+                 q = query.lower()
+                 
+                 # Determine if searching for specific stream or listing
+                 if any(w in q for w in ["list", "show", "available", "what"]):
+                     if "tv" in q or "news" in q:
+                         channels = live_stream_player.get_tv_channels()
+                         channel_list = "\n".join([f"• **{c['name']}** ({c['genre']})" for c in channels[:5]])
+                         response_text = f"📺 **Available TV Channels:**\n{channel_list}"
+                     elif "radio" in q or "music" in q:
+                         stations = live_stream_player.get_radio_stations()
+                         station_list = "\n".join([f"• **{s['name']}** ({s['genre']})" for s in stations[:5]])
+                         response_text = f"📻 **Available Radio Stations:**\n{station_list}"
+                     else:
+                         genres = live_stream_player.get_genres()
+                         response_text = f"🎵 **Genres:** Music: {', '.join(genres['music'])} | TV: {', '.join(genres['tv'])}"
+                 else:
+                     # Play stream by query
+                     result = live_stream_player.play_by_query(query)
+                     
+                     if result.get("status") == "success":
+                         return jsonify({
+                             "response": result.get("message"),
+                             "music": result.get("music"),
+                             "type": "stream",
+                             "stream_type": result.get("stream_type")
+                         }), 200
+                     else:
+                         response_text = f"❌ {result.get('error', 'Could not find stream')}"
+             except Exception as e:
+                 print(f"[ERROR] Stream error: {e}")
+                 response_text = f"Stream error: {str(e)}"
+
+        # 6b. WEBSITE CAPTURE (PDF) - NEW
+        elif trigger_type == "capture":
+             print(f"[SMART-TRIGGER] Capture command: {command}")
+             try:
+                 from Backend.WebsiteCapture import website_capture
+                 import re
+                 
+                 # Extract URL from command
+                 url_match = re.search(r'(https?://[^\s]+)', command)
+                 if not url_match:
+                     # Try to extract domain-like patterns
+                     domain_match = re.search(r'([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|org|net|io|co|edu|gov)[^\s]*)', command)
+                     if domain_match:
+                         url = "https://" + domain_match.group(1)
+                     else:
+                         response_text = "📄 Please provide a URL to capture. Example: 'capture https://example.com as pdf'"
+                         url = None
+                 else:
+                     url = url_match.group(1)
+                 
+                 if url:
+                     result = website_capture.url_to_pdf(url)
+                     
+                     if result.get("status") == "success":
+                         return jsonify({
+                             "response": f"📄 **PDF Captured:** {result.get('title', 'Page')}",
+                             "type": "pdf_capture",
+                             "title": result.get("title"),
+                             "pdf_url": result.get("pdf_url"),
+                             "thumbnail_url": result.get("thumbnail_url"),
+                             "page_count": result.get("page_count", 1)
+                         }), 200
+                     else:
+                         response_text = f"❌ Capture failed: {result.get('message', 'Unknown error')}"
+             except ImportError:
+                 response_text = "📄 Website capture module not available. Install playwright: pip install playwright"
+             except Exception as e:
+                 print(f"[ERROR] Capture error: {e}")
+                 response_text = f"Capture error: {str(e)}"
+
+        # 6c. WEB SCRAPING - ENHANCED
+        elif trigger_type == "scrape":
+             print(f"[SMART-TRIGGER] Scrape command: {command}")
+             try:
+                 import re
+                 
+                 # Extract URL from command
+                 url_match = re.search(r'(https?://[^\s]+)', command)
+                 if not url_match:
+                     # Try to extract domain-like patterns
+                     domain_match = re.search(r'([a-zA-Z0-9][-a-zA-Z0-9]*\.(?:com|org|net|io|co|edu|gov)[^\s]*)', command)
+                     if domain_match:
+                         url = "https://" + domain_match.group(1)
+                     else:
+                         response_text = "🌐 Please provide a URL to scrape. Example: 'scrape https://example.com'"
+                         url = None
+                 else:
+                     url = url_match.group(1)
+                 
+                 if url:
+                     # Try enhanced scraper first
+                     try:
+                         from Backend.EnhancedWebScraper import JarvisWebScraper
+                         scraper = JarvisWebScraper()
+                         result = scraper.scrape(url)
+                         
+                         if result:
+                             title = result.get('title', 'Unknown')
+                             description = result.get('meta_description', '')[:200]
+                             text_preview = result.get('text', '')[:500]
+                             links_count = len(result.get('links', []))
+                             images_count = len(result.get('images', []))
+                             
+                             response_text = f"""🌐 **Scraped: {title}**
+
+**Description:** {description}
+
+**Content Preview:**
+{text_preview}...
+
+📊 Found {links_count} links, {images_count} images"""
+                         else:
+                             response_text = f"❌ Could not scrape {url}"
+                     except ImportError:
+                         # Fallback to basic requests
+                         import requests
+                         from bs4 import BeautifulSoup
+                         
+                         resp = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+                         soup = BeautifulSoup(resp.text, 'html.parser')
+                         
+                         title = soup.title.string if soup.title else "No title"
+                         text = soup.get_text()[:500].strip()
+                         
+                         response_text = f"🌐 **{title}**\n\n{text}..."
+             except Exception as e:
+                 print(f"[ERROR] Scrape error: {e}")
+                 response_text = f"Scrape error: {str(e)}"
+
         # 6. GENERIC AUTOMATION (Fallback for others)
         elif trigger_type in ["chrome", "system", "app", "workflow", "whatsapp", "video", "switch"]:
              print(f"[SMART-TRIGGER] Detected {trigger_type} command: {command}")
@@ -4071,6 +4208,333 @@ def list_generated_images():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ==================== BEAST-LEVEL FEATURES ====================
+
+# --- MULTI-SOURCE MUSIC PLAYER ---
+@app.route('/api/v1/music/play', methods=['POST'])
+@require_api_key
+def play_music():
+    """Play music from YouTube, Spotify, or SoundCloud"""
+    try:
+        from Backend.MultiMusicPlayer import multi_music_player
+        
+        data = request.json
+        query = data.get('query', '')
+        source = data.get('source', 'auto')  # auto, youtube, spotify, soundcloud
+        
+        if not query:
+            return jsonify({"error": "Query required"}), 400
+        
+        result = multi_music_player.play(query, source)
+        
+        if result.get("status") == "success":
+            return jsonify({
+                "status": "success",
+                "type": "music",
+                "response": result.get("message"),
+                "music": result.get("music"),
+                "platform": result.get("platform")
+            })
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/music/sources', methods=['GET'])
+@require_api_key
+def list_music_sources():
+    """List available music sources"""
+    try:
+        from Backend.MultiMusicPlayer import multi_music_player
+        sources = multi_music_player.get_available_sources()
+        return jsonify({"status": "success", "sources": sources})
+    except Exception as e:
+        return jsonify({"sources": [
+            {"id": "youtube", "name": "YouTube", "icon": "🎬"},
+            {"id": "spotify", "name": "Spotify", "icon": "🎵"},
+            {"id": "soundcloud", "name": "SoundCloud", "icon": "🔊"}
+        ]})
+
+
+# --- LIVE TV & RADIO STREAMS ---
+@app.route('/api/v1/streams/radio', methods=['GET'])
+@require_api_key
+def list_radio_stations():
+    """List available radio stations"""
+    try:
+        from Backend.LiveStreamPlayer import live_stream_player
+        genre = request.args.get('genre')
+        stations = live_stream_player.get_radio_stations(genre)
+        return jsonify({"status": "success", "stations": stations})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/streams/tv', methods=['GET'])
+@require_api_key
+def list_tv_channels():
+    """List available TV channels"""
+    try:
+        from Backend.LiveStreamPlayer import live_stream_player
+        genre = request.args.get('genre')
+        channels = live_stream_player.get_tv_channels(genre)
+        return jsonify({"status": "success", "channels": channels})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/streams/play', methods=['POST'])
+@require_api_key
+def play_stream():
+    """Play a radio station or TV channel"""
+    try:
+        from Backend.LiveStreamPlayer import live_stream_player
+        
+        data = request.json
+        station_id = data.get('station_id')
+        query = data.get('query')
+        
+        if station_id:
+            result = live_stream_player.play_station(station_id)
+        elif query:
+            result = live_stream_player.play_by_query(query)
+        else:
+            return jsonify({"error": "station_id or query required"}), 400
+        
+        if result.get("status") == "success":
+            return jsonify({
+                "status": "success",
+                "type": "stream",
+                "response": result.get("message"),
+                "music": result.get("music"),
+                "stream_type": result.get("stream_type")
+            })
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/streams/genres', methods=['GET'])
+@require_api_key
+def list_stream_genres():
+    """List available stream genres"""
+    try:
+        from Backend.LiveStreamPlayer import live_stream_player
+        genres = live_stream_player.get_genres()
+        return jsonify({"status": "success", "genres": genres})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# --- AI CODE GENERATOR ---
+@app.route('/api/v1/code/generate', methods=['POST'])
+@require_api_key
+def generate_code():
+    """Generate code from natural language prompt"""
+    try:
+        from Backend.CodeExecutor import code_executor
+        
+        data = request.json
+        prompt = data.get('prompt', '')
+        language = data.get('language', 'python')
+        
+        if not prompt:
+            return jsonify({"error": "Prompt required"}), 400
+        
+        result = code_executor.generate_code(prompt, language)
+        
+        return jsonify({
+            "status": result.get("status"),
+            "type": "code_generation",
+            "code": result.get("code"),
+            "language": language,
+            "explanation": result.get("explanation"),
+            "error": result.get("error")
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/code/execute', methods=['POST'])
+@require_api_key
+def execute_code():
+    """Execute Python code safely"""
+    try:
+        from Backend.CodeExecutor import code_executor
+        
+        data = request.json
+        code = data.get('code', '')
+        language = data.get('language', 'python')
+        
+        if not code:
+            return jsonify({"error": "Code required"}), 400
+        
+        result = code_executor.execute(code, language)
+        
+        return jsonify({
+            "status": result.get("status"),
+            "type": "code_execution",
+            "output": result.get("output"),
+            "error": result.get("error"),
+            "execution_time": result.get("execution_time"),
+            "variables": result.get("variables", {})
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/code/generate-and-run', methods=['POST'])
+@require_api_key
+def generate_and_execute_code():
+    """Generate code from prompt AND execute it"""
+    try:
+        from Backend.CodeExecutor import code_executor
+        
+        data = request.json
+        prompt = data.get('prompt', '')
+        language = data.get('language', 'python')
+        
+        if not prompt:
+            return jsonify({"error": "Prompt required"}), 400
+        
+        result = code_executor.generate_and_execute(prompt, language)
+        
+        return jsonify({
+            "status": result.get("status"),
+            "type": "code_execution",
+            "response": result.get("message"),
+            "code": result.get("code"),
+            "output": result.get("output"),
+            "error": result.get("error"),
+            "execution_time": result.get("execution_time"),
+            "explanation": result.get("explanation")
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# --- YOUTUBE VIDEO SUMMARIZER ---
+@app.route('/api/v1/video/summarize', methods=['POST'])
+@require_api_key
+def summarize_video():
+    """Summarize a YouTube video"""
+    try:
+        from Backend.VideoSummarizer import video_summarizer
+        
+        data = request.json
+        url = data.get('url', '')
+        
+        if not url:
+            return jsonify({"error": "YouTube URL required"}), 400
+        
+        result = video_summarizer.summarize(url)
+        
+        if result.get("status") == "success":
+            return jsonify({
+                "status": "success",
+                "type": "video_summary",
+                "response": result.get("message"),
+                "title": result.get("title"),
+                "thumbnail": result.get("thumbnail"),
+                "summary": result.get("summary"),
+                "key_points": result.get("key_points"),
+                "target_audience": result.get("target_audience"),
+                "duration": result.get("duration"),
+                "url": result.get("url"),
+                "embed_url": result.get("embed_url")
+            })
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/video/transcript', methods=['POST'])
+@require_api_key
+def get_video_transcript():
+    """Get transcript of a YouTube video"""
+    try:
+        from Backend.VideoSummarizer import video_summarizer
+        
+        data = request.json
+        url = data.get('url', '')
+        
+        if not url:
+            return jsonify({"error": "YouTube URL required"}), 400
+        
+        result = video_summarizer.get_transcript_only(url)
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# --- WEBSITE CAPTURE (PDF & SCREENSHOT) ---
+@app.route('/api/v1/capture/pdf', methods=['POST'])
+@require_api_key
+def capture_url_as_pdf():
+    """Capture a website as a PDF with preview thumbnail"""
+    try:
+        from Backend.WebsiteCapture import website_capture
+        
+        data = request.json
+        url = data.get('url', '')
+        
+        if not url:
+            return jsonify({"error": "URL required"}), 400
+        
+        result = website_capture.url_to_pdf(url)
+        
+        if result.get("status") == "success":
+            return jsonify({
+                "status": "success",
+                "type": "pdf_capture",
+                "response": result.get("message"),
+                "title": result.get("title"),
+                "pdf_url": result.get("pdf_url"),
+                "thumbnail_url": result.get("thumbnail_url"),
+                "url": result.get("url"),
+                "page_count": result.get("page_count", 1)
+            })
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/capture/screenshot', methods=['POST'])
+@require_api_key
+def capture_url_as_screenshot():
+    """Take a screenshot of a website"""
+    try:
+        from Backend.WebsiteCapture import website_capture
+        
+        data = request.json
+        url = data.get('url', '')
+        full_page = data.get('full_page', True)
+        
+        if not url:
+            return jsonify({"error": "URL required"}), 400
+        
+        result = website_capture.url_to_screenshot(url, full_page)
+        
+        if result.get("status") == "success":
+            return jsonify({
+                "status": "success",
+                "type": "screenshot",
+                "response": result.get("message"),
+                "screenshot_url": result.get("screenshot_url"),
+                "url": result.get("url")
+            })
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================== END BEAST-LEVEL FEATURES ====================
 
 # --- FILE UPLOAD & ANALYSIS ---
 # @app.route('/api/v1/files/upload', methods=['POST'])
