@@ -2830,12 +2830,16 @@ Be informative, professional, and engaging. Do not use markdown formatting."""
                  }
                  
                  pdf_path = document_generator.generate_pdf(topic.title(), pdf_content)
+                 # Extract filename safely
+                 import os as os_module
+                 pdf_filename = os_module.path.basename(pdf_path)
+                 
                  # Return structured response for PDF preview card
                  return jsonify({
                      "response": f"📄 Generated PDF: **{topic.title()}**",
                      "type": "pdf",
                      "title": f"Report on {topic.title()}",
-                     "pdf_path": f"/data/Documents/{os.path.basename(pdf_path)}"
+                     "pdf_path": f"/data/Documents/{pdf_filename}"
                  }), 200
              except Exception as e:
                  print(f"[ERROR] Document generation failed: {e}")
