@@ -1626,14 +1626,24 @@ def chat():
                  
                  result = get_spotify_response(search_query)
                  
+                 # Debug logging
+                 print(f"[SPOTIFY] Search query: '{search_query}'")
+                 print(f"[SPOTIFY] Result status: {result.get('status')}")
+                 print(f"[SPOTIFY] Result keys: {list(result.keys())}")
+                 
                  if result.get("status") == "success" and result.get("spotify"):
+                     print(f"[SPOTIFY] ✅ Success! Returning Spotify embed")
                      return jsonify({
                          "response": result["message"],
                          "spotify": result["spotify"],
                          "type": "spotify"
                      }), 200
                  else:
-                     response_text = result.get("message", "Couldn't find that on Spotify")
+                     # Log why Spotify failed
+                     error_msg = result.get("error", result.get("message", "Unknown error"))
+                     print(f"[SPOTIFY] ❌ Failed: {error_msg}")
+                     print(f"[SPOTIFY] Falling back to YouTube...")
+                     response_text = f"Spotify search failed ({error_msg}), using YouTube instead"
              except Exception as e:
                  print(f"[ERROR] Spotify error: {e}")
                  import traceback
@@ -2740,15 +2750,28 @@ def chat():
                  ai_content = ""
                  try:
                      if ChatBot:
-                         ai_prompt = f"""Write a comprehensive 500-word article about {topic}. Structure it with:
-1. An engaging introduction (2-3 sentences)
-2. Overview section explaining what {topic} is
-3. Five key points about {topic} (one paragraph each)
-4. Practical applications and real-world examples
-5. A conclusion summarizing the main takeaways
+                         ai_prompt = f"""Write a comprehensive, detailed 800-word article about {topic}. Structure it professionally with:
 
-Be informative, professional, and engaging. Do not use markdown formatting."""
+1. **Introduction** (100 words): Hook the reader with an engaging opening that introduces {topic}
+
+2. **What is {topic}?** (150 words): Provide a clear, detailed explanation of what {topic} is, including its definition, origins, and significance
+
+3. **Key Aspects of {topic}** (400 words): Discuss 5-7 important points about {topic}, with each point explained in 50-80 words:
+   - Historical context or development
+   - Current applications and uses
+   - Benefits and advantages
+   - Challenges or limitations
+   - Future trends and predictions
+   - Real-world examples
+   - Expert perspectives
+
+4. **Practical Applications** (100 words): Describe how {topic} is used in everyday life, industry, or research with specific examples
+
+5. **Conclusion** (50 words): Summarize the key takeaways and importance of {topic}
+
+Write in a professional, informative tone. Use clear paragraphs. Do NOT use markdown, bullets, or special formatting - just plain text paragraphs."""
                          ai_content = ChatBot(ai_prompt)
+                         print(f"[PDF] AI generated {len(ai_content)} characters of content")
                  except Exception as ai_err:
                      print(f"[WARN] AI content generation failed: {ai_err}")
                  
