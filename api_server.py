@@ -2467,85 +2467,14 @@ def chat():
                          response_text = "📦 Extract: Right-click .zip file > Extract All"
                      
                      else:
-                         # Fall through to legacy FileIOAutomation
-                         raise ImportError("Use legacy module for this command")
-                         
-                 except ImportError:
-                     # Fall back to FileIOAutomation for other commands
-                     from Backend.FileIOAutomation import file_io
-                 
-                     if "create" in query_lower or "make" in query_lower:
-                         # Extract filename: "create file test.txt"
-                         filename = command.replace("create", "").replace("file", "").replace("make", "").strip()
-                         if not filename:
-                             filename = "new_file.txt"
-                         result = file_io.create_file(filename)
-                         response_text = result.get("message", f"Created {filename}")
-                     
-                     elif "delete" in query_lower or "remove" in query_lower:
-                         filename = command.replace("delete", "").replace("remove", "").replace("file", "").strip()
-                         result = file_io.delete_file(filename)
-                         response_text = result.get("message", f"Deleted {filename}")
-                     
-                     elif "read" in query_lower or "show" in query_lower:
-                         filename = command.replace("read", "").replace("show", "").replace("open", "").replace("file", "").strip()
-                         result = file_io.read_file(filename)
-                         if result.get("status") == "success":
-                             content = result.get("content", "")[:500]
-                             response_text = f"📄 **{filename}** ({result.get('size')} bytes):\n```\n{content}\n```"
-                         else:
-                             response_text = result.get("message", "File not found")
-                     
-                     elif "list" in query_lower:
-                         # Check for system folder listing
-                         folder_name = None
-                         for f in ["downloads", "documents", "desktop", "pictures", "videos", "music"]:
-                             if f in query_lower:
-                                 folder_name = f
-                                 break
-                         
-                         if folder_name:
-                             result = file_io.list_system_folder(folder_name)
-                             if result.get("status") == "success":
-                                 items = result.get("items", [])[:10]
-                                 item_list = "\n".join([f"• {i['name']} ({i['type']})" for i in items])
-                                 response_text = f"📁 **{folder_name.title()}** ({result.get('count')} items):\n{item_list}"
-                             else:
-                                 response_text = result.get("message")
-                         else:
-                             result = file_io.list_files()
-                             if result.get("status") == "success":
-                                 files = result.get("files", [])[:10]
-                                 file_list = "\n".join([f"• {f['name']} ({f['size']} bytes)" for f in files])
-                                 response_text = f"📁 Files in workspace ({result.get('count')} total):\n{file_list}"
-                             else:
-                                 response_text = result.get("message")
-                     
-                     elif "search" in query_lower or "find" in query_lower:
-                         search_query = command.replace("search", "").replace("find", "").replace("file", "").replace("files", "").strip()
-                         
-                         # Check if searching specific drive
-                         if " in d:" in query_lower or " on d:" in query_lower:
-                             result = file_io.search_drive(search_query, "D:")
-                         elif " in c:" in query_lower or " on c:" in query_lower:
-                             result = file_io.search_drive(search_query, "C:")
-                         else:
-                             # System-wide search (Downloads, Documents, Desktop, etc.)
-                             result = file_io.search_system(search_query)
-                         
-                         if result.get("status") == "success":
-                             results = result.get("results", [])[:5]
-                             if results:
-                                 res_list = "\n".join([f"• {r['name']} - {r.get('size', '')} ({r.get('path', '')[:50]}...)" for r in results])
-                                 response_text = f"🔍 Found {result.get('count')} files for '{search_query}':\n{res_list}"
-                             else:
-                                 response_text = f"No files found matching '{search_query}'"
-                         else:
-                             response_text = result.get("message")
-                     
-                     else:
-                         response_text = "📁 File commands: copy, move, rename, create, delete, list, search, select all, cut, paste, undo, redo, open folder"
+                        # Default file operation message
+                        response_text = "📁 File commands: copy, move, rename, create, delete, list, search, select all, cut, past, undo, redo, open folder"
 
+                 except ImportError:
+                     # Fall through to legacy FileIOAutomation
+                    # Fall through to RealtimeSearchEngine for web searches
+                    pass
+                         
              except Exception as e:
                  print(f"[ERROR] File operation failed: {e}")
                  response_text = f"File operation error: {str(e)}"

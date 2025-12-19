@@ -82,8 +82,8 @@ class SmartTrigger:
                     r"(?:jarvis\s+)?(?:rename|change name|call it)\s+(.+?)\s+(?:to|as)\s+(.+)",
                     # List/Show
                     r"(?:jarvis\s+)?(?:list|show|display|view|see|what's in)\s+(?:all\s+)?(?:files?|folders?|contents?)?\s*(?:in|of|from)?\s*(.+)?",
-                    # Search/Find
-                    r"(?:jarvis\s+)?(?:search|find|look for|locate|where is)\s+(?:the\s+)?(?:file|folder)?\s*(.+)",
+                    # Search/Find - require "file" keyword
+                    r"(?:jarvis\s+)?(?:search|find|look for|locate|where is)\s+(?:the\s+)?(?:file|folder)\s+(.+)",
                     # Open folder/explorer
                     r"(?:jarvis\s+)?(?:open|go to|navigate to|show me|browse)\s+(?:the\s+)?(?:folder|directory)?\s*(.+)?",
                     r"(?:jarvis\s+)?open\s+(?:file\s+)?(?:explorer|manager|finder)",
@@ -132,9 +132,9 @@ class SmartTrigger:
                     "what files", "what's in", "whats in", "contents", "view files",
                     "display files", "see files", "show me files", "list all",
                     "show all files", "show everything", "list everything",
-                    # Search/Find
-                    "search", "search file", "search files", "find", "find file",
-                    "locate", "where is", "look for", "search for", "find all",
+                    # Search/Find - SPECIFIC to file operations only
+                    "search file", "search files", "find file", "find files in",
+                    "locate file", "where is file", "look for file", "search for file", "find all files",
                     # Open/Navigate
                     "open folder", "open directory", "go to folder", "navigate",
                     "explorer", "file explorer", "file manager", "open explorer",
