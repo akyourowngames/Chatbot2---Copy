@@ -1,1 +1,1 @@
-web: gunicorn api_server:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --keep-alive 5
+web: PYTHONPATH=Organized_Project:$PYTHONPATH gunicorn api_server:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --keep-alive 5
