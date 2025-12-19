@@ -103,10 +103,134 @@
         }
 
         .glass-input {
-            background: rgba(31, 41, 55, 0.6);
-            backdrop-filter: blur(12px);
+            background: rgba(30, 32, 50, 0.7);
+            backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-input:focus-within {
+            border-color: rgba(139, 92, 246, 0.4);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* Holographic & Premium Messenger Bubbles */
+        .assistant-bubble {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .assistant-bubble::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            transition: 0.5s;
+        }
+
+        .assistant-bubble:hover::before {
+            left: 100%;
+        }
+
+        .user-bubble {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Animated Aurora Background for AI responses */
+        .aurora-glow {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%);
+            filter: blur(40px);
+            z-index: -1;
+            pointer-events: none;
+            animation: auroraMove 10s infinite alternate;
+        }
+
+        @keyframes auroraMove {
+            0% {
+                transform: translate(-20%, -20%) rotate(0deg);
+            }
+
+            100% {
+                transform: translate(20%, 20%) rotate(360deg);
+            }
+        }
+
+        /* AI Thinking State - Cinematic */
+        .thinking-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            width: fit-content;
+        }
+
+        .thinking-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            background: linear-gradient(90deg, #8b5cf6, #f472b6, #8b5cf6);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: textFlow 3s linear infinite;
+        }
+
+        @keyframes textFlow {
+            to {
+                background-position: 200% center;
+            }
+        }
+
+        .thinking-bar {
+            width: 40px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 1px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .thinking-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: #8b5cf6;
+            animation: processBar 1.5s infinite ease-in-out;
+        }
+
+        @keyframes processBar {
+            0% {
+                left: -100%;
+            }
+
+            50% {
+                left: 0;
+            }
+
+            100% {
+                left: 100%;
+            }
         }
 
         /* Code Block Styling */
@@ -171,8 +295,48 @@
         .typing-indicator {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 1rem;
+            gap: 12px;
+            padding: 16px;
+            opacity: 0.8;
+            transition: all 0.3s;
+        }
+
+        .typing-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(30, 41, 59, 0.4));
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .typing-avatar::after {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            z-index: -1;
+            opacity: 0.3;
+            filter: blur(4px);
+            animation: avatarPulse 2s infinite;
+        }
+
+        @keyframes avatarPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.2;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.4;
+            }
         }
 
         .typing-dots {
@@ -1457,10 +1621,16 @@
             contentWrapper.className = "flex-1 min-w-0";
 
             const contentDiv = document.createElement('div');
-            // Enhanced glassmorphism for both
+            // Enhanced holographic classes
             contentDiv.className = `message-bubble prose prose-invert max-w-none text-[15px] leading-relaxed transition-all duration-300 ${role === 'user'
-                ? 'bg-gray-800/60 backdrop-blur-md px-6 py-4 rounded-2xl rounded-tr-sm border border-white/10 shadow-lg'
-                : 'glass-panel px-6 py-4 rounded-2xl rounded-tl-sm border border-white/5 shadow-xl bg-gray-900/40'}`;
+                ? 'user-bubble px-6 py-4 rounded-2xl rounded-tr-sm text-white'
+                : 'assistant-bubble px-6 py-4 rounded-2xl rounded-tl-sm text-gray-100'}`;
+
+            if (role === 'assistant') {
+                const glow = document.createElement('div');
+                glow.className = 'aurora-glow';
+                contentWrapper.appendChild(glow);
+            }
 
             contentDiv.innerHTML = formatMessage(content);
 
@@ -1519,19 +1689,15 @@
             typingDiv.className = 'w-full animate-fade-in mt-4';
 
             typingDiv.innerHTML = `
-                <div class="max-w-4xl mx-auto flex gap-6">
-                    <div class="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-accent-600 to-indigo-600 text-white shadow-lg shadow-accent-500/20">
-                        <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <div class="typing-indicator" id="${id}">
+                    <div class="typing-avatar">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
                     </div>
-                    <div class="glass-panel px-6 py-4 rounded-2xl rounded-tl-sm border border-white/5 shadow-xl bg-gray-900/40">
-                        <div class="flex items-center gap-3">
-                            <div class="typing-dots">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </div>
-                            <span class="text-gray-400 text-sm">KAI is thinking...</span>
-                        </div>
+                    <div class="thinking-container">
+                        <span class="thinking-label">Intelligence Processing</span>
+                        <div class="thinking-bar"></div>
                     </div>
                 </div>
             `;

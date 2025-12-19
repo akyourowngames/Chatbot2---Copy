@@ -1473,8 +1473,9 @@ def chat():
         # === SMART MUSIC vs VIDEO vs SPOTIFY DETECTION ===
         if not trigger_type and ("play" in query_lower or "watch" in query_lower or "stream" in query_lower or "listen" in query_lower):
             
-            # 1. Spotify Priority
-            if "spotify" in query_lower:
+            # 1. Spotify Priority - Check for explicit Spotify request
+            spotify_patterns = ["spotify", "on spotify", "using spotify", "from spotify", "in spotify"]
+            if any(sp in query_lower for sp in spotify_patterns):
                 trigger_type = "spotify"
                 command = query
                 print(f"[PRE-CHECK] Smart detect: SPOTIFY")
@@ -1583,8 +1584,12 @@ def chat():
                      url = f"https://{url}" if '.' in url else f"https://google.com/search?q={url}"
                  
                  scraper = JarvisWebScraper()
+                 
+                 # Detect Deep Scrape
+                 is_deep = any(k in query_lower for k in ['deep', 'analyze', 'full', 'comprehensive', 'extensively'])
+                 
                  # Use new event loop for this sync request
-                 content = asyncio.run(scraper.scrape_to_markdown(url))
+                 content = asyncio.run(scraper.deep_scrape(url) if is_deep else scraper.scrape_to_markdown(url))
                  asyncio.run(scraper.close())
                  
                  # Parse metadata from content
@@ -1592,11 +1597,12 @@ def chat():
                  title = lines[0].replace("# ", "").strip() if len(lines) > 0 and lines[0].startswith("# ") else "Scraped Content"
                  
                  return jsonify({
-                     "response": f"I've scraped the content from {title}.",
+                     "response": f"I've {'deeply analyzed' if is_deep else 'scraped'} the content from {title}.",
                      "scrape_result": {
                          "title": title,
                          "url": url,
-                         "content": content
+                         "content": content,
+                         "is_deep": is_deep
                      },
                      "type": "scrape"
                  }), 200
@@ -1612,9 +1618,11 @@ def chat():
                  from Backend.SpotifyPlayer import get_spotify_response
                  
                  search_query = command if command else query
-                 # Clean up search query
-                 for word in ["play", "spotify", "music", "song", "listen to", "the"]:
-                     search_query = search_query.lower().replace(word, "").strip()
+                 # Clean up search query - remove trigger words and prepositions
+                 for word in ["play", "spotify", "on spotify", "music", "song", "listen to", "the", " on ", " from ", " in "]:
+                     search_query = search_query.lower().replace(word, " ").strip()
+                 # Clean up extra spaces
+                 search_query = " ".join(search_query.split())
                  
                  result = get_spotify_response(search_query)
                  
@@ -2822,7 +2830,13 @@ Be informative, professional, and engaging. Do not use markdown formatting."""
                  }
                  
                  pdf_path = document_generator.generate_pdf(topic.title(), pdf_content)
-                 response_text = f"I've generated a PDF about **{topic.title()}**. Saved at: `{pdf_path}`"
+                 # Return structured response for PDF preview card
+                 return jsonify({
+                     "response": f"📄 Generated PDF: **{topic.title()}**",
+                     "type": "pdf",
+                     "title": f"Report on {topic.title()}",
+                     "pdf_path": f"/data/Documents/{os.path.basename(pdf_path)}"
+                 }), 200
              except Exception as e:
                  print(f"[ERROR] Document generation failed: {e}")
                  import traceback

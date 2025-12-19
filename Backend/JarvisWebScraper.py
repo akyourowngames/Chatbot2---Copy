@@ -61,21 +61,66 @@ class JarvisWebScraper:
         content.append(f"# {title}\n")
         content.append(f"**URL:** {url}\n")
         
-        # Smart Content Extraction
-        main_content = soup.find('main') or soup.find('article') or soup.body
+        # Smart Content Extraction - Enhanced for more content
+        main_content = soup.find('main') or soup.find('article') or soup.find(class_=re.compile(r'content|article|post|entry')) or soup.body
         if main_content:
-            for tag in main_content.find_all(['h1', 'h2', 'h3', 'p', 'li']):
+            for tag in main_content.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'blockquote', 'pre', 'code', 'span', 'div']):
+                # Skip nested divs that contain other tags we'll process
+                if tag.name == 'div' and tag.find(['h1', 'h2', 'h3', 'h4', 'p', 'li']):
+                    continue
+                    
                 text = tag.get_text().strip()
-                if not text: continue
+                if not text or len(text) < 10: continue  # Skip short/empty content
                 
                 if tag.name == 'h1': content.append(f"# {text}")
                 elif tag.name == 'h2': content.append(f"## {text}")
                 elif tag.name == 'h3': content.append(f"### {text}")
+                elif tag.name in ['h4', 'h5', 'h6']: content.append(f"#### {text}")
                 elif tag.name == 'p': content.append(f"\n{text}\n")
                 elif tag.name == 'li': content.append(f"- {text}")
+                elif tag.name == 'blockquote': content.append(f"> {text}")
+                elif tag.name in ['pre', 'code']: content.append(f"```\n{text}\n```")
+                elif tag.name in ['span', 'div'] and len(text) > 50: content.append(f"\n{text}\n")
 
         markdown = "\n".join(content)
-        return markdown[:8000] # Limit to 8k chars
+        return markdown[:12000] # Limit to 12k chars for richer content
+
+    async def deep_scrape(self, url: str) -> str:
+        """Deep Intelligence: Scrape main page + crawl related internal links for maximum context"""
+        main_markdown = await self.scrape_to_markdown(url)
+        if "Error:" in main_markdown: return main_markdown
+
+        soup = BeautifulSoup(await self.fetch(url), 'html.parser')
+        links = []
+        domain = urlparse(url).netloc
+        
+        # Find 3-5 relevant internal links
+        for a in soup.find_all('a', href=True):
+            href = urljoin(url, a['href'])
+            if urlparse(href).netloc == domain and href != url and len(links) < 4:
+                if any(k in href.lower() for k in ['about', 'feature', 'product', 'guide', 'news', 'blog']):
+                    links.append(href)
+
+        # Scrape links in parallel
+        tasks = [self.scrape_to_markdown(link) for link in links]
+        sub_contents = await asyncio.gather(*tasks)
+
+        # Assemble Master Intelligence Report
+        deep_report = [
+            f"# DEEP INTELLIGENCE REPORT: {url}\n",
+            "## PRIMARY CONTENT",
+            main_markdown,
+            "\n---\n## KEY CONTEXT (CRAWLED DATA)",
+        ]
+
+        for i, sub_content in enumerate(sub_contents):
+            title = sub_content.split('\n')[0].replace("# ", "")
+            deep_report.append(f"### [Context {i+1}] {title}")
+            # Take only the first 1000 chars of sub-pages
+            snippet = sub_content.split('\n', 2)[-1][:1000]
+            deep_report.append(f"{snippet}...\n")
+
+        return "\n".join(deep_report)
 
     async def search_quick(self, query: str):
         """Ultra-fast search results extraction"""
@@ -103,9 +148,15 @@ class JarvisWebScraper:
     async def close(self):
         if self.session: await self.session.close()
 
+
 # Global instance
 jarvis_scraper = JarvisWebScraper()
 
 # Wrappers
-async def scrape_markdown(url): return await jarvis_scraper.scrape_to_markdown(url)
+async def scrape_markdown(url, deep=False): 
+    if deep:
+        return await jarvis_scraper.deep_scrape(url)
+    return await jarvis_scraper.scrape_to_markdown(url)
+
 async def quick_search(query): return await jarvis_scraper.search_quick(query)
+
