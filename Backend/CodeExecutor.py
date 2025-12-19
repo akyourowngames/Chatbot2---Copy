@@ -294,9 +294,169 @@ class CodeExecutor:
             "fastest": f"{min(times):.4f}s" if times else "N/A",
             "slowest": f"{max(times):.4f}s" if times else "N/A",
         }
+    
+    def generate_code(self, prompt: str, language: str = "python") -> Dict[str, Any]:
+        """
+        Generate code from natural language prompt using AI.
+        
+        Args:
+            prompt: Description of what the code should do
+            language: Target programming language (currently python)
+            
+        Returns:
+            Dictionary with generated code and explanation
+        """
+        try:
+            # Import LLM
+            try:
+                from Backend.LLM import ChatCompletion
+            except ImportError:
+                return {
+                    "status": "error",
+                    "error": "LLM not available for code generation"
+                }
+            
+            # Build the prompt for code generation
+            system_prompt = f"""You are an expert {language} programmer. Generate clean, efficient, and well-commented code based on the user's request.
+
+Rules:
+1. Write production-quality code
+2. Include helpful comments
+3. Use best practices for {language}
+4. Make the code self-contained (no external dependencies except standard library)
+5. Include example usage with print statements to show output
+6. If the task involves calculations, print the results
+
+Format your response as:
+```{language}
+# Your code here
+```
+
+EXPLANATION:
+Brief explanation of how the code works."""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Write {language} code to: {prompt}"}
+            ]
+            
+            response = ChatCompletion(messages, model="groq", text_only=True)
+            
+            # Extract code block from response
+            import re
+            code_pattern = rf'```(?:{language})?\s*([\s\S]*?)```'
+            code_match = re.search(code_pattern, response, re.IGNORECASE)
+            
+            if code_match:
+                generated_code = code_match.group(1).strip()
+            else:
+                # Try to find any code-like content
+                lines = response.split('\n')
+                code_lines = []
+                in_code = False
+                for line in lines:
+                    if line.strip().startswith(('def ', 'class ', 'import ', 'from ', '#')) or in_code:
+                        in_code = True
+                        code_lines.append(line)
+                    elif in_code and line.strip() == '':
+                        code_lines.append(line)
+                    elif in_code and not line.startswith(' ') and not line.startswith('\t'):
+                        if line.strip().startswith(('EXPLANATION', 'Output', 'Result')):
+                            break
+                        code_lines.append(line)
+                
+                generated_code = '\n'.join(code_lines).strip()
+            
+            if not generated_code:
+                return {
+                    "status": "error",
+                    "error": "Could not generate valid code from the prompt",
+                    "raw_response": response[:500]
+                }
+            
+            # Extract explanation
+            explanation = ""
+            if "EXPLANATION:" in response:
+                explanation = response.split("EXPLANATION:")[-1].strip()
+            elif "```" in response:
+                parts = response.split("```")
+                if len(parts) > 2:
+                    explanation = parts[-1].strip()
+            
+            return {
+                "status": "success",
+                "code": generated_code,
+                "language": language,
+                "explanation": explanation[:500] if explanation else "Code generated successfully.",
+                "prompt": prompt
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Code generation failed: {str(e)}"
+            }
+    
+    def generate_and_execute(self, prompt: str, language: str = "python") -> Dict[str, Any]:
+        """
+        Generate code from prompt AND execute it, returning both code and output.
+        
+        Args:
+            prompt: Description of what the code should do
+            language: Target programming language
+            
+        Returns:
+            Dictionary with generated code, output, and any errors
+        """
+        # Step 1: Generate the code
+        gen_result = self.generate_code(prompt, language)
+        
+        if gen_result.get("status") != "success":
+            return gen_result
+        
+        generated_code = gen_result["code"]
+        
+        # Step 2: Execute the generated code
+        exec_result = self.execute(generated_code, language)
+        
+        # Combine results
+        return {
+            "status": exec_result.get("status"),
+            "type": "code_execution",
+            "prompt": prompt,
+            "code": generated_code,
+            "language": language,
+            "output": exec_result.get("output", ""),
+            "error": exec_result.get("error"),
+            "execution_time": exec_result.get("execution_time"),
+            "variables": exec_result.get("variables", {}),
+            "explanation": gen_result.get("explanation", ""),
+            "message": self._format_code_response(generated_code, exec_result)
+        }
+    
+    def _format_code_response(self, code: str, exec_result: Dict) -> str:
+        """Format a nice response message for the chat"""
+        status_icon = "✅" if exec_result.get("status") == "success" else "❌"
+        
+        output = exec_result.get("output", "")
+        error = exec_result.get("error", "")
+        exec_time = exec_result.get("execution_time", 0)
+        
+        message = f"{status_icon} **Code Generated & Executed** ({exec_time:.3f}s)\n\n"
+        message += f"```python\n{code}\n```\n\n"
+        
+        if output:
+            message += f"**Output:**\n```\n{output}\n```"
+        
+        if error:
+            message += f"\n**Error:** {error}"
+        
+        return message
+
 
 # Global instance
 code_executor = CodeExecutor()
+
 
 if __name__ == "__main__":
     # Test Beast Mode features

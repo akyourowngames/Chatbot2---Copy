@@ -195,10 +195,30 @@ class SmartTrigger:
                 "keywords": [
                     "play radio", "stream radio", "live radio", "tune in",
                     "listen to radio", "lofi radio", "jazz radio", "classical radio",
-                    "play lofi", "stream lofi", "chill beats", "focus music radio",
+                    "stream lofi", "chill beats radio", "focus radio",
                     "watch news", "live news", "stream news", "live tv",
                     "watch tv", "stream tv", "news channel", "sky news", "bbc news",
-                    "ambient radio", "nature sounds", "rain sounds"
+                    "ambient radio", "nature sounds radio", "rain sounds radio"
+                ]
+            },
+            
+            # Spotify Music - NEW (for songs, artists, albums)
+            "spotify": {
+                "patterns": [
+                    r"(?:jarvis\s+)?(?:play|listen to)\s+(?:the\s+)?(?:song\s+)?(.+?)(?:\s+on\s+spotify)?",
+                    r"(?:jarvis\s+)?(?:spotify|music)\s+(.+)",
+                    r"(?:jarvis\s+)?(?:play|queue)\s+(?:some\s+)?(.+?)(?:\s+music)?",
+                ],
+                "keywords": [
+                    "play", "play music", "play song", "play songs", "listen to",
+                    "spotify", "on spotify", "play on spotify",
+                    "play artist", "play album", "play playlist",
+                    "queue", "queue song", "add to queue",
+                    "play drake", "play taylor", "play weeknd", "play ed sheeran",
+                    "play pop", "play rock", "play hip hop", "play jazz music",
+                    "play classical music", "play indie", "play electronic",
+                    "play lofi", "play chill", "play relaxing music",
+                    "what song", "next song", "skip song", "previous song"
                 ]
             },
             

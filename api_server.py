@@ -1470,29 +1470,40 @@ def chat():
                 command = query
                 print(f"[PRE-CHECK] Ambiguous search → defaulting to FILE search")
         
-        # === SMART MUSIC vs VIDEO DETECTION ===
-        # "play music/song" → music
-        # "play video" or "watch" → video
-        if not trigger_type and ("play" in query_lower or "watch" in query_lower):
-            music_words = ["music", "song", "audio", "track", "playlist", "album"]
-            video_words = ["video", "watch", "movie", "youtube video", "clip", "show me"]
+        # === SMART MUSIC vs VIDEO vs SPOTIFY DETECTION ===
+        if not trigger_type and ("play" in query_lower or "watch" in query_lower or "stream" in query_lower or "listen" in query_lower):
             
-            is_music = any(w in query_lower for w in music_words)
-            is_video = any(w in query_lower for w in video_words)
-            
-            if is_music and not is_video:
-                trigger_type = "music"
+            # 1. Spotify Priority
+            if "spotify" in query_lower:
+                trigger_type = "spotify"
                 command = query
-                print(f"[PRE-CHECK] Smart detect: MUSIC")
-            elif is_video and not is_music:
-                trigger_type = "video"
-                command = query
-                print(f"[PRE-CHECK] Smart detect: VIDEO")
-            elif "play" in query_lower and not is_video:
-                # Default "play X" to music
-                trigger_type = "music"
-                command = query
-                print(f"[PRE-CHECK] 'play' without context → MUSIC")
+                print(f"[PRE-CHECK] Smart detect: SPOTIFY")
+            else:
+                music_words = ["music", "song", "audio", "track", "playlist", "album"]
+                video_words = ["video", "watch", "movie", "youtube video", "clip", "show me"]
+                stream_words = ["radio", "stream", "live", "news", "tv", "channel", "broadcast"]
+                
+                is_music = any(w in query_lower for w in music_words)
+                is_video = any(w in query_lower for w in video_words)
+                is_stream = any(w in query_lower for w in stream_words)
+                
+                if is_stream:
+                    trigger_type = "stream"
+                    command = query
+                    print(f"[PRE-CHECK] Smart detect: STREAM")
+                elif is_music and not is_video:
+                    trigger_type = "music"
+                    command = query
+                    print(f"[PRE-CHECK] Smart detect: MUSIC")
+                elif is_video and not is_music:
+                    trigger_type = "video"
+                    command = query
+                    print(f"[PRE-CHECK] Smart detect: VIDEO")
+                elif "play" in query_lower and not is_video:
+                    # Default "play X" to music
+                    trigger_type = "music"
+                    command = query
+                    print(f"[PRE-CHECK] 'play' without context → MUSIC")
 
         # === LEGACY RESTORATION (FASTER) ===
         # Using SmartTrigger for instant, low-latency command detection.
@@ -1508,44 +1519,118 @@ def chat():
         response_text = ""
         
         # 1. MUSIC/MEDIA COMMANDS
+        # 1. MUSIC COMMANDS (YouTube/SoundCloud)
         if trigger_type == "music":
              print(f"[SMART-TRIGGER] Music command detected: {command}")
              try:
-                 from Backend.MusicPlayer import music_player
+                 from Backend.MultiMusicPlayer import multi_music_player
                  
-                 if "play" in query.lower():
-                     search_query = command if command and command.lower() not in ['music', 'song', 'track', 'audio'] else "lofi music"
-                     result_msg = music_player.play(search_query)
-                     response_text = f"🎵 {result_msg}"
-                 elif "pause" in query.lower():
-                     response_text = f"⏸️ {music_player.pause()}"
-                 elif "resume" in query.lower():
-                     response_text = f"▶️ {music_player.resume()}"
-                 elif "stop" in query.lower():
-                     response_text = f"⏹️ {music_player.stop()}"
-                 elif "next" in query.lower() or "skip" in query.lower():
-                     response_text = f"⏭️ {music_player.next_song()}"
-                 elif "lyrics" in query.lower():
-                     song_name = command or (music_player.current_song['title'] if music_player.current_song else None)
-                     if song_name:
-                         response_text = f"📖 {music_player.get_lyrics(song_name)}"
-                     else:
-                         response_text = "Which song's lyrics do you want?"
-                 elif "volume" in query.lower():
-                     import re as re_vol
-                     vol_match = re_vol.search(r'(\d+)', query)
-                     if vol_match:
-                         volume = int(vol_match.group(1))
-                         response_text = f"🔊 {music_player.set_volume(volume)}"
-                     else:
-                         response_text = "Specify volume (0-100)"
+                 search_query = command if command and command.lower() not in ['music', 'song', 'track', 'audio'] else "lofi music"
+                 
+                 # Play using auto source (YouTube/SoundCloud)
+                 result = multi_music_player.play(search_query, source="auto")
+                 
+                 if result.get("status") == "success":
+                     return jsonify({
+                         "response": result["message"],
+                         "music": result["music"],
+                         "type": "music"
+                     }), 200
                  else:
-                     # Default: try to play whatever was requested
-                     result_msg = music_player.play(command if command else "relaxing music")
-                     response_text = f"🎵 {result_msg}"
+                     response_text = result.get("error", "Could not play music.")
+                     
              except Exception as e:
                  print(f"[ERROR] Music player error: {e}")
+                 import traceback
+                 traceback.print_exc()
                  response_text = f"Music player error: {str(e)}"
+                 
+        # 1c. STREAM/RADIO COMMANDS (YouTube Live)
+        elif trigger_type == "stream":
+             print(f"[SMART-TRIGGER] Stream command detected: {command}")
+             try:
+                 from Backend.MultiMusicPlayer import multi_music_player
+                 
+                 search_query = command if command else "lofi hip hop radio"
+                 
+                 # Force YouTube for streams
+                 result = multi_music_player.play(search_query, source="youtube")
+                 
+                 if result.get("status") == "success":
+                     # Override type to 'stream' for different UI
+                     return jsonify({
+                         "response": result["message"].replace("Now playing", "Streaming"),
+                         "music": result["music"],
+                         "type": "stream"
+                     }), 200
+                 else:
+                     response_text = result.get("error", "Could not find stream.")
+                     
+             except Exception as e:
+                 print(f"[ERROR] Stream player error: {e}")
+                 response_text = f"Stream player error: {str(e)}"
+
+        # 1d. WEB SCRAPING
+        elif trigger_type == "scrape":
+             print(f"[SMART-TRIGGER] Scrape command detected: {command}")
+             try:
+                 import asyncio
+                 from Backend.JarvisWebScraper import JarvisWebScraper
+                 
+                 url = command.strip()
+                 # Basic URL cleanup
+                 if not url.startswith('http'):
+                     url = f"https://{url}" if '.' in url else f"https://google.com/search?q={url}"
+                 
+                 scraper = JarvisWebScraper()
+                 # Use new event loop for this sync request
+                 content = asyncio.run(scraper.scrape_to_markdown(url))
+                 asyncio.run(scraper.close())
+                 
+                 # Parse metadata from content
+                 lines = content.split('\n')
+                 title = lines[0].replace("# ", "").strip() if len(lines) > 0 and lines[0].startswith("# ") else "Scraped Content"
+                 
+                 return jsonify({
+                     "response": f"I've scraped the content from {title}.",
+                     "scrape_result": {
+                         "title": title,
+                         "url": url,
+                         "content": content
+                     },
+                     "type": "scrape"
+                 }), 200
+                     
+             except Exception as e:
+                 print(f"[ERROR] Scraper error: {e}")
+                 response_text = f"Scraper error: {str(e)}"
+
+        # 1b. SPOTIFY MUSIC (NEW - Uses Spotify API)
+        elif trigger_type == "spotify":
+             print(f"[SMART-TRIGGER] Spotify command detected: {command}")
+             try:
+                 from Backend.SpotifyPlayer import get_spotify_response
+                 
+                 search_query = command if command else query
+                 # Clean up search query
+                 for word in ["play", "spotify", "music", "song", "listen to", "the"]:
+                     search_query = search_query.lower().replace(word, "").strip()
+                 
+                 result = get_spotify_response(search_query)
+                 
+                 if result.get("status") == "success" and result.get("spotify"):
+                     return jsonify({
+                         "response": result["message"],
+                         "spotify": result["spotify"],
+                         "type": "spotify"
+                     }), 200
+                 else:
+                     response_text = result.get("message", "Couldn't find that on Spotify")
+             except Exception as e:
+                 print(f"[ERROR] Spotify error: {e}")
+                 import traceback
+                 traceback.print_exc()
+                 response_text = f"Spotify error: {str(e)}"
 
         
         # 2. IMAGE GENERATION (FIX)

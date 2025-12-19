@@ -87,3 +87,6 @@ psutil
 # ===== Production Server =====
 gunicorn>=21.0.0  # Linux/Mac WSGI server
 waitress>=2.1.0   # Windows WSGI server
+
+# ===== Beast-Level Features =====
+youtube-transcript-api>=0.6.0  # YouTube video summarizer
