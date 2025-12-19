@@ -70,8 +70,8 @@ CORS(app, resources={
 
 # ==================== SECURITY MIDDLEWARE ====================
 try:
-    from Backend.SecurityMiddleware import setup_security_middleware, add_security_headers
-    from Backend.RateLimiter import rate_limit, add_rate_limit_headers, configure_rate_limits
+    from Organized_Project.Backend.SecurityMiddleware import setup_security_middleware, add_security_headers
+    from Organized_Project.Backend.RateLimiter import rate_limit, add_rate_limit_headers, configure_rate_limits
     
     # Set up security middleware (headers, IP blocking, request validation)
     setup_security_middleware(app)
@@ -107,12 +107,12 @@ except ImportError as e:
 
 # Imports for Vision + File Upload (Optional - may not be available in cloud deployment)
 try:
-    from Backend.api.upload import upload_endpoint
-    from Backend.api.list import list_endpoint
-    from Backend.api.download import download_endpoint
-    from Backend.api.delete import delete_endpoint
-    from Backend.api.analyze import analyze_endpoint 
-    from Backend.api.analyze_image import analyze_image_endpoint
+    from Organized_Project.Backend.api.upload import upload_endpoint
+    from Organized_Project.Backend.api.list import list_endpoint
+    from Organized_Project.Backend.api.download import download_endpoint
+    from Organized_Project.Backend.api.delete import delete_endpoint
+    from Organized_Project.Backend.api.analyze import analyze_endpoint 
+    from Organized_Project.Backend.api.analyze_image import analyze_image_endpoint
     VISION_AVAILABLE = True
     print("[OK] Vision + File Upload modules loaded")
 except ImportError as e:
@@ -120,7 +120,7 @@ except ImportError as e:
     VISION_AVAILABLE = False
     upload_endpoint = list_endpoint = download_endpoint = delete_endpoint = None
     analyze_endpoint = analyze_image_endpoint = None
-# from Backend.Dispatcher import dispatcher # KAI Intelligence Engine (Bypassed)
+# from Organized_Project.Backend.Dispatcher import dispatcher # KAI Intelligence Engine (Bypassed)
 
 # ==================== HEALTH CHECK (CRITICAL) ====================
 @app.route("/health", methods=["GET"])
@@ -254,21 +254,21 @@ def get_module(name):
     
     if name == 'ChatBot':
         if not ChatBot:
-            from Backend.Chatbot_Enhanced import ChatBot as CB
+            from Organized_Project.Backend.Chatbot_Enhanced import ChatBot as CB
             ChatBot = CB
         return ChatBot
         
     if name == 'Automation':
         if not Automation:
-            from Backend.Automation import Automation as Aut
+            from Organized_Project.Backend.Automation import Automation as Aut
             Automation = Aut
         return Automation
 
     if name == 'firebase_auth':
         if not firebase_auth:
              try: 
-                from Backend.FirebaseAuth import FirebaseAuth
-                from Backend.FirebaseStorage import get_firebase_storage
+                from Organized_Project.Backend.FirebaseAuth import FirebaseAuth
+                from Organized_Project.Backend.FirebaseStorage import get_firebase_storage
                 fs = get_firebase_storage()
                 firebase_auth = FirebaseAuth(fs.db) if fs.db else None
              except Exception as firebase_err:
@@ -281,10 +281,10 @@ def get_module(name):
 # ==================== FIREBASE AUTHENTICATION & DAL ====================
 
 try:
-    from Backend.FirebaseAuth import FirebaseAuth
-    from Backend.FirebaseDAL import FirebaseDAL
-    from Backend.FirebaseStorage import get_firebase_storage
-    from Backend.SecurityManager import extract_user_from_token, verify_token
+    from Organized_Project.Backend.FirebaseAuth import FirebaseAuth
+    from Organized_Project.Backend.FirebaseDAL import FirebaseDAL
+    from Organized_Project.Backend.FirebaseStorage import get_firebase_storage
+    from Organized_Project.Backend.SecurityManager import extract_user_from_token, verify_token
     
     # Initialize Firebase
     firebase_storage = get_firebase_storage()
@@ -519,7 +519,7 @@ def auth_refresh():
             return jsonify({"error": "User not found"}), 404
         
         # Generate new access token
-        from Backend.SecurityManager import create_access_token
+        from Organized_Project.Backend.SecurityManager import create_access_token
         new_access_token = create_access_token(
             user_id,
             user_profile['email'],
@@ -663,7 +663,7 @@ def save_memory():
         if not content:
             return jsonify({"error": "Content required"}), 400
         
-        from Backend.Memory import memory_system
+        from Organized_Project.Backend.Memory import memory_system
         success = memory_system.remember(user_id, content, tags)
         
         if success:
@@ -687,7 +687,7 @@ def list_memories():
         
         limit = request.args.get('limit', 50, type=int)
         
-        from Backend.Memory import memory_system
+        from Organized_Project.Backend.Memory import memory_system
         memories_text = memory_system.recall(user_id, limit)
         
         return jsonify({
@@ -712,7 +712,7 @@ def search_memories():
         if not query:
             return jsonify({"error": "Query required"}), 400
         
-        from Backend.Memory import memory_system
+        from Organized_Project.Backend.Memory import memory_system
         results = memory_system.search_memories(user_id, query, limit)
         
         return jsonify({
@@ -731,7 +731,7 @@ def delete_memory(memory_id):
         user = get_current_user()
         user_id = user['user_id']
         
-        from Backend.Memory import memory_system
+        from Organized_Project.Backend.Memory import memory_system
         success = memory_system.delete_memory(user_id, memory_id)
         
         if success:
@@ -757,7 +757,7 @@ def get_chat_history():
         
         limit = request.args.get('limit', 50, type=int)
         
-        from Backend.ChatHistory import chat_history
+        from Organized_Project.Backend.ChatHistory import chat_history
         conversations = chat_history.get_conversations(user_id, limit)
         
         return jsonify({
@@ -779,7 +779,7 @@ def create_conversation():
         data = request.json
         title = data.get('title', 'New Conversation')
         
-        from Backend.ChatHistory import chat_history
+        from Organized_Project.Backend.ChatHistory import chat_history
         conv_id = chat_history.create_conversation(user_id, title)
         
         if conv_id:
@@ -812,7 +812,7 @@ def get_conversation(conversation_id):
         user = get_current_user()
         user_id = user['user_id']
         
-        from Backend.ChatHistory import chat_history
+        from Organized_Project.Backend.ChatHistory import chat_history
         conversation = chat_history.get_conversation(user_id, conversation_id)
         
         if conversation:
@@ -836,7 +836,7 @@ def delete_conversation(conversation_id):
         user = get_current_user()
         user_id = user['user_id']
         
-        from Backend.ChatHistory import chat_history
+        from Organized_Project.Backend.ChatHistory import chat_history
         success = chat_history.delete_conversation(user_id, conversation_id)
         
         if success:
@@ -866,7 +866,7 @@ def add_message(conversation_id):
         if not role or not content:
             return jsonify({"error": "Role and content required"}), 400
         
-        from Backend.ChatHistory import chat_history
+        from Organized_Project.Backend.ChatHistory import chat_history
         success = chat_history.add_message(user_id, conversation_id, role, content, metadata)
         
         if success:
@@ -898,7 +898,7 @@ def save_workflow():
         if not name or not steps:
             return jsonify({"error": "Name and steps required"}), 400
         
-        from Backend.WorkflowEngine import workflow_engine
+        from Organized_Project.Backend.WorkflowEngine import workflow_engine
         success = workflow_engine.create_workflow(name, description, steps, user_id)
         
         if success:
@@ -920,7 +920,7 @@ def list_workflows():
         user = get_current_user()
         user_id = user['user_id']
         
-        from Backend.WorkflowEngine import workflow_engine
+        from Organized_Project.Backend.WorkflowEngine import workflow_engine
         workflows = workflow_engine.list_workflows(user_id)
         
         return jsonify({
@@ -946,7 +946,7 @@ async def run_workflow():
         if not workflow_name:
             return jsonify({"error": "Workflow name required"}), 400
         
-        from Backend.WorkflowEngine import workflow_engine
+        from Organized_Project.Backend.WorkflowEngine import workflow_engine
         results = await workflow_engine.execute_workflow(workflow_name, user_id, parameters)
         
         return jsonify({
@@ -965,7 +965,7 @@ def get_workflow(workflow_id):
         user = get_current_user()
         user_id = user['user_id']
         
-        from Backend.WorkflowEngine import workflow_engine
+        from Organized_Project.Backend.WorkflowEngine import workflow_engine
         workflow = workflow_engine.get_workflow(workflow_id, user_id)
         
         if workflow:
@@ -989,7 +989,7 @@ def update_workflow(workflow_id):
         
         data = request.json
         
-        from Backend.WorkflowEngine import workflow_engine
+        from Organized_Project.Backend.WorkflowEngine import workflow_engine
         success = workflow_engine.update_workflow(workflow_id, data, user_id)
         
         if success:
@@ -1011,7 +1011,7 @@ def delete_workflow(workflow_id):
         user = get_current_user()
         user_id = user['user_id']
         
-        from Backend.WorkflowEngine import workflow_engine
+        from Organized_Project.Backend.WorkflowEngine import workflow_engine
         success = workflow_engine.delete_workflow(workflow_id, user_id)
         
         if success:
@@ -1036,7 +1036,7 @@ def web_music_play():
     The frontend handles actual playback in the browser.
     """
     try:
-        from Backend.WebMusicPlayer import get_music_response
+        from Organized_Project.Backend.WebMusicPlayer import get_music_response
         
         data = request.json
         query = data.get('query', '')
@@ -1120,7 +1120,7 @@ def generate_image_api():
 def list_smart_workflows():
     """List all available smart workflows"""
     try:
-        from Backend.SmartWorkflows import smart_workflows
+        from Organized_Project.Backend.SmartWorkflows import smart_workflows
         workflows = smart_workflows.list_workflows()
         return jsonify({
             "status": "success",
@@ -1188,7 +1188,7 @@ def execute_smart_workflow():
         if not workflow_name:
             return jsonify({"error": "Workflow name required"}), 400
         
-        from Backend.SmartWorkflows import smart_workflows
+        from Organized_Project.Backend.SmartWorkflows import smart_workflows
         
         # Find and execute
         workflow_key = smart_workflows.find_workflow(workflow_name)
@@ -1249,7 +1249,7 @@ def get_memory_summary():
         user = get_current_user()
         user_id = user['user_id']
         
-        from Backend.Memory import memory_system
+        from Organized_Project.Backend.Memory import memory_system
         # Assuming memory_system has a summary or count method, or we count manually
         if hasattr(memory_system, 'get_stats'):
             summary = memory_system.get_stats(user_id)
@@ -1275,7 +1275,7 @@ def delete_all_conversations():
         user = get_current_user()
         user_id = user['user_id']
         
-        from Backend.ChatHistory import chat_history
+        from Organized_Project.Backend.ChatHistory import chat_history
         success = chat_history.delete_all_conversations(user_id)
         
         if success:
@@ -1301,7 +1301,7 @@ def chat():
     if not ChatBot:
         print("[DEBUG] ChatBot not loaded, attempting to load...")
         try:
-            from Backend.Chatbot_Enhanced import ChatBot as CB
+            from Organized_Project.Backend.Chatbot_Enhanced import ChatBot as CB
             ChatBot = CB
             print("[SUCCESS] ChatBot module loaded successfully")
         except Exception as e:
@@ -1320,7 +1320,7 @@ def chat():
     if image_path:
         print(f"[VISION] Received image: {image_path}")
         try:
-            from Backend.vision.florence_inference import analyze_image_comprehensive
+            from Organized_Project.Backend.vision.florence_inference import analyze_image_comprehensive
             vision_result = analyze_image_comprehensive(image_path)
             
             if vision_result.get('error'):
@@ -1341,7 +1341,7 @@ def chat():
     music_triggers = ["play music", "play song", "play ", "listen to", "play me"]
     if any(trigger in query_lower for trigger in music_triggers):
         try:
-            from Backend.WebMusicPlayer import get_music_response
+            from Organized_Project.Backend.WebMusicPlayer import get_music_response
             music_result = get_music_response(query)
             if music_result.get("status") == "success":
                 return jsonify({
@@ -1361,7 +1361,7 @@ def chat():
         # Load recent chat history for LLM context
         chat_context = []
         try:
-            from Backend.Chatbot import chatlog_path
+            from Organized_Project.Backend.Chatbot import chatlog_path
             from json import load as json_load
             with open(chatlog_path, 'r') as f:
                 history = json_load(f)
@@ -1512,7 +1512,7 @@ def chat():
         
         # Use SmartTrigger only if pre-check didn't match
         if not trigger_type:
-            from Backend.SmartTrigger import smart_trigger
+            from Organized_Project.Backend.SmartTrigger import smart_trigger
             trigger_type, command, _ = smart_trigger.detect(query)
 
         
@@ -1524,7 +1524,7 @@ def chat():
         if trigger_type == "music":
              print(f"[SMART-TRIGGER] Music command detected: {command}")
              try:
-                 from Backend.MultiMusicPlayer import multi_music_player
+                 from Organized_Project.Backend.MultiMusicPlayer import multi_music_player
                  
                  search_query = command if command and command.lower() not in ['music', 'song', 'track', 'audio'] else "lofi music"
                  
@@ -1550,7 +1550,7 @@ def chat():
         elif trigger_type == "stream":
              print(f"[SMART-TRIGGER] Stream command detected: {command}")
              try:
-                 from Backend.MultiMusicPlayer import multi_music_player
+                 from Organized_Project.Backend.MultiMusicPlayer import multi_music_player
                  
                  search_query = command if command else "lofi hip hop radio"
                  
@@ -1576,7 +1576,7 @@ def chat():
              print(f"[SMART-TRIGGER] Scrape command detected: {command}")
              try:
                  import asyncio
-                 from Backend.JarvisWebScraper import JarvisWebScraper
+                 from Organized_Project.Backend.JarvisWebScraper import JarvisWebScraper
                  
                  url = command.strip()
                  # Basic URL cleanup
@@ -1615,7 +1615,7 @@ def chat():
         elif trigger_type == "spotify":
              print(f"[SMART-TRIGGER] Spotify command detected: {command}")
              try:
-                 from Backend.SpotifyPlayer import get_spotify_response
+                 from Organized_Project.Backend.SpotifyPlayer import get_spotify_response
                  
                  search_query = command if command else query
                  # Clean up search query - remove trigger words and prepositions
@@ -1656,7 +1656,7 @@ def chat():
              print(f"[SMART-TRIGGER] Image generation command: {command}")
              try:
                  import os
-                 from Backend.EnhancedImageGen import enhanced_image_gen
+                 from Organized_Project.Backend.EnhancedImageGen import enhanced_image_gen
                  
                  # Extract style from query
                  query_lower = query.lower()
@@ -1727,7 +1727,7 @@ def chat():
         elif trigger_type == "instagram":
              print(f"[SMART-TRIGGER] Instagram command: {command}")
              try:
-                 from Backend.InstagramAutomation import instagram
+                 from Organized_Project.Backend.InstagramAutomation import instagram
                  q = query.lower()
                  
                  if "dm" in q or "message" in q:
@@ -1810,7 +1810,7 @@ def chat():
         elif trigger_type == "whatsapp":
              print(f"[SMART-TRIGGER] WhatsApp command: {command}")
              try:
-                 from Backend.WhatsAppAutomation import whatsapp
+                 from Organized_Project.Backend.WhatsAppAutomation import whatsapp
                  import re
                  q = query.lower()
                  
@@ -1859,7 +1859,7 @@ def chat():
         # 4. MATH/CALCULATOR
         elif trigger_type == "math":
              try:
-                 from Backend.MathSolver import MathSolver
+                 from Organized_Project.Backend.MathSolver import MathSolver
                  solver = MathSolver()
                  result = solver.solve(command)
                  response_text = f"The answer is: {result}"
@@ -1869,7 +1869,7 @@ def chat():
         # 5. TRANSLATOR
         elif trigger_type == "translate":
              try:
-                 from Backend.Translator import Translator
+                 from Organized_Project.Backend.Translator import Translator
                  target_lang_code = "fr"  # Default to French
                  text_to_translate = command
                  
@@ -1900,7 +1900,7 @@ def chat():
         elif trigger_type == "stream":
              print(f"[SMART-TRIGGER] Stream command: {command}")
              try:
-                 from Backend.LiveStreamPlayer import live_stream_player
+                 from Organized_Project.Backend.LiveStreamPlayer import live_stream_player
                  
                  q = query.lower()
                  
@@ -1938,7 +1938,7 @@ def chat():
         elif trigger_type == "capture":
              print(f"[SMART-TRIGGER] Capture command: {command}")
              try:
-                 from Backend.WebsiteCapture import website_capture
+                 from Organized_Project.Backend.WebsiteCapture import website_capture
                  import re
                  
                  # Extract URL from command
@@ -1996,7 +1996,7 @@ def chat():
                  if url:
                      # Try enhanced scraper first
                      try:
-                         from Backend.EnhancedWebScraper import JarvisWebScraper
+                         from Organized_Project.Backend.EnhancedWebScraper import JarvisWebScraper
                          scraper = JarvisWebScraper()
                          result = scraper.scrape(url)
                          
@@ -2040,7 +2040,7 @@ def chat():
              try:
                  # Handle SYSTEM commands directly for immediate feedback
                  if trigger_type == "system":
-                     from Backend.UltimatePCControl import ultimate_pc
+                     from Organized_Project.Backend.UltimatePCControl import ultimate_pc
                      cmd_lower = command.lower() if command else ""
                      
                      if "battery" in cmd_lower or "power" in cmd_lower:
@@ -2066,7 +2066,7 @@ def chat():
                          response_text = f"🖥️ **System Health**\n- CPU: {stats['cpu']['total']}% | RAM: {stats['memory']['percent']}%\n- Hogs: {top_hogs}\n- Uptime: {stats['uptime']}"
                      elif "screenshot" in cmd_lower:
                          try:
-                             from Backend.ChromeAutomation import chrome_bot
+                             from Organized_Project.Backend.ChromeAutomation import chrome_bot
                              # Use advanced screenshot if chrome is active
                              result = chrome_bot.screenshot()
                              if result:
@@ -2088,10 +2088,10 @@ def chat():
                              pyautogui.screenshot(filename)
                              response_text = f"📸 Screenshot saved: {filename}"
                      elif "grid" in cmd_lower or "arrange" in cmd_lower:
-                         from Backend.WindowManager import grid_layout
+                         from Organized_Project.Backend.WindowManager import grid_layout
                          response_text = f"🪟 {grid_layout()}"
                      elif "split" in cmd_lower:
-                         from Backend.WindowManager import window_manager
+                         from Organized_Project.Backend.WindowManager import window_manager
                          response_text = f"🌓 {window_manager.split_screen()}"
                      elif "volume" in cmd_lower:
                          import keyboard
@@ -2104,7 +2104,7 @@ def chat():
                          response_text = "🔒 Screen locked"
                      else:
                          # Run through multi-tier automation
-                         from Backend.Automation import System as sys_auto
+                         from Organized_Project.Backend.Automation import System as sys_auto
                          res = sys_auto(command)
                          response_text = str(res) if res else f"✅ Executed: {command}"
                  
@@ -2189,7 +2189,7 @@ def chat():
                                  import subprocess
                                  import os
                                  # Use AutomationChain for robust opening and verification
-                                 from Backend.AutomationChain import automation_chain
+                                 from Organized_Project.Backend.AutomationChain import automation_chain
                                  
                                  success, msg = automation_chain.open_and_verify(app_name, app_name)
                                  if success:
@@ -2248,7 +2248,7 @@ def chat():
                  # Handle WORKFLOW commands with SmartWorkflows
                  elif trigger_type == "workflow":
                      try:
-                         from Backend.SmartWorkflows import smart_workflows
+                         from Organized_Project.Backend.SmartWorkflows import smart_workflows
                          
                          # Try to find matching workflow
                          workflow_key = smart_workflows.find_workflow(query)
@@ -2277,8 +2277,8 @@ def chat():
                 
                  # Handle CONFIRM commands (Yes/Proceed for pending actions)
                  elif trigger_type == "confirm":
-                     from Backend.AutomationChain import automation_chain
-                     from Backend.EmailAutomation import email_automation
+                     from Organized_Project.Backend.AutomationChain import automation_chain
+                     from Organized_Project.Backend.EmailAutomation import email_automation
                      
                      if automation_chain.has_pending():
                          success, msg = automation_chain.confirm_typing()
@@ -2292,7 +2292,7 @@ def chat():
                 
                  # Handle INTERACTION commands (Write/Save)
                  elif trigger_type == "interaction":
-                     from Backend.AutomationChain import automation_chain
+                     from Organized_Project.Backend.AutomationChain import automation_chain
                      
                      if any(k in query.lower() for k in ["save", "save as"]):
                          # SAVE operation
@@ -2308,7 +2308,7 @@ def chat():
                          prompt = f"Write {command}" # Reconstruct prompt
                          try:
                              # Use Simple ChatBot to generate content (Function based)
-                             from Backend.Chatbot import ChatBot as SimpleChatBot
+                             from Organized_Project.Backend.Chatbot import ChatBot as SimpleChatBot
                              gen_content = SimpleChatBot(prompt) 
                              
                              # Use prepare_typing for confirmation flow
@@ -2322,8 +2322,8 @@ def chat():
 
                  # Handle EMAIL commands
                  elif trigger_type == "email":
-                     from Backend.EmailAutomation import email_automation
-                     from Backend.Chatbot import ChatBot as SimpleChatBot
+                     from Organized_Project.Backend.EmailAutomation import email_automation
+                     from Organized_Project.Backend.Chatbot import ChatBot as SimpleChatBot
                      
                      # Parse recipient and subject from command
                      query_lower = query.lower()
@@ -2349,8 +2349,8 @@ def chat():
                 
                  # Handle FORM FILL commands
                  elif trigger_type == "form_fill":
-                     from Backend.UserProfile import user_profile
-                     from Backend.WebsiteAutomation import website_automation
+                     from Organized_Project.Backend.UserProfile import user_profile
+                     from Organized_Project.Backend.WebsiteAutomation import website_automation
                      
                      try:
                          # Get user's auto-fill data
@@ -2390,7 +2390,7 @@ def chat():
                  
                  # Try the new AdvancedFileOps first for enhanced commands
                  try:
-                     from Backend.BasicFileOps import file_ops
+                     from Organized_Project.Backend.BasicFileOps import file_ops
                      
                      # Keyboard shortcuts
                      if "select all" in query_lower:
@@ -2492,10 +2492,10 @@ def chat():
                      
                      # Use enhanced ProWebScraper
                      try:
-                         from Backend.ProWebScraper import pro_scraper
+                         from Organized_Project.Backend.ProWebScraper import pro_scraper
                          result = pro_scraper.scrape_smart(url)
                      except ImportError:
-                         from Backend.EnhancedWebScraper import EnhancedWebScraper
+                         from Organized_Project.Backend.EnhancedWebScraper import EnhancedWebScraper
                          scraper = EnhancedWebScraper()
                          result = scraper.scrape_url(url)
                      
@@ -2539,7 +2539,7 @@ def chat():
                      if "search" in query.lower():
                          search_term = query.lower().replace("search", "").replace("scrape", "").strip()
                          try:
-                             from Backend.ProWebScraper import pro_scraper
+                             from Organized_Project.Backend.ProWebScraper import pro_scraper
                              result = pro_scraper.search_google(search_term)
                              if result.get("status") == "success":
                                  results = result.get("results", [])[:3]
@@ -2561,7 +2561,7 @@ def chat():
         elif trigger_type == "code":
              print(f"[SMART-TRIGGER] Code command: {command}")
              try:
-                 from Backend.CodeEngine import code_engine
+                 from Organized_Project.Backend.CodeEngine import code_engine
                  query_lower = query.lower()
                  
                  # Determine code language
@@ -2667,7 +2667,7 @@ def chat():
         elif trigger_type == "document":
              print(f"[SMART-TRIGGER] Document generation: {command}")
              try:
-                 from Backend.DocumentGenerator import document_generator
+                 from Organized_Project.Backend.DocumentGenerator import document_generator
                  from datetime import datetime
                  
                  # Extract topic
@@ -2804,7 +2804,7 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
         elif trigger_type == "reminder":
              print(f"[SMART-TRIGGER] Reminder command: {command}")
              try:
-                 from Backend.TaskScheduler import task_scheduler
+                 from Organized_Project.Backend.TaskScheduler import task_scheduler
                  
                  # Start scheduler if not running
                  if not task_scheduler.is_running:
@@ -2825,7 +2825,7 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
         elif trigger_type == "action":
              print(f"[SMART-TRIGGER] Action chain: {command}")
              try:
-                 from Backend.ActionChain import action_chain
+                 from Organized_Project.Backend.ActionChain import action_chain
                  
                  result = action_chain.parse_and_execute(query)
                  
@@ -2841,7 +2841,7 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
         elif trigger_type == "gesture":
              print(f"[SMART-TRIGGER] Gesture command: {command}")
              try:
-                 from Backend.JarvisGesture import gesture_control
+                 from Organized_Project.Backend.JarvisGesture import gesture_control
                  query_lower = query.lower()
                  
                  if any(x in query_lower for x in ["stop", "disable", "turn off", "quit", "exit"]):
@@ -2867,7 +2867,7 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
              else:
                  # Lazy load ChatBot
                  print("[DEBUG] Loading ChatBot module")
-                 from Backend.Chatbot_Enhanced import ChatBot as CB
+                 from Organized_Project.Backend.Chatbot_Enhanced import ChatBot as CB
                  response_text = CB(query)
              
              print(f"[DEBUG] ChatBot Response: {response_text[:100] if response_text else 'None'}...")
@@ -2989,7 +2989,7 @@ def vision_analyze():
             
             # Save to history for context awareness
             try:
-                from Backend.Chatbot_Enhanced import add_interaction_to_history
+                from Organized_Project.Backend.Chatbot_Enhanced import add_interaction_to_history
                 # context_query = f"[User uploaded an image/screenshot] {query}"
                 # actually, usually query is "Describe this screen". 
                 # We'll tag it clearly.
@@ -3022,7 +3022,7 @@ def image_generate():
                     image_urls.append(f"/data/{img_filename}")
                 # Save to history for context
                 try:
-                    from Backend.Chatbot_Enhanced import add_interaction_to_history
+                    from Organized_Project.Backend.Chatbot_Enhanced import add_interaction_to_history
                     cmd = f"Generate {style} image of {prompt}"
                     # Add image markdown to response for history
                     response_md = f"Generated {style} image of {prompt}:\n\n![Generated Image]({image_urls[0]})"
@@ -3113,7 +3113,7 @@ def vqa_endpoint():
                 
                 # Save to history so the chatbot can "see" the image context in subsequent turns
                 try:
-                    from Backend.Chatbot_Enhanced import add_interaction_to_history
+                    from Organized_Project.Backend.Chatbot_Enhanced import add_interaction_to_history
                     # Format a context entry
                     user_msg = f"[Image Upload] {question}"
                     # result contains 'answer' which is the AI response
@@ -3342,7 +3342,7 @@ def automation_execute():
             
             # Save to history
             try:
-                from Backend.Chatbot_Enhanced import add_interaction_to_history
+                from Organized_Project.Backend.Chatbot_Enhanced import add_interaction_to_history
                 cmd_str = ", ".join(commands)
                 add_interaction_to_history(f"Execute automation: {cmd_str}", f"✅ Executed automation commands: {cmd_str}")
             except Exception:
@@ -3367,7 +3367,7 @@ def workflow_run():
             
             # Save to history
             try:
-                from Backend.Chatbot_Enhanced import add_interaction_to_history
+                from Organized_Project.Backend.Chatbot_Enhanced import add_interaction_to_history
                 add_interaction_to_history(f"Run workflow: {workflow}", f"✅ Workflow executed: {result}")
             except Exception:
                 pass
@@ -3402,7 +3402,7 @@ def search_realtime():
 def data_live():
     """Get live data for dashboard (Crypto, Weather, etc.)"""
     try:
-        from Backend.RealtimeSearchEngine import fetch_crypto_price
+        from Organized_Project.Backend.RealtimeSearchEngine import fetch_crypto_price
         
         # Bitcoin
         btc_price = fetch_crypto_price("bitcoin")
@@ -3447,7 +3447,7 @@ def reminders():
                 
                 # Save to history
                 try:
-                    from Backend.Chatbot_Enhanced import add_interaction_to_history
+                    from Organized_Project.Backend.Chatbot_Enhanced import add_interaction_to_history
                     add_interaction_to_history(f"Set reminder: {text} at {time_str}", f"✅ {msg}")
                 except Exception:
                     pass
@@ -3995,7 +3995,7 @@ def web_scrape():
 def chrome_control():
     """Control Chrome browser"""
     try:
-        from Backend.ChromeAutomation import chrome_bot, chrome_search, chrome_open, chrome_command
+        from Organized_Project.Backend.ChromeAutomation import chrome_bot, chrome_search, chrome_open, chrome_command
     except ImportError as e:
         return jsonify({"error": f"Chrome Automation not available: {str(e)}"}), 503
     
@@ -4272,7 +4272,7 @@ def list_generated_images():
 def play_music():
     """Play music from YouTube, Spotify, or SoundCloud"""
     try:
-        from Backend.MultiMusicPlayer import multi_music_player
+        from Organized_Project.Backend.MultiMusicPlayer import multi_music_player
         
         data = request.json
         query = data.get('query', '')
@@ -4302,7 +4302,7 @@ def play_music():
 def list_music_sources():
     """List available music sources"""
     try:
-        from Backend.MultiMusicPlayer import multi_music_player
+        from Organized_Project.Backend.MultiMusicPlayer import multi_music_player
         sources = multi_music_player.get_available_sources()
         return jsonify({"status": "success", "sources": sources})
     except Exception as e:
@@ -4319,7 +4319,7 @@ def list_music_sources():
 def list_radio_stations():
     """List available radio stations"""
     try:
-        from Backend.LiveStreamPlayer import live_stream_player
+        from Organized_Project.Backend.LiveStreamPlayer import live_stream_player
         genre = request.args.get('genre')
         stations = live_stream_player.get_radio_stations(genre)
         return jsonify({"status": "success", "stations": stations})
@@ -4331,7 +4331,7 @@ def list_radio_stations():
 def list_tv_channels():
     """List available TV channels"""
     try:
-        from Backend.LiveStreamPlayer import live_stream_player
+        from Organized_Project.Backend.LiveStreamPlayer import live_stream_player
         genre = request.args.get('genre')
         channels = live_stream_player.get_tv_channels(genre)
         return jsonify({"status": "success", "channels": channels})
@@ -4343,7 +4343,7 @@ def list_tv_channels():
 def play_stream():
     """Play a radio station or TV channel"""
     try:
-        from Backend.LiveStreamPlayer import live_stream_player
+        from Organized_Project.Backend.LiveStreamPlayer import live_stream_player
         
         data = request.json
         station_id = data.get('station_id')
@@ -4375,7 +4375,7 @@ def play_stream():
 def list_stream_genres():
     """List available stream genres"""
     try:
-        from Backend.LiveStreamPlayer import live_stream_player
+        from Organized_Project.Backend.LiveStreamPlayer import live_stream_player
         genres = live_stream_player.get_genres()
         return jsonify({"status": "success", "genres": genres})
     except Exception as e:
@@ -4388,7 +4388,7 @@ def list_stream_genres():
 def generate_code():
     """Generate code from natural language prompt"""
     try:
-        from Backend.CodeExecutor import code_executor
+        from Organized_Project.Backend.CodeExecutor import code_executor
         
         data = request.json
         prompt = data.get('prompt', '')
@@ -4416,7 +4416,7 @@ def generate_code():
 def execute_code():
     """Execute Python code safely"""
     try:
-        from Backend.CodeExecutor import code_executor
+        from Organized_Project.Backend.CodeExecutor import code_executor
         
         data = request.json
         code = data.get('code', '')
@@ -4444,7 +4444,7 @@ def execute_code():
 def generate_and_execute_code():
     """Generate code from prompt AND execute it"""
     try:
-        from Backend.CodeExecutor import code_executor
+        from Organized_Project.Backend.CodeExecutor import code_executor
         
         data = request.json
         prompt = data.get('prompt', '')
@@ -4476,7 +4476,7 @@ def generate_and_execute_code():
 def summarize_video():
     """Summarize a YouTube video"""
     try:
-        from Backend.VideoSummarizer import video_summarizer
+        from Organized_Project.Backend.VideoSummarizer import video_summarizer
         
         data = request.json
         url = data.get('url', '')
@@ -4511,7 +4511,7 @@ def summarize_video():
 def get_video_transcript():
     """Get transcript of a YouTube video"""
     try:
-        from Backend.VideoSummarizer import video_summarizer
+        from Organized_Project.Backend.VideoSummarizer import video_summarizer
         
         data = request.json
         url = data.get('url', '')
@@ -4532,7 +4532,7 @@ def get_video_transcript():
 def capture_url_as_pdf():
     """Capture a website as a PDF with preview thumbnail"""
     try:
-        from Backend.WebsiteCapture import website_capture
+        from Organized_Project.Backend.WebsiteCapture import website_capture
         
         data = request.json
         url = data.get('url', '')
@@ -4564,7 +4564,7 @@ def capture_url_as_pdf():
 def capture_url_as_screenshot():
     """Take a screenshot of a website"""
     try:
-        from Backend.WebsiteCapture import website_capture
+        from Organized_Project.Backend.WebsiteCapture import website_capture
         
         data = request.json
         url = data.get('url', '')
@@ -5473,19 +5473,19 @@ def load_all_integrations():
 
     # Special instantiations
     try:
-        from Backend.FileManager import FileManager
+        from Organized_Project.Backend.FileManager import FileManager
         gl['file_manager'] = FileManager()
         print("[OK] Loaded file_manager")
     except Exception as e: print(f"[FAIL] file_manager: {e}")
 
     try:
-        from Backend.VideoPlayer import get_video_player
+        from Organized_Project.Backend.VideoPlayer import get_video_player
         gl['video_player'] = get_video_player()
         print("[OK] Loaded video_player")
     except Exception as e: print(f"[FAIL] video_player: {e}")
 
     try:
-        from Backend.UltimatePCControl import UltimatePCControl
+        from Organized_Project.Backend.UltimatePCControl import UltimatePCControl
         gl['ultimate_pc'] = UltimatePCControl()
         print("[OK] Loaded ultimate_pc")
     except: pass
@@ -5528,7 +5528,7 @@ def start_api_server(port=5000, debug=False):
             asyncio.set_event_loop(loop)
             
             # Initialize RealtimeSync with database
-            from Backend.RealtimeSync import initialize_realtime_sync
+            from Organized_Project.Backend.RealtimeSync import initialize_realtime_sync
             if firebase_storage and firebase_storage.db:
                 rs = initialize_realtime_sync(firebase_storage.db, 8765)
                 # Run the server
