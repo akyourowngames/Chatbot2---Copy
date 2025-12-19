@@ -1,2 +1,0 @@
-# Instagram Automation Dependencies
-instagrapi>=1.16.51
