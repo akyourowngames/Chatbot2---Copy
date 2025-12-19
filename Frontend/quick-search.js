@@ -5,7 +5,7 @@
 
 class QuickSearch {
     constructor() {
-        this.API_URL = 'http://localhost:5000/api/v1';
+        this.API_URL = 'https://kai-api-nxxv.onrender.com/api/v1';
         this.API_KEY = 'demo_key_12345';
         this.isOpen = false;
         this.selectedIndex = 0;
