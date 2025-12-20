@@ -1611,6 +1611,58 @@ def chat():
                  print(f"[ERROR] Scraper error: {e}")
                  response_text = f"Scraper error: {str(e)}"
 
+        # RAG (Chat with Documents) - Handles PDF URLs and document chat
+        elif trigger_type == "rag":
+             print(f"[SMART-TRIGGER] RAG command detected: {command}")
+             try:
+                 from Backend.DocumentRAG import document_rag
+                 
+                 # Extract URL from command
+                 import re
+                 url_match = re.search(r'https?://[^\s]+', command or query)
+                 
+                 if url_match:
+                     url = url_match.group(0)
+                     # Upload and process the URL
+                     result = document_rag.upload_url(url)
+                     
+                     if result.get("status") == "success":
+                         # Now chat with it to summarize
+                         chat_result = document_rag.chat_with_document("Please provide a comprehensive summary of this document.")
+                         
+                         summary = chat_result.get("response", "Document uploaded successfully!")
+                         
+                         return jsonify({
+                             "response": f"📄 **{result.get('title', 'Document')}**\n\n{summary}",
+                             "type": "rag",
+                             "rag_result": {
+                                 "doc_id": result.get("doc_id"),
+                                 "title": result.get("title"),
+                                 "char_count": result.get("char_count"),
+                                 "summary": result.get("summary"),
+                                 "suggested_questions": result.get("suggested_questions", [])
+                             }
+                         }), 200
+                     else:
+                         response_text = result.get("message", "Failed to process document")
+                 else:
+                     # No URL found - might be a follow-up question
+                     chat_result = document_rag.chat_with_document(command or query)
+                     if chat_result.get("status") == "success":
+                         return jsonify({
+                             "response": chat_result.get("response"),
+                             "type": "rag_chat",
+                             "documents_used": chat_result.get("documents_used", [])
+                         }), 200
+                     else:
+                         response_text = chat_result.get("message", "No document loaded for chat")
+                         
+             except Exception as e:
+                 print(f"[ERROR] RAG error: {e}")
+                 import traceback
+                 traceback.print_exc()
+                 response_text = f"Document processing error: {str(e)}"
+
         # 1b. SPOTIFY MUSIC (NEW - Uses Spotify API)
         elif trigger_type == "spotify":
              print(f"[SMART-TRIGGER] Spotify command detected: {command}")

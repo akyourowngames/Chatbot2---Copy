@@ -172,6 +172,21 @@ def FirstLayerDMM(prompt: str = "test"):
                 return [f"system switch to {app_name}"]
             elif "list" in prompt_lower:
                 return ["system list apps"]
+        
+        elif trigger_type == "rag":
+            # Handle RAG (Chat with Documents) - NEW
+            return [f"rag {command}"]
+    
+    # AUTO-DETECT PDF/SUPABASE URLs in message (for direct URL summarization)
+    import re
+    url_match = re.search(r'https?://[^\s]+\.pdf', prompt, re.IGNORECASE)
+    supabase_match = re.search(r'https?://[^\s]*supabase[^\s]*', prompt, re.IGNORECASE)
+    
+    if url_match or supabase_match:
+        matched_url = url_match.group(0) if url_match else supabase_match.group(0)
+        # Check if user wants to summarize or chat with it
+        if any(word in prompt_lower for word in ['summarize', 'summarise', 'sum up', 'summary', 'chat', 'read', 'add', 'upload', 'analyze', 'analyse']):
+            return [f"rag upload {matched_url}"]
     
     # FAST REGEX PATTERNS (50-100ms response)
     if "time" in prompt_lower and "what" in prompt_lower:
