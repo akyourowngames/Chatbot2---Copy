@@ -302,7 +302,44 @@ class DocumentGenerator:
                     p.space_after = Pt(10)
 
         prs.save(filepath)
-        return filepath
+        
+        # Upload to Supabase in production
+        pptx_url = None
+        if os.getenv('FLASK_ENV') == 'production' or os.getenv('USE_SUPABASE_STORAGE', 'false').lower() == 'true':
+            try:
+                from Backend.SupabaseDB import supabase_db
+                if supabase_db:
+                    print(f"[DocumentGenerator] Uploading PPTX to Supabase...")
+                    # Use generic file upload for PPTX (content type is openxmlformats)
+                    storage_path = f"documents/{filename}"
+                    pptx_url = supabase_db.upload_file(
+                        filepath, 
+                        storage_path, 
+                        bucket='kai-files',
+                        content_type='application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                    )
+                    
+                    if pptx_url:
+                        print(f"[DocumentGenerator] Uploaded to: {pptx_url}")
+                        # Delete local file after upload
+                        os.remove(filepath)
+                    else:
+                        print(f"[DocumentGenerator] Upload failed, keeping local file")
+                        pptx_url = f"/data/Documents/{filename}"
+            except Exception as e:
+                print(f"[DocumentGenerator] Supabase upload error: {e}, using local path")
+                pptx_url = f"/data/Documents/{filename}"
+        else:
+            # Local development
+            pptx_url = f"/data/Documents/{filename}"
+
+        return {
+            "filepath": filepath if os.path.exists(filepath) else None,
+            "url": pptx_url,
+            "filename": filename,
+            "title": title,
+            "type": "pptx"
+        }
 
     def create_document(self, topic: str, doc_type: str = "pdf") -> str:
         """

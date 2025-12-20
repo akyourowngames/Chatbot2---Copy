@@ -369,13 +369,41 @@ class WebsiteCapture:
                 with open(screenshot_path, 'wb') as f:
                     f.write(img_response.content)
                 
-                screenshot_relative = f"/data/Captures/{screenshot_filename}"
-                
+                # Upload to Supabase in production
+                cloud_url = None
+                if os.getenv('FLASK_ENV') == 'production' or os.getenv('USE_SUPABASE_STORAGE', 'false').lower() == 'true':
+                    try:
+                        from Backend.SupabaseDB import supabase_db
+                        if supabase_db:
+                            print(f"[WebsiteCapture] Uploading screenshot to Supabase...")
+                            
+                            # Use upload_file for generic file upload (since it's a PNG, not PDF)
+                            storage_path = f"captures/screenshots/{screenshot_filename}"
+                            cloud_url = supabase_db.upload_file(
+                                screenshot_path, 
+                                storage_path, 
+                                bucket='kai-files', 
+                                content_type='image/png'
+                            )
+                            
+                            if cloud_url:
+                                print(f"[WebsiteCapture] Uploaded screenshot to: {cloud_url}")
+                                # Delete local file after upload
+                                os.remove(screenshot_path)
+                            else:
+                                print(f"[WebsiteCapture] Screenshot upload failed, keeping local file")
+                                cloud_url = screenshot_relative
+                    except Exception as e:
+                        print(f"[WebsiteCapture] Supabase upload error: {e}, using local path")
+                        cloud_url = screenshot_relative
+                else:
+                    cloud_url = screenshot_relative
+
                 return {
                     "status": "success",
                     "message": f"📸 Captured screenshot of: **{url}**",
-                    "screenshot_path": screenshot_path,
-                    "screenshot_url": screenshot_relative,
+                    "screenshot_path": screenshot_path if not cloud_url.startswith('http') else None,
+                    "screenshot_url": cloud_url,
                     "url": url,
                     "type": "screenshot"
                 }

@@ -1474,6 +1474,8 @@
         }
         function saveChatHistory(message, response) {
             if (window.authClient && window.authClient.isAuthenticated()) return;
+
+            // 1. Save Header/Metadata
             const chatData = {
                 id: currentChatId,
                 title: message.substring(0, 30) + '...',
@@ -1482,11 +1484,60 @@
             };
             let history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
             const existingIndex = history.findIndex(c => c.id === currentChatId);
-            if (existingIndex > -1) history[existingIndex] = chatData;
-            else history.unshift(chatData);
+            if (existingIndex > -1) {
+                history[existingIndex] = { ...history[existingIndex], ...chatData };
+            } else {
+                history.unshift(chatData);
+            }
             localStorage.setItem('chatHistory', JSON.stringify(history));
+
+            // 2. Save Actual Content (Messages)
+            const contentKey = `chat_content_${currentChatId}`;
+            let content = JSON.parse(localStorage.getItem(contentKey) || '[]');
+
+            // Add User Message
+            content.push({ role: 'user', content: message, timestamp: Date.now() });
+
+            // Add Assistant Message (with potential images/links)
+            content.push({ role: 'assistant', content: response, timestamp: Date.now() });
+
+            localStorage.setItem(contentKey, JSON.stringify(content));
+
             loadChatHistoryLocal();
         }
+
+        // Load a specific conversation
+        function loadConversation(chatId) {
+            currentChatId = chatId;
+            console.log('Loading conversation:', chatId);
+
+            // 1. Update UI Selection
+            loadChatHistoryLocal();
+
+            // 2. Clear current view
+            const messagesDiv = document.getElementById('messages');
+            const welcome = document.getElementById('welcome');
+            if (welcome) welcome.style.display = 'none'; // Hide welcome
+
+            // Remove all existing message bubbles
+            const existingMsgs = messagesDiv.querySelectorAll('.message-animated');
+            existingMsgs.forEach(el => el.remove());
+
+            // 3. Load & Render Content
+            const contentKey = `chat_content_${chatId}`;
+            const content = JSON.parse(localStorage.getItem(contentKey) || '[]');
+
+            if (content.length === 0) {
+                // If empty or lost, maybe show welcome?
+                // For now, do nothing
+            } else {
+                content.forEach(msg => {
+                    // Re-render message
+                    addMessage(msg.role, msg.content);
+                });
+            }
+        }
+
 
         function loadChatHistoryLocal() {
             const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
@@ -1854,7 +1905,9 @@
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const response = await fetch(`${API_URL}/analyze-image`, {
+                formData.append('auto_analyze', 'true');
+
+                const response = await fetch(`${API_URL}/files/upload`, {
                     method: 'POST',
                     body: formData
                 });
@@ -1903,8 +1956,9 @@
                 const data = await response.json();
                 removeTypingIndicator(typingId);
 
-                if (data.status === 'success') {
-                    addMessage('assistant', `✅ File uploaded: ${data.file.name}`);
+                if (data.success) {
+                    const fileUrl = data.file.url || data.file.filepath;
+                    addMessage('assistant', `✅ File uploaded: [${data.file.name}](${fileUrl})`);
                 } else {
                     addMessage('assistant', `❌ Upload failed: ${data.error}`);
                 }

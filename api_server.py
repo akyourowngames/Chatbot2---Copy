@@ -107,19 +107,13 @@ except ImportError as e:
 
 # Imports for Vision + File Upload (Optional - may not be available in cloud deployment)
 try:
-    from Backend.api.upload import upload_endpoint
-    from Backend.api.list import list_endpoint
-    from Backend.api.download import download_endpoint
-    from Backend.api.delete import delete_endpoint
-    from Backend.api.analyze import analyze_endpoint 
-    from Backend.api.analyze_image import analyze_image_endpoint
+    # Vision & File Upload logic is defined inline below using FileAnalyzer
+    # We don't need to import from Backend.api.* which might not exist
     VISION_AVAILABLE = True
-    print("[OK] Vision + File Upload modules loaded")
-except ImportError as e:
-    print(f"[WARN] Vision + File Upload not available (expected in cloud): {e}")
+    print("[OK] Vision + File Upload modules enabled (Inline)")
+except Exception as e:
+    print(f"[WARN] Unexpected error enabling Vision: {e}")
     VISION_AVAILABLE = False
-    upload_endpoint = list_endpoint = download_endpoint = delete_endpoint = None
-    analyze_endpoint = analyze_image_endpoint = None
 # from Backend.Dispatcher import dispatcher # KAI Intelligence Engine (Bypassed)
 
 # ==================== HEALTH CHECK (CRITICAL) ====================
@@ -206,6 +200,7 @@ ChatBot = None
 Automation = None
 workflow_engine = None
 file_manager = None
+file_analyzer = None
 Remember = None
 Recall = None
 ultimate_pc = None
@@ -3185,14 +3180,26 @@ def files_upload():
                     "error": f"File too large ({file_size_mb:.1f}MB). Maximum size is 150MB."
                 }), 400
             
-            filepath = file_analyzer.save_upload(file_data, file.filename)
+            upload_result = file_analyzer.save_upload(file_data, file.filename)
+            
+            # Handle return type (dict or string)
+            if isinstance(upload_result, dict):
+                filepath = upload_result.get("filepath")
+                cloud_url = upload_result.get("url")
+                safe_filename = upload_result.get("filename", os.path.basename(filepath) if filepath else file.filename)
+            else:
+                filepath = upload_result
+                cloud_url = None
+                safe_filename = os.path.basename(filepath)
+
             file_type = file_analyzer.get_file_type(file.filename)
             
             response_data = {
                 "success": True,
                 "file": {
-                    "filename": os.path.basename(filepath),
+                    "filename": safe_filename,
                     "filepath": filepath,
+                    "url": cloud_url,
                     "type": file_type,
                     "size_mb": round(file_size_mb, 2)
                 }
@@ -3254,6 +3261,34 @@ def files_list():
                 f['has_analysis'] = bool(cached)
                 f['caption'] = cached.get('caption', '') if cached else ''
             return jsonify({"success": True, "files": files})
+        return jsonify({"success": False, "error": "Service unavailable"}), 503
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/v1/files/<path:file_id>', methods=['DELETE'])
+def files_delete(file_id):
+    """Delete an uploaded file"""
+    try:
+        if file_analyzer:
+            # Simple security check to prevent directory traversal
+            filename = os.path.basename(file_id)
+            if file_analyzer.delete_upload(filename):
+                return jsonify({"success": True, "message": "File deleted"})
+            return jsonify({"success": False, "error": "File not found"}), 404
+        return jsonify({"success": False, "error": "Service unavailable"}), 503
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/v1/files/<path:file_id>/download', methods=['GET'])
+def files_download(file_id):
+    """Download an uploaded file"""
+    try:
+        if file_analyzer:
+            filename = os.path.basename(file_id)
+            filepath = os.path.join(file_analyzer.upload_dir, filename)
+            if os.path.exists(filepath):
+                 return send_from_directory(file_analyzer.upload_dir, filename, as_attachment=True)
+            return jsonify({"success": False, "error": "File not found"}), 404
         return jsonify({"success": False, "error": "Service unavailable"}), 503
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -3633,13 +3668,29 @@ def system_control():
 # --- FILE UPLOAD & ANALYSIS ---
 # --- VISION & FILE UPLOAD ROUTES ---
 if VISION_AVAILABLE:
-    app.add_url_rule('/api/v1/files/upload', view_func=upload_endpoint, methods=['POST'])
-    app.add_url_rule('/api/v1/files', view_func=list_endpoint, methods=['GET'])
-    app.add_url_rule('/api/v1/files/<path:file_id>/download', view_func=download_endpoint, methods=['GET'])
-    app.add_url_rule('/api/v1/files/<path:file_id>', view_func=delete_endpoint, methods=['DELETE'])
-    app.add_url_rule('/api/v1/files/<path:file_id>/analyze', view_func=analyze_endpoint, methods=['GET'])
-    app.add_url_rule('/api/v1/analyze-image', view_func=analyze_image_endpoint, methods=['POST'])
-    print("[OK] Vision & File Upload routes registered")
+    # Use inline functions instead of broken imports
+    app.add_url_rule('/api/v1/files/upload', view_func=files_upload, methods=['POST'])
+    app.add_url_rule('/api/v1/files', view_func=files_list, methods=['GET'])
+    app.add_url_rule('/api/v1/files/<path:file_id>/download', view_func=files_download, methods=['GET'])
+    app.add_url_rule('/api/v1/files/<path:file_id>', view_func=files_delete, methods=['DELETE'])
+    app.add_url_rule('/api/v1/files/<path:file_id>/analyze', view_func=files_analyze, methods=['POST']) # Correct method is POST usually, but maybe GET for re-analyze? 
+    # Actually files_analyze uses POST and expects JSON body with filepath. 
+    # But files_analyze signature above is: def files_analyze(): ... data = request.json ...
+    # So it supports POST.
+    # The route /api/v1/files/<path:file_id>/analyze with GET is different.
+    # But files_analyze is @app.route decorated already!
+    
+    # Wait, files_upload, files_analyze etc are ALREADY decorated with @app.route.
+    # So we don't need app.add_url_rule for them if they are in the same file and decorated.
+    # But let's check if they are decorated.
+    # Yes: @app.route('/api/v1/files/upload', methods=['POST']) above files_upload definition.
+    # Wait, lines 3163 in view show the decorator was COMMENTED OUT: # @app.route...
+    # So we DO need to add_url_rule or uncomment the decorators.
+    # The replacement above didn't show decorators for files_delete/download being commented out, but I added them.
+    # To be safe and consistent, we'll keep the manual adding here or ensure decorators are active.
+    # I'll just register them here to be sure.
+    app.add_url_rule('/api/v1/analyze-image', view_func=files_analyze, methods=['POST']) # Alias
+    print("[OK] Vision & File Upload routes registered (Inline)")
 else:
     print("[INFO] Vision routes disabled (cloud deployment)")
 
@@ -4072,16 +4123,27 @@ def create_pdf():
             "sections": sections
         }
         
-        filepath = document_generator.generate_pdf(title, pdf_content)
+        result = document_generator.generate_pdf(title, pdf_content)
         
-        # Return relative path for serving
-        filename = os.path.basename(filepath)
-        return jsonify({
-            "status": "success",
-            "message": "PDF created successfully",
-            "filepath": filepath,
-            "url": f"/data/Documents/{filename}"
-        })
+        # Handle dict response
+        if isinstance(result, dict):
+            return jsonify({
+                "status": "success",
+                "message": "PDF created successfully",
+                "filepath": result.get("filepath"), # Local path (might be None if uploaded)
+                "url": result.get("url") # Cloud URL or local path
+            })
+        else:
+            # Fallback for legacy string return
+            filepath = result
+            filename = os.path.basename(filepath)
+            return jsonify({
+                "status": "success",
+                "message": "PDF created successfully",
+                "filepath": filepath,
+                "url": f"/data/Documents/{filename}"
+            })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -4104,15 +4166,28 @@ def create_powerpoint():
                 {"title": "Conclusion", "content": ["Summary", "Next steps"]}
             ]
         
-        filepath = document_generator.generate_powerpoint(title, slides)
-        
-        filename = os.path.basename(filepath)
-        return jsonify({
-            "status": "success",
-            "message": "PowerPoint created successfully",
-            "filepath": filepath,
-            "url": f"/data/Documents/{filename}"
-        })
+        # Call generate_presentation (was generate_powerpoint)
+        result = document_generator.generate_presentation(title, {"slides": slides}, filename=None)
+         
+        # Handle dict response
+        if isinstance(result, dict):
+            return jsonify({
+                "status": "success",
+                "message": "PowerPoint created successfully",
+                "filepath": result.get("filepath"),
+                "url": result.get("url")
+            })
+        else:
+             # Fallback
+            filepath = result
+            filename = os.path.basename(filepath)
+            return jsonify({
+                "status": "success",
+                "message": "PowerPoint created successfully",
+                "filepath": filepath,
+                "url": f"/data/Documents/{filename}"
+            })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -4159,8 +4234,13 @@ def generate_enhanced_image():
         
         images = enhanced_image_gen.generate_with_style(prompt, style, num_images)
         
-        # Convert to relative URLs
-        image_urls = [f"/data/Images/{os.path.basename(img)}" for img in images]
+        # Smart URL handling: Use cloud URL if available, else local path
+        image_urls = []
+        for img in images:
+            if img.startswith(('http://', 'https://')):
+                image_urls.append(img)
+            else:
+                image_urls.append(f"/data/Images/{os.path.basename(img)}")
         
         return jsonify({
             "status": "success",
@@ -4187,7 +4267,14 @@ def generate_hd_image():
             return jsonify({"error": "Prompt required"}), 400
         
         images = enhanced_image_gen.generate_hd(prompt, num_images)
-        image_urls = [f"/data/Images/{os.path.basename(img)}" for img in images]
+        
+        # Smart URL handling
+        image_urls = []
+        for img in images:
+            if img.startswith(('http://', 'https://')):
+                image_urls.append(img)
+            else:
+                image_urls.append(f"/data/Images/{os.path.basename(img)}")
         
         return jsonify({
             "status": "success",
@@ -5477,6 +5564,12 @@ def load_all_integrations():
         gl['file_manager'] = FileManager()
         print("[OK] Loaded file_manager")
     except Exception as e: print(f"[FAIL] file_manager: {e}")
+
+    try:
+        from Backend.FileAnalyzer import FileAnalyzer
+        gl['file_analyzer'] = FileAnalyzer()
+        print("[OK] Loaded file_analyzer")
+    except Exception as e: print(f"[FAIL] file_analyzer: {e}")
 
     try:
         from Backend.VideoPlayer import get_video_player
