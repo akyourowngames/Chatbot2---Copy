@@ -5523,7 +5523,9 @@ def load_all_integrations():
             else:
                 print(f"[WARN] {attr_name} not found in {mod_path}")
         except Exception as e:
+            import traceback
             print(f"[FAIL] {global_name}: {e}")
+            traceback.print_exc()
 
     # Special instantiations
     try:
