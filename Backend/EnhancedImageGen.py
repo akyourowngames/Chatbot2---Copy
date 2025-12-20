@@ -64,7 +64,7 @@ class EnhancedImageGenerator:
                         from Backend.SupabaseDB import supabase_db
                         if supabase_db:
                             print(f"[EnhancedImageGen] Uploading image {i+1} to Supabase...")
-                            cloud_url = supabase_db.upload_image(filepath, folder='generated')
+                            cloud_url = supabase_db.upload_image(filepath, folder='')
                             if cloud_url:
                                 print(f"✓ Generated and uploaded image {i+1}/{num_images} to Supabase")
                                 # Keep local file as backup, but return cloud URL
