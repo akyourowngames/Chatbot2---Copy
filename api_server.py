@@ -11,14 +11,8 @@ from flask_cors import CORS
 import threading
 import json
 import os
-import sys
 import base64
 import time
-
-# Add Organized_Project to sys.path so Backend modules can be imported directly
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(current_dir, "Organized_Project"))
-
 import asyncio
 from typing import Dict, Any, List
 from functools import wraps
