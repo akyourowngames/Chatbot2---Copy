@@ -59,29 +59,27 @@ class EnhancedImageGenerator:
                     with open(filepath, 'wb') as f:
                         f.write(response.content)
                     
-                    # Upload to Supabase in production
-                    if os.getenv('FLASK_ENV') == 'production' or os.getenv('USE_SUPABASE_STORAGE', 'false').lower() == 'true':
-                        try:
-                            from Backend.SupabaseDB import supabase_db
-                            if supabase_db:
-                                print(f"[EnhancedImageGen] Uploading image {i+1} to Supabase...")
-                                cloud_url = supabase_db.upload_image(filepath, folder='generated')
-                                if cloud_url:
-                                    # Delete local file after upload
-                                    os.remove(filepath)
-                                    images.append(cloud_url)
-                                    print(f"✓ Generated and uploaded image {i+1}/{num_images}")
-                                else:
-                                    # Upload failed, use local path
-                                    images.append(f"/data/Images/{filename}")
-                                    print(f"✓ Generated image {i+1}/{num_images} (local)")
-                        except Exception as upload_error:
-                            print(f"[EnhancedImageGen] Upload error: {upload_error}, using local path")
+                    # Always upload to Supabase Storage
+                    try:
+                        from Backend.SupabaseDB import supabase_db
+                        if supabase_db:
+                            print(f"[EnhancedImageGen] Uploading image {i+1} to Supabase...")
+                            cloud_url = supabase_db.upload_image(filepath, folder='generated')
+                            if cloud_url:
+                                print(f"✓ Generated and uploaded image {i+1}/{num_images} to Supabase")
+                                # Keep local file as backup, but return cloud URL
+                                images.append(cloud_url)
+                            else:
+                                # Upload failed, use local path
+                                print(f"[EnhancedImageGen] Upload failed, using local path")
+                                images.append(f"/data/Images/{filename}")
+                        else:
+                            # Supabase not available, use local path
+                            print(f"[EnhancedImageGen] Supabase not available, using local path")
                             images.append(f"/data/Images/{filename}")
-                    else:
-                        # Local development - use local path
-                        images.append(filepath)
-                        print(f"✓ Generated image {i+1}/{num_images}")
+                    except Exception as upload_error:
+                        print(f"[EnhancedImageGen] Upload error: {upload_error}, using local path")
+                        images.append(f"/data/Images/{filename}")
                 else:
                     print(f"✗ Failed to generate image {i+1}")
                     
