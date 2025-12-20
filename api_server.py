@@ -1082,8 +1082,10 @@ def generate_image_api():
                 # If it's a file path, we need to ensure it's in Data directory
                 
                 image_url = images[0]
-                # Fix path for serving
-                if "Data" in image_url:
+                # Fix path for serving if it's not a cloud URL
+                if image_url.startswith(('http://', 'https://')):
+                    pass # It's already a valid cloud URL
+                elif "Data" in image_url:
                      image_url = image_url[image_url.find("Data"):] # keep Data/...
                      image_url = "/" + image_url.replace("\\", "/")
                 
