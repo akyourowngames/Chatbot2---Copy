@@ -192,11 +192,79 @@ class DocumentRAG:
             logger.error(f"[RAG] PDF extraction error: {e}")
             return f"Error extracting PDF: {str(e)}"
     
+    def download_and_extract_pdf(self, url: str) -> Dict[str, Any]:
+        """
+        Download PDF from URL (including Supabase Storage) and extract text.
+        Solves the "cannot access external private assets" issue.
+        """
+        try:
+            import requests
+            import tempfile
+            
+            logger.info(f"[RAG] Downloading PDF from: {url[:80]}...")
+            
+            # Download PDF
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=60, stream=True)
+            
+            if response.status_code != 200:
+                return {"status": "error", "message": f"Failed to download PDF: HTTP {response.status_code}"}
+            
+            # Check if it's actually a PDF
+            content_type = response.headers.get('Content-Type', '')
+            if 'pdf' not in content_type.lower() and not url.lower().endswith('.pdf'):
+                return {"status": "error", "message": f"URL does not point to a PDF file"}
+            
+            # Save to temp file
+            temp_path = os.path.join(self.temp_dir, f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
+            with open(temp_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            logger.info(f"[RAG] Downloaded PDF to: {temp_path}")
+            
+            # Extract text
+            content = self.extract_pdf_text(temp_path)
+            
+            # Clean up temp file
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+            
+            if content.startswith("Error") or content.startswith("PDF extraction"):
+                return {"status": "error", "message": content}
+            
+            # Extract title from URL
+            title = url.split('/')[-1].replace('.pdf', '').replace('_', ' ').replace('%20', ' ')
+            if len(title) > 50:
+                title = title[:50] + "..."
+            
+            return {
+                "status": "success",
+                "title": title,
+                "content": content,
+                "url": url,
+                "char_count": len(content),
+                "doc_type": "pdf"
+            }
+            
+        except Exception as e:
+            logger.error(f"[RAG] PDF download error: {e}")
+            return {"status": "error", "message": str(e)}
+    
     def extract_url_content(self, url: str) -> Dict[str, Any]:
         """Extract content from a URL using web scraper."""
         # Check if it's a YouTube URL
         if 'youtube.com' in url or 'youtu.be' in url:
             return self.extract_youtube_transcript(url)
+        
+        # Check if it's a PDF URL (including Supabase Storage)
+        if url.lower().endswith('.pdf') or 'supabase' in url.lower() and '.pdf' in url.lower():
+            return self.download_and_extract_pdf(url)
+
         
         if not pro_scraper:
             return {"status": "error", "message": "Web scraper not available"}
