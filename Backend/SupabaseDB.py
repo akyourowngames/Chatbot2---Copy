@@ -22,7 +22,8 @@ class SupabaseDB:
     def __init__(self):
         """Initialize Supabase connection"""
         url = os.getenv("SUPABASE_URL", "https://skbfmcwrshxnmaxfqyaw.supabase.co")
-        key = os.getenv("SUPABASE_KEY", "sb_secret_kT3r_lTsBYBLwpv313A0qQ_przZ-Q8v")
+        # Check both possible env var names for the key
+        key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY") or "sb_secret_kT3r_lTsBYBLwpv313A0qQ_przZ-Q8v"
         
         if not url or not key:
             raise ValueError("Supabase credentials missing in environment")
