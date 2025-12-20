@@ -29,6 +29,12 @@ services:
         sync: false
       - key: FIREBASE_CREDENTIALS
         sync: false
+      - key: SUPABASE_URL
+        sync: false  # Set in dashboard
+      - key: SUPABASE_KEY
+        sync: false  # Set in dashboard (anon key)
+      - key: USE_SUPABASE_STORAGE
+        value: "true"
       - key: ENCRYPTION_KEY
         generateValue: true  # Auto-generate secure key
       - key: CORS_ALLOWED_ORIGINS
