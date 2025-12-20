@@ -342,7 +342,8 @@ class SupabaseDB:
         """
         filename = os.path.basename(file_path)
         storage_path = f"{folder}/{filename}"
-        return self.upload_file(file_path, storage_path, bucket='kai-pdfs', content_type='application/pdf')
+        # detailed: Use 'kai-files' bucket instead of 'kai-pdfs'
+        return self.upload_file(file_path, storage_path, bucket='kai-files', content_type='application/pdf')
     
     def upload_image(self, file_path: str, folder: str = 'generated') -> str:
         """
@@ -368,7 +369,8 @@ class SupabaseDB:
             '.webp': 'image/webp'
         }.get(ext, 'image/png')
         
-        return self.upload_file(file_path, storage_path, bucket='kai-images', content_type=content_type)
+        # detailed: Use 'kai-files' bucket instead of 'kai-images'
+        return self.upload_file(file_path, storage_path, bucket='kai-files', content_type=content_type)
     
     # ==================== ANALYTICS ====================
     

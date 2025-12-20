@@ -24,7 +24,6 @@ env/
 *~
 
 # Environment
-.env
 .env.local
 .env.production
 *.local
@@ -95,3 +94,5 @@ Data/watch_history.json
 
 # Local-only files (desktop version - not for web deployment)
 _local_only/
+
+.env

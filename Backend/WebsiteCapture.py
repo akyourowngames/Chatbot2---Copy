@@ -247,7 +247,7 @@ class WebsiteCapture:
                             thumbnail_url = supabase_db.upload_file(
                                 thumbnail_path, 
                                 storage_path, 
-                                bucket='kai-images', 
+                                bucket='kai-files', 
                                 content_type='image/png'
                             )
                         
