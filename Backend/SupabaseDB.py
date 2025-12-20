@@ -5,8 +5,11 @@ Cloud database with real-time sync
 """
 
 from supabase import create_client, Client
-# Import realtime sync helper
-from Backend.RealtimeSync import get_realtime_sync
+# Import realtime sync helper (optional - may not be available on all deployments)
+try:
+    from Backend.RealtimeSync import get_realtime_sync
+except ImportError:
+    get_realtime_sync = None
 import os
 import json
 from datetime import datetime
