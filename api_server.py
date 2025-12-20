@@ -4397,6 +4397,66 @@ def rag_delete_document(doc_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/v1/rag/compare', methods=['POST'])
+@require_api_key
+def rag_compare_documents():
+    """Compare two RAG documents"""
+    rag = get_document_rag()
+    if not rag:
+        return jsonify({"error": "RAG module not available"}), 503
+    
+    try:
+        data = request.json
+        doc_id1 = data.get('doc_id1')
+        doc_id2 = data.get('doc_id2')
+        aspect = data.get('aspect')  # Optional focus area
+        
+        if not doc_id1 or not doc_id2:
+            return jsonify({"error": "Two document IDs required"}), 400
+        
+        result = rag.compare_documents(doc_id1, doc_id2, aspect)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/rag/set-active', methods=['POST'])
+@require_api_key
+def rag_set_active_documents():
+    """Set multiple documents as active for multi-document chat"""
+    rag = get_document_rag()
+    if not rag:
+        return jsonify({"error": "RAG module not available"}), 503
+    
+    try:
+        data = request.json
+        doc_ids = data.get('doc_ids', [])
+        
+        if not doc_ids:
+            return jsonify({"error": "At least one document ID required"}), 400
+        
+        result = rag.set_active_documents(doc_ids)
+        return jsonify({
+            "status": "success",
+            "message": f"Set {len(doc_ids)} document(s) as active",
+            "active_documents": doc_ids
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/rag/clear-history', methods=['POST'])
+@require_api_key
+def rag_clear_conversation():
+    """Clear RAG conversation history for fresh start"""
+    rag = get_document_rag()
+    if not rag:
+        return jsonify({"error": "RAG module not available"}), 503
+    
+    try:
+        result = rag.clear_conversation()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ==================== BEAST-LEVEL FEATURES ====================
 
 # --- MULTI-SOURCE MUSIC PLAYER ---
