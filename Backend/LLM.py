@@ -49,17 +49,60 @@ if GEMINI_API_KEY and len(GEMINI_API_KEY) > 10:
     except Exception as e:
         print(f"[LLM] Gemini Init Failed: {e}")
 
-def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.3-70b-versatile"):
+def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.3-70b-versatile", user_id="default", inject_memory=True):
     """
     Unified chat completion function with robust error handling.
+    NOW WITH MEMORY INTEGRATION - KAI remembers everything!
     """
     if not groq_client:
         return "System Error: Groq API Key is missing or invalid. Please check .env file."
 
+    # ==================== MEMORY INJECTION ====================
+    memory_context = ""
+    if inject_memory:
+        try:
+            from Backend.ContextualMemory import contextual_memory
+            
+            # Get the user's query (last user message)
+            user_query = ""
+            for msg in reversed(messages):
+                if msg.get('role') == 'user':
+                    user_query = msg.get('content', '')
+                    break
+            
+            if user_query:
+                # Get relevant memories for context
+                context_data = contextual_memory.get_context(user_query)
+                
+                if context_data and context_data.get("relevant_memories"):
+                    memory_items = context_data.get("relevant_memories", [])[:5]
+                    if memory_items:
+                        memory_context = "\n\n[MEMORY - What you know about the user]:\n"
+                        for mem in memory_items:
+                            if isinstance(mem, dict):
+                                memory_context += f"- {mem.get('content', mem)}\n"
+                            else:
+                                memory_context += f"- {mem}\n"
+                        print(f"[LLM] Injected {len(memory_items)} memories into context")
+        except Exception as e:
+            print(f"[LLM] Memory injection skipped: {e}")
+
     # Pre-process messages
     if system_prompt:
+        # Append memory context to system prompt
+        enhanced_prompt = system_prompt + memory_context
         if not any(m['role'] == 'system' for m in messages):
-            messages.insert(0, {'role': 'system', 'content': system_prompt})
+            messages.insert(0, {'role': 'system', 'content': enhanced_prompt})
+    elif memory_context:
+        # Add memory as separate system message if no system prompt
+        if any(m['role'] == 'system' for m in messages):
+            for m in messages:
+                if m['role'] == 'system':
+                    m['content'] += memory_context
+                    break
+        else:
+            messages.insert(0, {'role': 'system', 'content': f"You are KAI, a helpful AI assistant.{memory_context}"})
+            
             
     # Retry Loop
     max_retries = 2
@@ -196,9 +239,27 @@ def FirstLayerDMM(prompt):
     ]
     
     try:
-        response = ChatCompletion(messages, model="llama-3.3-70b-versatile")
+        response = ChatCompletion(messages, model="llama-3.3-70b-versatile", inject_memory=False)
         if "[" in response and "]" in response:
              return ast.literal_eval(response[response.find("["):response.rfind("]")+1])
     except:
         pass
     return ["general"]
+
+
+def auto_save_memory(user_message: str, ai_response: str, user_id: str = "default"):
+    """
+    Auto-extract and save important information from conversations.
+    Called after each chat to build up KAI's knowledge of the user.
+    """
+    try:
+        from Backend.ContextualMemory import contextual_memory
+        
+        # Let ContextualMemory handle extraction and storage
+        contextual_memory.add_conversation(user_message, ai_response)
+        print(f"[MEMORY] Processed conversation for auto-extraction")
+        return True
+    except Exception as e:
+        print(f"[MEMORY] Auto-save skipped: {e}")
+        return False
+
