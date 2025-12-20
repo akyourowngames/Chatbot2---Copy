@@ -5678,6 +5678,154 @@ def serve_uploaded_file(filename):
     except Exception as e:
         return jsonify({"error": f"File not found: {filename}"}), 404
 
+# ==================== MULTI-AGENT SYSTEM ====================
+# KAI's team of specialist AI agents working together
+
+# Lazy load agent orchestrator
+_agent_orchestrator = None
+
+def get_orchestrator():
+    """Lazy load the agent orchestrator."""
+    global _agent_orchestrator
+    if _agent_orchestrator is None:
+        try:
+            from Backend.Agents.AgentOrchestrator import agent_orchestrator
+            _agent_orchestrator = agent_orchestrator
+            print("[AGENTS] Multi-Agent System loaded")
+        except Exception as e:
+            print(f"[AGENTS] Failed to load: {e}")
+    return _agent_orchestrator
+
+@app.route('/api/v1/agents/execute', methods=['POST'])
+def execute_multi_agent_task():
+    """
+    Execute a task using the multi-agent system.
+    
+    Body: {
+        "task": "Research AI trends and write a summary",
+        "mode": "auto" | "research" | "write" | "analyze" | "research_write" | "full"
+    }
+    """
+    orchestrator = get_orchestrator()
+    if not orchestrator:
+        return jsonify({"error": "Multi-agent system not available"}), 500
+    
+    try:
+        data = request.json
+        task = data.get('task', '')
+        mode = data.get('mode', 'auto')
+        
+        if not task:
+            return jsonify({"error": "Task is required"}), 400
+        
+        print(f"[AGENTS] Executing: {task[:50]}... (mode: {mode})")
+        
+        # Execute the task
+        from Backend.Agents.AgentOrchestrator import run_multi_agent_task
+        result = run_multi_agent_task(task, mode)
+        
+        return jsonify({
+            "status": result.get("status"),
+            "task": result.get("task"),
+            "mode": result.get("task_type"),
+            "steps": result.get("steps_executed"),
+            "result": result.get("final_output"),
+            "agent_details": result.get("agent_results"),
+            "execution_time": result.get("execution_time_seconds"),
+            "timestamp": result.get("timestamp")
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/agents/status', methods=['GET'])
+def get_agents_status():
+    """Get status of all agents and recent executions."""
+    orchestrator = get_orchestrator()
+    if not orchestrator:
+        return jsonify({"error": "Multi-agent system not available"}), 500
+    
+    try:
+        status = orchestrator.get_status()
+        return jsonify({
+            "status": "active",
+            "agents": status.get("agents"),
+            "total_executions": status.get("total_executions"),
+            "recent": status.get("recent_executions")
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/agents/research', methods=['POST'])
+def agent_research():
+    """Quick access to research agent."""
+    orchestrator = get_orchestrator()
+    if not orchestrator:
+        return jsonify({"error": "Multi-agent system not available"}), 500
+    
+    try:
+        data = request.json
+        query = data.get('query', '')
+        
+        if not query:
+            return jsonify({"error": "Query is required"}), 400
+        
+        result = orchestrator.research(query)
+        return jsonify({
+            "status": result.get("status"),
+            "result": result.get("final_output"),
+            "sources": result.get("agent_results", [{}])[0].get("sources", [])
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/agents/write', methods=['POST'])
+def agent_write():
+    """Quick access to writer agent."""
+    orchestrator = get_orchestrator()
+    if not orchestrator:
+        return jsonify({"error": "Multi-agent system not available"}), 500
+    
+    try:
+        data = request.json
+        content_request = data.get('content', '') or data.get('request', '')
+        
+        if not content_request:
+            return jsonify({"error": "Content request is required"}), 400
+        
+        result = orchestrator.write(content_request)
+        return jsonify({
+            "status": result.get("status"),
+            "result": result.get("final_output"),
+            "word_count": len(result.get("final_output", "").split())
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/agents/analyze', methods=['POST'])
+def agent_analyze():
+    """Quick access to analyst agent."""
+    orchestrator = get_orchestrator()
+    if not orchestrator:
+        return jsonify({"error": "Multi-agent system not available"}), 500
+    
+    try:
+        data = request.json
+        content = data.get('content', '')
+        
+        if not content:
+            return jsonify({"error": "Content to analyze is required"}), 400
+        
+        result = orchestrator.analyze(content)
+        return jsonify({
+            "status": result.get("status"),
+            "analysis": result.get("final_output")
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ==================== STARTUP ====================
 
 def load_all_integrations():
