@@ -5,11 +5,8 @@ Cloud database with real-time sync
 """
 
 from supabase import create_client, Client
-# Import realtime sync helper (optional - may not be available on all deployments)
-try:
-    from Backend.RealtimeSync import get_realtime_sync
-except ImportError:
-    get_realtime_sync = None
+# Import realtime sync helper
+from Backend.RealtimeSync import get_realtime_sync
 import os
 import json
 from datetime import datetime
@@ -22,8 +19,7 @@ class SupabaseDB:
     def __init__(self):
         """Initialize Supabase connection"""
         url = os.getenv("SUPABASE_URL", "https://skbfmcwrshxnmaxfqyaw.supabase.co")
-        # Check both possible env var names for the key
-        key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY") or "sb_secret_kT3r_lTsBYBLwpv313A0qQ_przZ-Q8v"
+        key = os.getenv("SUPABASE_KEY", "sb_secret_kT3r_lTsBYBLwpv313A0qQ_przZ-Q8v")
         
         if not url or not key:
             raise ValueError("Supabase credentials missing in environment")
@@ -346,8 +342,7 @@ class SupabaseDB:
         """
         filename = os.path.basename(file_path)
         storage_path = f"{folder}/{filename}"
-        # detailed: Use 'kai-files' bucket instead of 'kai-pdfs'
-        return self.upload_file(file_path, storage_path, bucket='kai-files', content_type='application/pdf')
+        return self.upload_file(file_path, storage_path, bucket='kai-pdfs', content_type='application/pdf')
     
     def upload_image(self, file_path: str, folder: str = 'generated') -> str:
         """
@@ -373,8 +368,7 @@ class SupabaseDB:
             '.webp': 'image/webp'
         }.get(ext, 'image/png')
         
-        # detailed: Use 'kai-files' bucket instead of 'kai-images'
-        return self.upload_file(file_path, storage_path, bucket='kai-files', content_type=content_type)
+        return self.upload_file(file_path, storage_path, bucket='kai-images', content_type=content_type)
     
     # ==================== ANALYTICS ====================
     
@@ -513,8 +507,6 @@ try:
     supabase_db = SupabaseDB()
 except Exception as e:
     logger.error(f"[SUPABASE] Failed to initialize: {e}")
-    with open("debug_supabase_init.txt", "a") as f:
-        f.write(f"[Init Fail] {e}\n")
     supabase_db = None
 
 if __name__ == "__main__":

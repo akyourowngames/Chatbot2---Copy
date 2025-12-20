@@ -35,31 +35,7 @@ class FileAnalyzer:
         with open(filepath, 'wb') as f:
             f.write(file_data)
         
-        cloud_url = None
-        # Upload to Supabase in production
-        if os.getenv('FLASK_ENV') == 'production' or os.getenv('USE_SUPABASE_STORAGE', 'false').lower() == 'true':
-            try:
-                from Backend.SupabaseDB import supabase_db
-                if supabase_db:
-                    print(f"[FileAnalyzer] Uploading {filename} to Supabase...")
-                    storage_path = f"uploads/{safe_filename}"
-                    cloud_url = supabase_db.upload_file(
-                        filepath, 
-                        storage_path, 
-                        bucket='kai-files',
-                        content_type=mimetypes.guess_type(filepath)[0] or 'application/octet-stream'
-                    )
-                    
-                    if cloud_url:
-                        print(f"[FileAnalyzer] Uploaded to: {cloud_url}")
-            except Exception as e:
-                print(f"[FileAnalyzer] Supabase upload error: {e}")
-        
-        return {
-            "filepath": filepath,
-            "url": cloud_url,
-            "filename": safe_filename
-        }
+        return filepath
     
     def get_file_type(self, filename: str) -> str:
         """Determine file type"""

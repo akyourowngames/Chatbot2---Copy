@@ -1,0 +1,2521 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAI AI - Premium Interface</title>
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        gray: {
+                            750: '#2d3748',
+                            850: '#1a202c',
+                            900: '#111827',
+                            950: '#030712',
+                        },
+                        accent: {
+                            500: '#8b5cf6', // Violet
+                            600: '#7c3aed',
+                            glow: 'rgba(139, 92, 246, 0.5)'
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.4s ease-out',
+                        'pulse-slow': 'pulse 3s infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Legacy Stylesheets (Kept for compatibility with modal/search scripts) -->
+    <link rel="stylesheet" href="components.css">
+    <link rel="stylesheet" href="quick-search.css">
+    <link rel="stylesheet" href="../static/css/auth-modal.css">
+
+    <!-- Prism.js for Code Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+
+    <!-- KAI Beast Mode Stylesheet -->
+    <link rel="stylesheet" href="chat.css">
+
+</head>
+
+<body
+    class="text-gray-100 h-screen w-full overflow-hidden flex antialiased selection:bg-accent-500/30 selection:text-white"
+    style="background: #000000;">
+
+    <!-- Mobile Overlay -->
+    <div id="mobile-overlay" class="fixed inset-0 bg-black/80 z-40 hidden lg:hidden backdrop-blur-sm"
+        onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar"
+        class="fixed lg:static inset-y-0 left-0 w-72 glass-panel z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col">
+        <!-- Sidebar Header -->
+        <div class="p-5 flex items-center justify-between border-b border-white/5">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-accent-500/20">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <h1 class="font-bold text-lg tracking-tight">KAI</h1>
+            </div>
+            <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- New Chat & Actions -->
+        <div class="p-4 flex gap-2">
+            <button onclick="confirmBulkDelete()"
+                class="p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-all duration-300"
+                title="Clear All Chats">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </button>
+            <button onclick="openExportModal()"
+                class="p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-purple-500/10 hover:border-purple-500/30 hover:text-purple-400 transition-all duration-300"
+                title="Export Chat">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+            </button>
+            <button onclick="newChat()"
+                class="flex-1 py-3 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-accent-500/50 hover:shadow-lg hover:shadow-accent-500/10 transition-all duration-300 flex items-center justify-center gap-3 group">
+                <span
+                    class="p-1 rounded-md bg-accent-500/20 text-accent-500 group-hover:scale-110 transition-transform">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                </span>
+                <span class="font-medium text-sm">New Chat</span>
+            </button>
+        </div>
+
+        <!-- History -->
+        <div class="flex-1 overflow-y-auto px-4 py-2 space-y-2" id="chatHistory">
+            <!-- History items injected by JS -->
+        </div>
+
+        <!-- User Profile & Settings -->
+        <div class="p-4 border-t border-white/5 bg-gray-900/50 sidebar-footer">
+            <button onclick="openSettings()"
+                class="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors text-sm font-medium mb-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                    </path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span>Settings</span>
+            </button>
+            <!-- User profile injected here -->
+        </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="flex-1 flex flex-col relative" style="background: #000000;">
+        <!-- Background Gradient REMOVED -->
+
+        <!-- Top Header -->
+        <header
+            class="flex items-center justify-between px-6 py-4 z-20 sticky top-0 bg-black/80 backdrop-blur-md border-b border-white/5 lg:border-none lg:bg-transparent lg:backdrop-filter-none">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar()" class="lg:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                <div class="relative">
+                    <select id="modelSelector"
+                        class="appearance-none bg-white/5 border border-white/10 text-gray-200 text-sm rounded-full pl-4 pr-10 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500/50 transition-all hover:bg-white/10 cursor-pointer">
+                        <option value="jarvis">KAI Beast Mode</option>
+                        <option value="fast">Fast Mode</option>
+                        <option value="creative">Creative Mode</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
+                            </path>
+                        </svg>
+                    </div>
+                </div>
+                <!-- Connection Status -->
+                <div id="connectionStatus"
+                    class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span class="text-xs text-green-400 font-medium">Connected</span>
+                </div>
+            </div>
+
+            <div class="header-actions flex items-center gap-2">
+                <!-- Auth Button Container (Login/Profile) -->
+                <div id="authButtonContainer"></div>
+
+                <!-- Web Mode Badge -->
+                <div
+                    class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-xs font-medium text-blue-300">Web Mode</span>
+                </div>
+            </div>
+
+
+        </header>
+
+        <!-- Messages Area -->
+        <div id="messages" class="flex-1 overflow-y-auto px-4 md:px-6 py-6 scroll-smooth space-y-6">
+            <!-- Welcome Screen - Beast Mode -->
+            <div id="welcome"
+                class="flex flex-col items-center justify-center min-h-[60vh] text-center max-w-4xl mx-auto animate-fade-in px-4">
+                <div class="relative mb-6">
+                    <div
+                        class="w-24 h-24 rounded-3xl bg-gradient-to-tr from-accent-600 via-purple-500 to-blue-500 flex items-center justify-center shadow-2xl shadow-accent-500/40 animate-pulse-slow">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <span
+                        class="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 text-xs font-bold text-white rounded-full"
+                        style="background: linear-gradient(135deg, #3b82f6, #8b5cf6);">☁️ WEB</span>
+                </div>
+                <h1
+                    class="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400 mb-4 tracking-tight">
+                    How can I help you?</h1>
+                <p class="text-gray-400 text-lg mb-8 max-w-md">Your premium AI assistant -
+                    chat, music, search, translate & more. Works anywhere!
+                </p>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl">
+                    <button onclick="sendQuickMessage('What can you do?')"
+                        class="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-yellow-500/30 transition-all duration-300 text-left">
+                        <div class="text-2xl mb-2">💡</div>
+                        <span class="font-semibold text-gray-200 text-sm">Capabilities</span>
+                        <p class="text-xs text-gray-500 mt-1">See all features</p>
+                    </button>
+                    <button onclick="sendQuickMessage('search latest tech news today')"
+                        class="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-green-500/30 transition-all duration-300 text-left">
+                        <div class="text-2xl mb-2">📰</div>
+                        <span class="font-semibold text-gray-200 text-sm">News</span>
+                        <p class="text-xs text-gray-500 mt-1">Latest updates</p>
+                    </button>
+                    <button onclick="sendQuickMessage('What is Bitcoin price?')"
+                        class="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-blue-500/30 transition-all duration-300 text-left">
+                        <div class="text-2xl mb-2">📊</div>
+                        <span class="font-semibold text-gray-200 text-sm">Live Data</span>
+                        <p class="text-xs text-gray-500 mt-1">Markets & crypto</p>
+                    </button>
+                    <button onclick="sendQuickMessage('search for AI trends 2024')"
+                        class="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 text-left">
+                        <div class="text-2xl mb-2">🔎</div>
+                        <span class="font-semibold text-gray-200 text-sm">Web Search</span>
+                        <p class="text-xs text-gray-500 mt-1">Find anything</p>
+                    </button>
+                    <button onclick="sendQuickMessage('play lofi beats')"
+                        class="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-red-500/30 transition-all duration-300 text-left">
+                        <div class="text-2xl mb-2">🎵</div>
+                        <span class="font-semibold text-gray-200 text-sm">Music</span>
+                        <p class="text-xs text-gray-500 mt-1">Play YouTube</p>
+                    </button>
+                    <button onclick="sendQuickMessage('translate hello to japanese')"
+                        class="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-orange-500/30 transition-all duration-300 text-left">
+                        <div class="text-2xl mb-2">🌐</div>
+                        <span class="font-semibold text-gray-200 text-sm">Translate</span>
+                        <p class="text-xs text-gray-500 mt-1">46+ languages</p>
+                    </button>
+                    <button onclick="sendQuickMessage('calculate 15 percent of 250')"
+                        class="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-500/30 transition-all duration-300 text-left">
+                        <div class="text-2xl mb-2">🔢</div>
+                        <span class="font-semibold text-gray-200 text-sm">Calculate</span>
+                        <p class="text-xs text-gray-500 mt-1">Math solver</p>
+                    </button>
+                    <button onclick="sendQuickMessage('tell me a joke')"
+                        class="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-pink-500/30 transition-all duration-300 text-left">
+                        <div class="text-2xl mb-2">😄</div>
+                        <span class="font-semibold text-gray-200 text-sm">Fun</span>
+                        <p class="text-xs text-gray-500 mt-1">Jokes & chat</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 md:p-6 pb-6">
+            <div class="max-w-3xl mx-auto w-full relative">
+                <!-- Smart Suggestions -->
+                <div id="smartSuggestions" class="smart-suggestions"></div>
+
+                <div class="glass-input rounded-2xl md:rounded-3xl p-2 pl-4 pr-2 flex items-end gap-2 relative z-10">
+                    <!-- Quick Actions Dropdown -->
+                    <div class="relative shrink-0 pb-1">
+                        <button onclick="toggleQuickActions(event)"
+                            class="p-2.5 text-yellow-400 hover:text-yellow-300 hover:bg-white/10 rounded-xl transition-colors"
+                            title="Quick Actions">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </button>
+
+                        <!-- Dropdown Menu -->
+                        <div id="quickActionsDropdown"
+                            class="hidden absolute bottom-full left-0 mb-3 w-56 bg-[#1a1c2e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-50 transform origin-bottom-left transition-all duration-200">
+                            <button onclick="quickAction('music')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-purple-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                                    </svg></span>
+                                Play Music
+                            </button>
+                            <button onclick="quickAction('image')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-pink-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg></span>
+                                Generate Image
+                            </button>
+                            <button onclick="quickAction('search')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-blue-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg></span>
+                                Web Search
+                            </button>
+                            <button onclick="quickAction('translate')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-green-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                    </svg></span>
+                                Translate
+                            </button>
+                            <button onclick="quickAction('pdf')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center"><svg class="w-4 h-4 text-red-400" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg></span>
+                                Generate PDF
+                            </button>
+                            <!-- NEW FEATURES -->
+                            <div class="border-t border-white/10 my-1"></div>
+                            <button onclick="quickAction('radio')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center text-lg">📻</span>
+                                Live Radio/TV
+                            </button>
+                            <button onclick="quickAction('scrape')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center text-lg">🌐</span>
+                                Scrape Website
+                            </button>
+                            <button onclick="quickAction('capture')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center text-lg">📄</span>
+                                Capture as PDF
+                            </button>
+                            <button onclick="quickAction('workflow')"
+                                class="flex items-center gap-3 w-full px-4 py-3 hover:bg-white/5 text-gray-200 hover:text-white transition-colors text-sm text-left">
+                                <span class="w-6 flex justify-center text-lg">⚡</span>
+                                Quick Workflows
+                            </button>
+                        </div>
+                    </div>
+                    <button onclick="attachFile()"
+                        class="p-2.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors shrink-0"
+                        title="Attach file">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
+                            </path>
+                        </svg>
+                    </button>
+
+                    <textarea id="messageInput"
+                        class="w-full bg-transparent border-0 text-gray-100 focus:ring-0 focus:outline-none outline-none resize-none py-3.5 max-h-48 placeholder-gray-500 font-sans text-[15px] leading-relaxed"
+                        placeholder="Message KAI..." rows="1" onkeydown="handleKeyPress(event)"
+                        oninput="autoResize(this)"></textarea>
+
+                    <div class="flex items-center gap-1 pb-1">
+                        <button id="continuousModeBtn" onclick="toggleContinuousMode()"
+                            class="icon-btn p-2.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors shrink-0"
+                            title="Continuous Mode">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                </path>
+                            </svg>
+                        </button>
+                        <button onclick="toggleVoice()"
+                            class="icon-btn p-2.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors shrink-0"
+                            title="Voice Input">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z">
+                                </path>
+                            </svg>
+                        </button>
+                        <button id="sendBtn" onclick="sendMessage()"
+                            class="p-2.5 bg-accent-600 hover:bg-accent-500 text-white rounded-xl shadow-lg shadow-accent-500/20 transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-5 h-5 translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 12h14M12 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="text-center mt-2">
+                    <p class="text-xs text-gray-500 font-medium">AI can make mistakes. Please check important info.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ========== API CONFIGURATION ==========
+        // Set to true to use Render (cloud) API, false for local development
+        const USE_CLOUD_API = true;
+
+        const API_URL = USE_CLOUD_API
+            ? 'https://kai-api-nxxv.onrender.com/api/v1'  // Cloud (Render)
+            : 'http://localhost:5000/api/v1';             // Local development
+
+        const BASE_URL = USE_CLOUD_API
+            ? 'https://kai-api-nxxv.onrender.com'
+            : 'http://localhost:5000';
+
+        console.log(`🔗 KAI API: ${USE_CLOUD_API ? 'Cloud (Render)' : 'Local'} - ${API_URL}`);
+
+        // API Key Security: Use session storage instead of hardcoding
+        // In production, this should be fetched via secure auth flow
+        function getApiKey() {
+            let key = sessionStorage.getItem('kai_api_key');
+            if (!key) {
+                // Default key for local development only
+                // TODO: Replace with proper auth in production
+                key = 'demo_key_12345';
+                sessionStorage.setItem('kai_api_key', key);
+            }
+            return key;
+        }
+        const API_KEY = getApiKey();
+
+        let currentChatId = Date.now();
+        let chatHistory = [];
+        let isListening = false;
+        let isConnected = false;
+
+        // Connection status check
+        async function checkConnection() {
+            const statusEl = document.getElementById('connectionStatus');
+            try {
+                // Use /health for cloud, /status for local
+                const healthUrl = USE_CLOUD_API ? `${BASE_URL}/health` : `${API_URL}/status`;
+                const res = await fetch(healthUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: AbortSignal.timeout(10000)  // 10s for cold start
+                });
+                if (res.ok) {
+                    isConnected = true;
+                    if (statusEl) {
+                        statusEl.className = 'hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30';
+                        statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span><span class="text-xs text-green-400 font-medium">Connected</span>';
+                    }
+                } else {
+                    throw new Error('Not OK');
+                }
+            } catch (e) {
+                isConnected = false;
+                if (statusEl) {
+                    statusEl.className = 'hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30';
+                    statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span><span class="text-xs text-red-400 font-medium">Offline</span>';
+                }
+            }
+        }
+
+        // Check connection on load and periodically
+        checkConnection();
+        setInterval(checkConnection, 30000);
+
+
+        // UI Helpers
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hidden');
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // Logic (Preserved but updated to output new HTML structure)
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            // Remove welcome screen if first message
+            const welcome = document.getElementById('welcome');
+            if (welcome) {
+                welcome.classList.add('hidden'); // Use class to hide instead of remove to keep DOM clean if needed
+                welcome.style.display = 'none';
+            }
+
+            addMessage('user', message);
+            input.value = '';
+            input.style.height = 'auto';
+
+            // === SMART COMMAND DETECTION ===
+            // Only distinguish between SPOTIFY MUSIC and STREAMS
+            let processedMessage = message;
+            const lowerMsg = message.toLowerCase();
+
+            // Detect if user wants RADIO/STREAM vs SPOTIFY MUSIC
+            const streamKeywords = ['radio', 'station', 'stream', 'live', 'broadcast', 'news', 'channel'];
+
+            if (lowerMsg.startsWith('play ')) {
+                const query = lowerMsg.substring(5);
+
+                // If it contains stream keywords, make it a stream request
+                if (streamKeywords.some(kw => query.includes(kw))) {
+                    processedMessage = `stream ${query}`;
+                    console.log('[Command] Detected STREAM intent:', processedMessage);
+                }
+                // Otherwise treat as Spotify music request
+                else {
+                    processedMessage = `spotify ${query}`;
+                    console.log('[Command] Detected SPOTIFY intent:', processedMessage);
+                }
+            }
+            const typingId = addTypingIndicator();
+
+            try {
+                // Image Generation
+                if (message.toLowerCase().startsWith('generate image') || message.toLowerCase().startsWith('create image')) {
+                    const response = await fetch(`${API_URL}/image/generate`, {
+                        method: 'POST',
+                        headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: message })
+                    });
+                    const data = await response.json();
+                    removeTypingIndicator(typingId);
+
+                    if (data.status === 'success' && data.images && data.images.length > 0) {
+                        addMessage('assistant', `✅ Generated ${data.images.length} image(s) for: "${message}"`);
+                        data.images.forEach((imgUrl, index) => {
+                            let fullUrl;
+                            if (imgUrl.startsWith('http')) {
+                                fullUrl = imgUrl;
+                            } else if (imgUrl.startsWith('/data/Images/')) {
+                                fullUrl = `${BASE_URL}${imgUrl}`;
+                            } else if (imgUrl.startsWith('/data/')) {
+                                const filename = imgUrl.replace('/data/', '');
+                                fullUrl = `${BASE_URL}/data/Images/${filename}`;
+                            } else {
+                                fullUrl = `${BASE_URL}/data/Images/${imgUrl}`;
+                            }
+                            addImageMessage('assistant', fullUrl);
+                        });
+
+                        if (window.authClient && window.authClient.isAuthenticated()) {
+                            await saveMessageToFirebase(message, `Generated ${data.images.length} image(s)`);
+                        } else {
+                            saveChatHistory(message, `Generated ${data.images.length} image(s)`);
+                        }
+                    } else {
+                        const errorMsg = data.error || 'Failed to generate image.';
+                        addMessage('assistant', `❌ ${errorMsg}`);
+                    }
+                    return;
+                }
+
+                // Normal Chat - Use processedMessage with clarified intent
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: processedMessage })  // Use processed message with clear intent
+                });
+
+                const data = await response.json();
+                removeTypingIndicator(typingId);
+
+                const responseText = data.response || 'Sorry, I encountered an error.';
+                addMessage('assistant', responseText);
+
+                // Check for images in response
+                const imageUrlRegex = /!\[.*?\]\((.*?)\)|(?:http:\/\/localhost:5000)?\/data\/(?:Images\/)?([^\s\)]+\.(?:jpg|jpeg|png|gif|webp))/gi;
+                let match;
+                const foundImages = [];
+
+                while ((match = imageUrlRegex.exec(responseText)) !== null) {
+                    const imageUrl = match[1] || `/data/Images/${match[2]}` || match[0];
+                    if (!foundImages.includes(imageUrl)) {
+                        foundImages.push(imageUrl);
+                        const fullUrl = imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
+                        addImageMessage('assistant', fullUrl);
+                    }
+                }
+
+                if (responseText.includes('✅ Generated') || responseText.includes('image!')) {
+                    const pathMatch = responseText.match(/\/data\/(?:Images\/)?([^\s\)]+\.(?:jpg|jpeg|png|gif|webp))/i);
+                    if (pathMatch && !foundImages.some(img => img.includes(pathMatch[0]))) {
+                        const imageUrl = `${BASE_URL}${pathMatch[0]}`;
+                        addImageMessage('assistant', imageUrl);
+                    }
+                }
+
+                // === SPOTIFY PLAYER - MUSIC ONLY (YouTube removed) ===
+                if (data.type === 'spotify' && data.spotify && data.spotify.embed_url) {
+                    addSpotifyPlayer('assistant', data.spotify);
+                }
+
+                // === LIVE STREAMS (Radio/TV) ===
+                if (data.type === 'stream' && data.music && data.music.embed_url) {
+                    addStreamPlayer('assistant', data.music);
+                }
+
+                // === PDF CAPTURE WITH PREVIEW ===
+                if (data.type === 'pdf_capture' && data.pdf_url) {
+                    addPDFPreview('assistant', {
+                        title: data.title,
+                        pdf_url: data.pdf_url,
+                        thumbnail_url: data.thumbnail_url,
+                        url: data.url
+                    });
+                }
+
+                // === GENERATED PDF PREVIEW ===
+                if (data.type === 'pdf' && data.pdf_path) {
+                    addPDFPreview('assistant', {
+                        title: data.title || 'Generated PDF',
+                        pdf_url: data.pdf_path.startsWith('http') ? data.pdf_path : `${BASE_URL}${data.pdf_path}`,
+                        thumbnail_url: null,
+                        url: null
+                    });
+                }
+
+                // === SCRAPE RESULTS (Styled) ===
+                if (data.type === 'scrape' && data.scrape_result) {
+                    addScrapeResult('assistant', data.scrape_result);
+                }
+
+                // === SCREENSHOT CAPTURE ===
+                if (data.type === 'screenshot' && data.screenshot_url) {
+                    const fullUrl = data.screenshot_url.startsWith('http')
+                        ? data.screenshot_url
+                        : `${BASE_URL}${data.screenshot_url}`;
+                    addImageMessage('assistant', fullUrl);
+                }
+
+                // === VIDEO SUMMARY ===
+                if (data.type === 'video_summary') {
+                    addVideoSummary('assistant', data);
+                }
+
+                // === CODE EXECUTION ===
+                if (data.type === 'code_execution' && data.code) {
+                    addCodeExecution('assistant', data);
+                }
+
+                if (!data.command_executed) {
+                    // Browser-based TTS for faster response
+                    speakResponse(data.response);
+                }
+
+                if (window.authClient && window.authClient.isAuthenticated()) {
+                    await saveMessageToFirebase(message, data.response);
+                } else {
+                    saveChatHistory(message, data.response);
+                }
+
+            } catch (error) {
+                removeTypingIndicator(typingId);
+                addMessage('assistant', 'Connection error. Make sure the API server is running.');
+            }
+        }
+
+        function addMessage(role, content) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            // Full width container with centered content
+            messageDiv.className = `w-full message-animated ${role === 'user' ? 'bg-transparent' : 'bg-transparent'}`;
+
+            // Inner content layout
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-4xl mx-auto flex gap-4 md:gap-6 ${role === 'user' ? 'flex-row-reverse' : 'flex-row group'}`; // Added group for hover effects
+
+            // Avatar
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = `w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-sm shadow-xl ${role === 'user' ? 'bg-indigo-600 text-white' : 'bg-gradient-to-br from-accent-600 to-indigo-600 text-white shadow-accent-500/20'}`;
+            avatarDiv.innerHTML = role === 'user' ?
+                '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>' :
+                '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>';
+
+            // Content Bubble
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = "flex-1 min-w-0";
+
+            const contentDiv = document.createElement('div');
+            // Enhanced holographic classes
+            contentDiv.className = `message-bubble prose prose-invert max-w-none text-[15px] leading-relaxed transition-all duration-300 ${role === 'user'
+                ? 'user-bubble px-6 py-4 rounded-2xl rounded-tr-sm text-white'
+                : 'assistant-bubble px-6 py-4 rounded-2xl rounded-tl-sm text-gray-100'}`;
+
+            if (role === 'assistant') {
+                const glow = document.createElement('div');
+                glow.className = 'aurora-glow';
+                contentWrapper.appendChild(glow);
+            }
+
+            contentDiv.innerHTML = formatMessage(content);
+
+            contentWrapper.appendChild(contentDiv);
+
+            // Add Actions for Assistant
+            if (role === 'assistant') {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'message-actions animate-fade-in';
+
+                // Copy Button
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'msg-action-btn';
+                copyBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy';
+                copyBtn.onclick = function () { copyMessage(this, content); };
+
+                // Regenerate Button (dummy for now)
+                const regenBtn = document.createElement('button');
+                regenBtn.className = 'msg-action-btn';
+                regenBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Regenerate';
+                regenBtn.onclick = function () { sendQuickMessage('Regenerate that response'); };
+
+                // Speed Badge
+                const speedBadge = document.createElement('span');
+                const time = getResponseTime();
+                if (time) {
+                    speedBadge.className = 'speed-badge';
+                    speedBadge.innerText = `⚡ ${time}`;
+                    actionsDiv.appendChild(speedBadge);
+                }
+
+                actionsDiv.appendChild(copyBtn);
+                actionsDiv.appendChild(regenBtn);
+                contentWrapper.appendChild(actionsDiv);
+
+                // Update Smart Suggestions
+                setTimeout(() => updateSmartSuggestions(content.toLowerCase().includes('image') ? 'image' : 'assistant'), 500);
+            }
+
+            innerDiv.appendChild(avatarDiv);
+            innerDiv.appendChild(contentWrapper);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+
+            // Smooth scroll to bottom
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        /* Updated Typing Indicator */
+        function addTypingIndicator() {
+            startResponseTimer(); // Start timing
+            const messagesDiv = document.getElementById('messages');
+            const typingDiv = document.createElement('div');
+            const id = 'typing-' + Date.now();
+            typingDiv.id = id;
+            typingDiv.className = 'w-full animate-fade-in mt-4';
+
+            typingDiv.innerHTML = `
+                <div class="typing-indicator" id="${id}">
+                    <div class="typing-avatar">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <div class="thinking-container">
+                        <span class="thinking-label">Intelligence Processing</span>
+                        <div class="thinking-bar"></div>
+                    </div>
+                </div>
+            `;
+
+            messagesDiv.appendChild(typingDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+            return id;
+        }
+
+        function addImageMessage(role, imageUrl) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 ${role === 'user' ? 'flex-row-reverse' : 'flex-row'}`;
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = `w-8 h-8 rounded-lg flex-shrink-0 opacity-0`; // Invisible spacer
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+            contentDiv.innerHTML = `
+                <div class="relative group rounded-xl overflow-hidden border border-white/10 bg-gray-900 shadow-2xl max-w-md ${role === 'user' ? 'ml-auto' : ''}">
+                    <img src="${imageUrl}" class="w-full h-auto transform transition-transform duration-500 group-hover:scale-105" loading="lazy">
+                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none"></div>
+                    <a href="${imageUrl}" target="_blank" class="absolute bottom-2 right-2 p-2 bg-black/50 backdrop-blur-md rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    </a>
+                </div>
+            `;
+
+            innerDiv.appendChild(avatarDiv);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        function addVideoMessage(role, videoUrl) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 ${role === 'user' ? 'flex-row-reverse' : 'flex-row'}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+            contentDiv.innerHTML = `
+                <div class="rounded-xl overflow-hidden border border-white/10 bg-gray-900 shadow-2xl max-w-lg ${role === 'user' ? 'ml-auto' : ''}">
+                    <video controls class="w-full">
+                        <source src="${videoUrl}" type="video/mp4">
+                        <source src="${videoUrl}" type="video/webm">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            `;
+
+            // Spacer for alignment
+            const spacer = document.createElement('div');
+            spacer.className = "w-8 h-8 flex-shrink-0";
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === WEB MUSIC PLAYER ===
+        function addMusicPlayer(role, musicData) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            // Check if running from file:// (embeds don't work from file://)
+            const isLocalFile = window.location.protocol === 'file:';
+            const youtubeWatchUrl = `https://www.youtube.com/watch?v=${musicData.video_id}`;
+
+            if (isLocalFile) {
+                // For file:// - show play button that opens YouTube
+                contentDiv.innerHTML = `
+                    <div class="rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-purple-900/50 to-indigo-900/50 shadow-2xl max-w-lg backdrop-blur-sm">
+                        <div class="p-4 flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform" onclick="window.open('${youtubeWatchUrl}', '_blank')">
+                                <svg class="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-sm font-semibold text-white">🎵 Music Ready</div>
+                                <div class="text-xs text-gray-400">Click play to open in YouTube</div>
+                            </div>
+                            <a href="${youtubeWatchUrl}" target="_blank" 
+                               class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-full text-sm font-medium transition-colors flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                                </svg>
+                                Open YouTube
+                            </a>
+                        </div>
+                        <div class="h-40 bg-gray-900/50 flex items-center justify-center">
+                            <img src="${musicData.thumbnail}" alt="Video thumbnail" class="h-full w-full object-cover opacity-50" onerror="this.style.display='none'">
+                        </div>
+                    </div>
+                `;
+                // Auto-open YouTube in a new tab
+                window.open(youtubeWatchUrl, '_blank');
+            } else {
+                // For http/https - use iframe embed
+                contentDiv.innerHTML = `
+                    <div class="rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-purple-900/50 to-indigo-900/50 shadow-2xl max-w-lg backdrop-blur-sm">
+                        <div class="p-3 flex items-center gap-3 border-b border-white/10">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <div class="text-sm font-semibold text-white">🎵 Now Playing</div>
+                                <div class="text-xs text-gray-400">YouTube Music</div>
+                            </div>
+                            <a href="${youtubeWatchUrl}" target="_blank" 
+                               class="p-2 text-gray-400 hover:text-white transition-colors" title="Open in YouTube">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                </svg>
+                            </a>
+                        </div>
+                        <div class="aspect-video">
+                            <iframe 
+                                src="${musicData.embed_url}" 
+                                class="w-full h-full"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen>
+                            </iframe>
+                        </div>
+                    </div>
+                `;
+            }
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === PDF PREVIEW (Like Image Preview) ===
+        function addPDFPreview(role, pdfData) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            const thumbnailUrl = pdfData.thumbnail_url
+                ? (pdfData.thumbnail_url.startsWith('http') ? pdfData.thumbnail_url : `${BASE_URL}${pdfData.thumbnail_url}`)
+                : null;
+            const pdfUrl = pdfData.pdf_url.startsWith('http') ? pdfData.pdf_url : `${BASE_URL}${pdfData.pdf_url}`;
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-red-900/30 to-orange-900/30 shadow-2xl max-w-md backdrop-blur-sm group">
+                    <div class="p-4 flex items-start gap-4">
+                        <div class="w-16 h-20 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0 flex items-center justify-center border border-white/10">
+                            ${thumbnailUrl
+                    ? `<img src="${thumbnailUrl}" alt="PDF Preview" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<svg class=\\'w-8 h-8 text-red-400\\' fill=\\'currentColor\\' viewBox=\\'0 0 24 24\\'><path d=\\'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z\\'/><path d=\\'M14 2v6h6\\'/></svg>'">`
+                    : `<svg class="w-8 h-8 text-red-400" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6"/></svg>`
+                }
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-semibold text-white truncate">${pdfData.title || 'Captured PDF'}</div>
+                            <div class="text-xs text-gray-400 truncate mt-1">${pdfData.url || 'Website capture'}</div>
+                            <div class="flex gap-2 mt-3">
+                                <a href="${pdfUrl}" target="_blank" download 
+                                   class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    Download
+                                </a>
+                                <a href="${pdfUrl}" target="_blank" 
+                                   class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                    </svg>
+                                    Open
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === SPOTIFY PLAYER ===
+        function addSpotifyPlayer(role, data) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-[#121212] shadow-2xl max-w-lg mx-auto backdrop-blur-sm group hover:border-[#1DB954]/50 transition-colors duration-300">
+                    <div class="p-3 flex items-center gap-3 border-b border-white/5 bg-gradient-to-r from-[#1DB954]/10 to-transparent">
+                        <div class="w-8 h-8 rounded-full bg-[#1DB954] flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5 text-black" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.2-1.32 9.6-0.66 13.38 1.68.42.181.6.72.36 1.141zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.46-1.02 16.08 1.74.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm font-bold text-white truncate">${data.name || 'Spotify Track'}</div>
+                            <div class="text-xs text-[#1DB954] truncate">playing on spotify</div>
+                        </div>
+                        <a href="${data.external_url}" target="_blank" 
+                           class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors" title="Open in Spotify">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                            </svg>
+                        </a>
+                    </div>
+                    <div class="w-full" style="height: 152px;">
+                        <iframe 
+                            src="${data.embed_url}" 
+                            width="100%" 
+                            height="152" 
+                            frameborder="0" 
+                            allowtransparency="true" 
+                            allow="encrypted-media"
+                            class="bg-[#121212]">
+                        </iframe>
+                    </div>
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === STREAM PLAYER (Radio/TV) ===
+        function addStreamPlayer(role, streamData) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-blue-900/40 to-cyan-900/40 shadow-2xl max-w-lg backdrop-blur-sm">
+                    <div class="p-3 flex items-center gap-3 border-b border-white/10 bg-black/20">
+                        <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center animate-pulse">
+                            <span class="text-xl">📡</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-semibold text-white flex items-center gap-2">
+                                ${streamData.title || 'Live Stream'}
+                                <span class="flex h-2 w-2 relative">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                </span>
+                            </div>
+                            <div class="text-xs text-blue-300">Live Broadcast</div>
+                        </div>
+                    </div>
+                    <div class="aspect-video relative bg-black">
+                        <iframe 
+                            src="${streamData.embed_url}" 
+                            class="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === SCRAPE RESULT CARD ===
+        function addScrapeResult(role, data) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl border border-white/10 bg-[#1e1e2e]/80 p-5 shadow-xl max-w-2xl backdrop-blur-sm group hover:border-[#3b82f6]/50 transition-all">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-bold text-white truncate pr-2">${data.title || 'Web Page'}</h3>
+                            <a href="${data.url}" target="_blank" class="text-sm text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 mt-0.5 truncate">
+                                ${new URL(data.url).hostname}
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="prose prose-invert prose-sm max-w-none text-gray-300 bg-black/20 p-4 rounded-xl border border-white/5 max-h-60 overflow-y-auto custom-scrollbar">
+                        ${formatMessage(data.content)}
+                    </div>
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === VIDEO SUMMARY DISPLAY ===
+        function addVideoSummary(role, data) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            const keyPointsHTML = (data.key_points || []).map(point =>
+                `<li class="text-gray-300 text-sm">${point}</li>`
+            ).join('');
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-br from-red-900/20 to-purple-900/20 shadow-2xl max-w-lg backdrop-blur-sm">
+                    <div class="relative">
+                        <img src="${data.thumbnail}" alt="${data.title}" class="w-full h-48 object-cover opacity-80">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                        <div class="absolute bottom-3 left-3 right-3">
+                            <div class="text-white font-semibold text-sm line-clamp-2">${data.title || 'Video'}</div>
+                            <div class="text-gray-400 text-xs mt-1">${data.duration || ''} • ${data.author || ''}</div>
+                        </div>
+                        <a href="${data.url}" target="_blank" class="absolute top-3 right-3 p-2 bg-red-600 rounded-full hover:bg-red-500 transition-colors">
+                            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </a>
+                    </div>
+                    <div class="p-4">
+                        <div class="text-white text-sm font-medium mb-2">📝 Summary</div>
+                        <div class="text-gray-300 text-sm leading-relaxed">${data.summary || 'No summary available.'}</div>
+                        ${keyPointsHTML ? `
+                            <div class="mt-4">
+                                <div class="text-white text-sm font-medium mb-2">✨ Key Points</div>
+                                <ul class="list-disc list-inside space-y-1">${keyPointsHTML}</ul>
+                            </div>
+                        ` : ''}
+                        ${data.target_audience ? `
+                            <div class="mt-3 text-xs text-gray-500">
+                                🎯 Best for: ${data.target_audience}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+        // === YOUTUBE EMBED FUNCTION ===
+        function extractYouTubeId(url) {
+            // Extract video ID from various YouTube URL formats
+            let videoId = null;
+
+            try {
+                if (url.includes('youtube.com/watch?v=')) {
+                    videoId = url.split('v=')[1].split('&')[0];
+                } else if (url.includes('youtu.be/')) {
+                    videoId = url.split('youtu.be/')[1].split('?')[0];
+                } else if (url.includes('youtube.com/embed/')) {
+                    videoId = url.split('embed/')[1].split('?')[0];
+                } else if (url.includes('youtube.com/v/')) {
+                    videoId = url.split('v/')[1].split('?')[0];
+                }
+            } catch (e) {
+                console.error('[YouTube] Error extracting video ID:', e);
+            }
+
+            return videoId;
+        }
+
+        function addYouTubeEmbed(url, title = 'YouTube Video') {
+            const videoId = extractYouTubeId(url);
+
+            if (!videoId) {
+                console.error('[YouTube] Could not extract video ID from:', url);
+                return;
+            }
+
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-red-500/30 bg-gradient-to-br from-red-900/20 to-black shadow-2xl backdrop-blur-sm">
+                    <div class="flex items-center gap-3 p-4 bg-red-900/30 border-b border-red-500/20">
+                        <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                        <span class="text-white font-semibold text-sm">${title}</span>
+                    </div>
+                    
+                    <div class="relative w-full" style="padding-bottom: 56.25%;">
+                        <iframe 
+                            src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1" 
+                            class="absolute top-0 left-0 w-full h-full"
+                            frameborder="0" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                    
+                    <div class="p-3 bg-black/20 border-t border-white/5">
+                        <a href="${url}" target="_blank" class="text-xs text-red-400 hover:text-red-300 hover:underline flex items-center gap-1">
+                            Open in YouTube
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        </a>
+                    </div>
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+
+            console.log('[YouTube] Embedded video:', videoId);
+        }
+
+        // Helper function to detect and auto-embed YouTube URLs in messages
+        function detectAndEmbedYouTube(text) {
+            const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
+            const matches = text.match(youtubeRegex);
+
+            if (matches && matches.length > 0) {
+                // Embed the first YouTube URL found
+                const url = matches[0].startsWith('http') ? matches[0] : 'https://' + matches[0];
+                setTimeout(() => addYouTubeEmbed(url), 100);
+            }
+        }
+
+        // === CODE EXECUTION DISPLAY ===
+        function addCodeExecution(role, data) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `w-full animate-slide-up mt-4`;
+
+            const innerDiv = document.createElement('div');
+            innerDiv.className = `max-w-3xl mx-auto flex gap-4 md:gap-6 flex-row`;
+
+            // Avatar spacer
+            const spacer = document.createElement('div');
+            spacer.className = "w-9 h-9 flex-shrink-0";
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `flex-1`;
+
+            const statusIcon = data.status === 'success' ? '✅' : '❌';
+            const statusColor = data.status === 'success' ? 'green' : 'red';
+            const escapedCode = (data.code || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escapedOutput = (data.output || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const encodedCode = btoa(unescape(encodeURIComponent(data.code || '')));
+
+            contentDiv.innerHTML = `
+                <div class="rounded-2xl overflow-hidden border border-white/10 bg-gray-900/80 shadow-2xl max-w-lg backdrop-blur-sm">
+                    <div class="p-3 flex items-center justify-between border-b border-white/10 bg-gray-800/50">
+                        <div class="flex items-center gap-2">
+                            <span class="text-${statusColor}-400">${statusIcon}</span>
+                            <span class="text-sm font-medium text-white">Code Execution</span>
+                            <span class="text-xs text-gray-500">${data.language || 'python'}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${data.execution_time ? `<span class="text-xs text-gray-400">⚡ ${data.execution_time}s</span>` : ''}
+                            <button onclick="copyCodeBlock(this, '${encodedCode}')" class="text-xs text-gray-400 hover:text-white transition-colors flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-3 max-h-48 overflow-auto">
+                        <pre class="text-xs text-gray-300 font-mono whitespace-pre-wrap">${escapedCode}</pre>
+                    </div>
+                    ${escapedOutput || data.error ? `
+                        <div class="border-t border-white/10 p-3 bg-gray-800/30">
+                            <div class="text-xs font-medium text-gray-400 mb-2">${data.error ? '❌ Error' : '📤 Output'}</div>
+                            <pre class="text-xs ${data.error ? 'text-red-400' : 'text-green-400'} font-mono whitespace-pre-wrap max-h-32 overflow-auto">${data.error || escapedOutput}</pre>
+                        </div>
+                    ` : ''}
+                    ${data.explanation ? `
+                        <div class="border-t border-white/10 p-3 bg-gray-800/20">
+                            <div class="text-xs text-gray-400">${data.explanation}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            innerDiv.appendChild(spacer);
+            innerDiv.appendChild(contentDiv);
+            messageDiv.appendChild(innerDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+        }
+
+
+
+        function removeTypingIndicator(id) {
+
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        // Logic Preserved...
+        function formatMessage(text) {
+            if (!text) return '';
+
+            // Code blocks with syntax highlighting
+            text = text.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                const langClass = lang ? `language-${lang}` : 'language-plaintext';
+                const langLabel = lang || 'code';
+                const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const encodedCode = btoa(unescape(encodeURIComponent(code.trim())));
+                return `
+                    <div class="code-block-wrapper">
+                        <span class="code-lang-label">${langLabel}</span>
+                        <button class="code-copy-btn" onclick="copyCodeBlock(this, '${encodedCode}')">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            Copy
+                        </button>
+                        <pre><code class="${langClass}">${escapedCode}</code></pre>
+                    </div>
+                `;
+            });
+
+            // Inline code
+            text = text.replace(/`([^`]+)`/g, '<code class="bg-gray-800 px-1.5 py-0.5 rounded text-purple-300 font-mono text-sm">$1</code>');
+            text = text.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-white font-semibold">$1</strong>');
+            text = text.replace(/\n/g, '<br>');
+            return text;
+        }
+
+        function copyCodeBlock(btn, encodedCode) {
+            const code = decodeURIComponent(escape(atob(encodedCode)));
+            navigator.clipboard.writeText(code).then(() => {
+                btn.classList.add('copied');
+                btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy';
+                }, 2000);
+            });
+        }
+
+        function sendQuickMessage(message) {
+            document.getElementById('messageInput').value = message;
+            sendMessage();
+        }
+
+        function newChat() {
+            currentChatId = Date.now();
+            window.currentConversationId = null;
+            chatHistory = [];
+
+            // Clear messages and show welcome
+            const messagesDiv = document.getElementById('messages');
+            const welcome = document.getElementById('welcome');
+
+            // Remove all messages except welcome
+            Array.from(messagesDiv.children).forEach(child => {
+                if (child.id !== 'welcome') {
+                    child.remove();
+                }
+            });
+
+            // Show welcome if hidden
+            if (welcome) {
+                welcome.style.display = 'flex';
+                welcome.classList.remove('hidden');
+            }
+
+            // Clear input
+            const input = document.getElementById('messageInput');
+            if (input) {
+                input.value = '';
+                input.style.height = 'auto';
+            }
+        }
+        function saveChatHistory(message, response) {
+            if (window.authClient && window.authClient.isAuthenticated()) return;
+            const chatData = {
+                id: currentChatId,
+                title: message.substring(0, 30) + '...',
+                date: new Date().toLocaleDateString(),
+                preview: response.substring(0, 50) + '...'
+            };
+            let history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+            const existingIndex = history.findIndex(c => c.id === currentChatId);
+            if (existingIndex > -1) history[existingIndex] = chatData;
+            else history.unshift(chatData);
+            localStorage.setItem('chatHistory', JSON.stringify(history));
+            loadChatHistoryLocal();
+        }
+
+        function loadChatHistoryLocal() {
+            const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+            updateChatHistoryUI(history);
+        }
+
+        function updateChatHistoryUI(historyItems) {
+            const historyDiv = document.getElementById('chatHistory');
+            historyDiv.innerHTML = '';
+
+            historyItems.forEach(chat => {
+                const item = document.createElement('div');
+                const isActive = chat.id == currentChatId;
+                item.className = `p-3 rounded-lg cursor-pointer transition-all duration-200 group flex items-center gap-3 ${isActive ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}`;
+
+                // Content wrapper
+                const contentWrapper = document.createElement('div');
+                contentWrapper.className = "flex-1 flex items-center gap-3 min-w-0";
+                contentWrapper.onclick = () => loadConversation(chat.id);
+                contentWrapper.innerHTML = `
+                    <svg class="w-4 h-4 opacity-50 group-hover:opacity-100 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                    <div class="truncate text-sm font-medium">
+                        ${chat.title || 'New Conversation'}
+                    </div>
+                `;
+
+                // Delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = "opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 hover:bg-white/10 rounded transition-all";
+                deleteBtn.title = "Delete Chat";
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    confirmDeleteChat(chat.id, chat.title);
+                };
+                deleteBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                `;
+
+                item.appendChild(contentWrapper);
+                item.appendChild(deleteBtn);
+                historyDiv.appendChild(item);
+            });
+        }
+
+        // ==================== ENHANCED VOICE SYSTEM ====================
+
+        let recognition = null;
+        let speechSynthesis = window.speechSynthesis;
+        let continuousMode = false;
+
+        // Initialize Web Speech API
+        function initVoice() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => {
+                    isListening = true;
+                    showVoiceStatus('🎤 Listening...', true);
+                    updateVoiceButton(true);
+                };
+
+                recognition.onresult = (event) => {
+                    let transcript = '';
+                    let isFinal = false;
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                        if (event.results[i].isFinal) isFinal = true;
+                    }
+
+                    // Show real-time transcript
+                    document.getElementById('messageInput').value = transcript;
+                    showVoiceStatus(`🎤 "${transcript}"`, true);
+
+                    if (isFinal) {
+                        hideVoiceStatus();
+                        updateVoiceButton(false);
+                        isListening = false;
+                        if (transcript.trim()) {
+                            sendMessage();
+                        }
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech error:', event.error);
+                    isListening = false;
+                    updateVoiceButton(false);
+
+                    // Specific handling for network error - commonly happens in Electron/WebViews
+                    if (event.error === 'network' || event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                        showVoiceStatus('⚠️ Switching to System Voice...', false);
+                        setTimeout(() => {
+                            fallbackServerVoice();
+                        }, 1000);
+                        return;
+                    }
+
+                    let errorMsg = '❌ Voice Error';
+                    if (event.error === 'no-speech') errorMsg = '❌ No speech detected';
+                    if (event.error === 'audio-capture') errorMsg = '❌ No microphone found';
+
+                    showVoiceStatus(errorMsg, false);
+                    setTimeout(hideVoiceStatus, 3000);
+                };
+
+                recognition.onend = () => {
+                    // Only clean up if we didn't just have an error (which handles its own cleanup)
+                    if (isListening) {
+                        isListening = false;
+                        updateVoiceButton(false);
+                        hideVoiceStatus();
+                    }
+
+                    // Continuous mode: restart after speaking
+                    if (continuousMode && !speechSynthesis.speaking) {
+                        setTimeout(() => {
+                            if (continuousMode) toggleVoice();
+                        }, 1500);
+                    }
+                };
+
+                console.log('[Voice] Web Speech API initialized');
+            } else {
+                console.warn('[Voice] Web Speech API not supported');
+            }
+        }
+
+        function toggleVoice() {
+            const btn = document.querySelector('.icon-btn[title="Voice Input"]');
+
+            if (isListening) {
+                // Stop listening
+                if (recognition) recognition.stop();
+                isListening = false;
+                hideVoiceStatus();
+                updateVoiceButton(false);
+                return;
+            }
+
+            if (!recognition) {
+                // Fallback to server API if Web Speech not available
+                fallbackServerVoice();
+                return;
+            }
+
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error('Voice start error:', e);
+            }
+        }
+
+        // Fallback to server-side recognition
+        async function fallbackServerVoice() {
+            const btn = document.querySelector('.icon-btn[title="Voice Input"]');
+            isListening = true;
+            updateVoiceButton(true);
+            showVoiceStatus('🎤 Listening (server)...', true);
+
+            try {
+                const response = await fetch(`${API_URL}/speech/recognize`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                const data = await response.json();
+                hideVoiceStatus();
+
+                if (data.status === 'success' && data.text) {
+                    document.getElementById('messageInput').value = data.text;
+                    sendMessage();
+                }
+            } catch (error) {
+                console.error('Voice error:', error);
+                showVoiceStatus('❌ Voice error', false);
+                setTimeout(hideVoiceStatus, 2000);
+            } finally {
+                isListening = false;
+                updateVoiceButton(false);
+            }
+        }
+
+        function updateVoiceButton(active) {
+            const btn = document.querySelector('.icon-btn[title="Voice Input"]');
+            if (active) {
+                btn.classList.add('text-red-500', 'voice-listening');
+            } else {
+                btn.classList.remove('text-red-500', 'voice-listening');
+            }
+        }
+
+        function showVoiceStatus(text, withWaveform = false) {
+            let status = document.getElementById('voiceStatus');
+            if (!status) {
+                status = document.createElement('div');
+                status.id = 'voiceStatus';
+                status.className = 'voice-status';
+                document.body.appendChild(status);
+            }
+
+            if (withWaveform) {
+                status.innerHTML = `
+                    <div class="voice-waveform">
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <span class="text-white font-medium">${text}</span>
+                `;
+            } else {
+                status.innerHTML = `<span class="text-white font-medium">${text}</span>`;
+            }
+            status.style.display = 'flex';
+        }
+
+        function hideVoiceStatus() {
+            const status = document.getElementById('voiceStatus');
+            if (status) status.style.display = 'none';
+        }
+
+        // ==================== SMART TTS ====================
+
+        function speakResponse(text) {
+            if (!speechSynthesis) return;
+
+            // Cancel any ongoing speech
+            speechSynthesis.cancel();
+
+            const cleanText = text.replace(/<[^>]*>/g, '').replace(/```[\s\S]*?```/g, '');
+
+            let toSpeak = cleanText;
+            let needsReadMore = false;
+
+            // Smart handling: short = all, long = summarize
+            if (cleanText.length > 200) {
+                // Find first sentence/paragraph end
+                const endMarks = ['. ', '! ', '? ', '\n'];
+                let firstEnd = cleanText.length;
+                for (const mark of endMarks) {
+                    const pos = cleanText.indexOf(mark);
+                    if (pos > 30 && pos < firstEnd) firstEnd = pos + 1;
+                }
+
+                toSpeak = cleanText.substring(0, Math.min(firstEnd, 150));
+                needsReadMore = true;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(toSpeak);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+
+            // Try to get a good voice
+            const voices = speechSynthesis.getVoices();
+            const preferred = voices.find(v => v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Zira'));
+            if (preferred) utterance.voice = preferred;
+
+            utterance.onend = () => {
+                if (needsReadMore) {
+                    setTimeout(() => {
+                        const more = new SpeechSynthesisUtterance('The rest is on your screen.');
+                        more.rate = 1.0;
+                        if (preferred) more.voice = preferred;
+                        speechSynthesis.speak(more);
+                    }, 300);
+                }
+
+                // Continuous mode: resume listening
+                if (continuousMode) {
+                    setTimeout(() => {
+                        if (continuousMode && !isListening) toggleVoice();
+                    }, 1000);
+                }
+            };
+
+            speechSynthesis.speak(utterance);
+        }
+
+        // Toggle continuous conversation mode
+        function toggleContinuousMode() {
+            continuousMode = !continuousMode;
+            const btn = document.getElementById('continuousModeBtn');
+            if (btn) {
+                if (continuousMode) {
+                    btn.classList.add('bg-green-500/20', 'border-green-500/50', 'text-green-400');
+                    btn.classList.remove('bg-white/5');
+                    showVoiceStatus('✅ Continuous mode ON', false);
+                    setTimeout(() => {
+                        hideVoiceStatus();
+                        toggleVoice();
+                    }, 1000);
+                } else {
+                    btn.classList.remove('bg-green-500/20', 'border-green-500/50', 'text-green-400');
+                    btn.classList.add('bg-white/5');
+                    showVoiceStatus('Continuous mode OFF', false);
+                    setTimeout(hideVoiceStatus, 1500);
+                }
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('load', initVoice);
+
+        // Export/Settings/File Logic
+        function exportChat() {
+            const text = chatHistory.map(chat => `User: ${chat.user}\nAssistant: ${chat.assistant}\n\n`).join('');
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'jarvis-chat-' + Date.now() + '.txt';
+            a.click();
+        }
+
+        function openSettings() { alert('Settings panel coming soon!'); }
+
+        // Switch to Speech Mode (launches GUI_Ultimate.py)
+        async function switchToSpeechMode() {
+            try {
+                addMessage('assistant', '🎤 Launching Speech Mode... The voice interface will open in a new window.');
+
+                const response = await fetch(`${API_URL}/switch/speech`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    addMessage('assistant', '✅ Speech Mode launched! You can now use voice-to-voice interaction.');
+                } else {
+                    addMessage('assistant', `⚠️ Could not launch Speech Mode: ${data.message}`);
+                }
+            } catch (error) {
+                addMessage('assistant', '⚠️ Could not connect to server. Make sure the API is running.');
+                console.error('Speech mode switch error:', error);
+            }
+        }
+
+        async function attachFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '*/*';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (file.type.startsWith('image/')) {
+                    await uploadAndAnalyzeImage(file);
+                } else {
+                    await uploadToSupabase(file);
+                }
+            };
+            input.click();
+        }
+
+        async function uploadAndAnalyzeImage(file) {
+            addMessage('user', `🖼️ Analyzing image: ${file.name}`);
+            const typingId = addTypingIndicator();
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${API_URL}/analyze-image`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                removeTypingIndicator(typingId);
+
+                if (data.success && data.analysis) {
+                    const result = data.analysis;
+
+                    // Show friendly response
+                    if (result.friendly_response) {
+                        addMessage('assistant', result.friendly_response);
+                    } else {
+                        addMessage('assistant', result.description || "Image analyzed.");
+                    }
+
+                    // Show detected text if curious (and wasn't part of friendly response)
+                    /*
+                    if (result.text_detected && (!result.friendly_response || !result.friendly_response.includes(result.text_detected))) {
+                         addMessage('assistant', `**Detected Text:**\n${result.text_detected}`);
+                    }
+                    */
+
+                } else {
+                    addMessage('assistant', `❌ Analysis failed: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                removeTypingIndicator(typingId);
+                console.error('Analysis Error:', error);
+                addMessage('assistant', `❌ Connection error during analysis.`);
+            }
+        }
+
+        async function uploadToSupabase(file) {
+            addMessage('user', `📎 Uploading to Cloud: ${file.name}`);
+            const typingId = addTypingIndicator();
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const response = await fetch(`${API_URL}/files/upload`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY },
+                    body: formData
+                });
+                const data = await response.json();
+                removeTypingIndicator(typingId);
+
+                if (data.status === 'success') {
+                    addMessage('assistant', `✅ File uploaded: ${data.file.name}`);
+                } else {
+                    addMessage('assistant', `❌ Upload failed: ${data.error}`);
+                }
+            } catch (e) {
+                removeTypingIndicator(typingId);
+                addMessage('assistant', `❌ Error: ${e}`);
+            }
+        }
+
+        // Paste Listener
+        window.addEventListener('load', () => {
+            const msgInput = document.getElementById('messageInput');
+            if (msgInput) {
+                msgInput.addEventListener('paste', async (e) => {
+                    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                    for (const item of items) {
+                        if (item.kind === 'file' && item.type.startsWith('image/')) {
+                            const file = item.getAsFile();
+                            await uploadAndAnalyzeImage(file);
+                        }
+                    }
+                });
+            }
+        });
+
+
+        // Firebase Auth Integration (Preserved)
+        window.addEventListener('DOMContentLoaded', () => {
+            loadChatHistoryLocal(); // Load local first
+            if (window.authClient && !window.authClient.isAuthenticated()) {
+                addLoginButton();
+            } else if (window.authClient) {
+                loadUserData();
+            }
+        });
+
+        function addLoginButton() {
+            const headerActions = document.querySelector('.header-actions');
+            if (headerActions && !document.getElementById('login-btn')) {
+                const loginBtn = document.createElement('button');
+                loginBtn.id = 'login-btn';
+                loginBtn.className = 'p-2 text-gray-400 hover:text-white transition-colors';
+                loginBtn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>';
+                loginBtn.onclick = () => showAuthModal('login');
+                headerActions.prepend(loginBtn);
+            }
+        }
+
+        async function loadUserData() {
+            try {
+                const user = window.authClient.getUser();
+                updateUserUI(user);
+                const conversations = await window.authClient.get('/chat/history?limit=50');
+                if (conversations && conversations.success) {
+                    // Map Firebase format to UI format
+                    const uiConvos = conversations.conversations.map(c => ({
+                        id: c.id,
+                        title: c.title || 'Untitled Chat',
+                        date: c.created_at
+                    }));
+                    updateChatHistoryUI(uiConvos);
+                }
+            } catch (error) {
+                console.error('[AUTH] Error loading user data:', error);
+            }
+        }
+
+        function updateUserUI(user) {
+            const sidebarFooter = document.querySelector('.sidebar-footer');
+            if (sidebarFooter) {
+                // Clear existing buttons to prevent dups
+                sidebarFooter.innerHTML = '';
+
+                // Settings button (re-add)
+                sidebarFooter.innerHTML += `
+                    <button onclick="openSettings()" class="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors text-sm font-medium mb-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span>Settings</span>
+                    </button>
+                `;
+
+                const userBtn = document.createElement('button');
+                userBtn.className = 'flex items-center gap-3 w-full p-2 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors text-sm font-medium';
+                userBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <span class="truncate">${user.email}</span>
+                `;
+                userBtn.onclick = () => showUserMenu();
+                sidebarFooter.appendChild(userBtn);
+            }
+        }
+
+        function showUserMenu() {
+            if (confirm('Logout?')) {
+                window.authClient.logout();
+                window.location.reload();
+            }
+        }
+
+        async function loadConversation(conversationId) {
+            console.log('[CHAT] Loading conversation:', conversationId);
+
+            // Check if user is authenticated
+            if (window.authClient && window.authClient.isAuthenticated()) {
+                // Authenticated user - load from Firebase
+                try {
+                    const response = await window.authClient.get(`/chat/history/${conversationId}`);
+                    console.log('[CHAT] Response:', response);
+
+                    if (response && response.success) {
+                        const conversation = response.conversation;
+                        window.currentConversationId = conversationId;
+                        displayConversation(conversationId, conversation.messages || []);
+                    } else {
+                        console.error('[CHAT] Failed to load conversation:', response);
+                        alert('Could not load this conversation. It may have been deleted.');
+                    }
+                } catch (e) {
+                    console.error('[CHAT] Error loading conversation:', e);
+                    alert('Error loading conversation: ' + e.message);
+                }
+            } else {
+                // Not authenticated - this is a local chat (can't reload full history)
+                // Just highlight the chat and set it as current
+                console.log('[CHAT] Not authenticated - using local mode');
+                currentChatId = conversationId;
+                window.currentConversationId = conversationId;
+
+                // Highlight the selected chat
+                highlightActiveChat(conversationId);
+
+                // For local mode, we can't reload the messages since they're not persisted
+                // Just show a message that this chat is now active
+                alert('Local chats cannot be reloaded after refresh. Please log in to save your chat history to the cloud!');
+            }
+        }
+
+        function displayConversation(conversationId, messages) {
+            // Highlight the active chat
+            highlightActiveChat(conversationId);
+
+            const messagesContainer = document.getElementById('messages');
+            messagesContainer.innerHTML = '';
+
+            // Hide welcome screen
+            const welcome = document.getElementById('welcome');
+            if (welcome) {
+                welcome.style.display = 'none';
+                welcome.classList.add('hidden');
+            }
+
+            if (messages && messages.length > 0) {
+                messages.forEach(msg => {
+                    addMessage(msg.role, msg.content);
+                });
+            } else {
+                addMessage('assistant', 'This conversation is empty. Start chatting!');
+            }
+        }
+
+        function highlightActiveChat(conversationId) {
+            const historyDiv = document.getElementById('chatHistory');
+            Array.from(historyDiv.children).forEach(child => {
+                // Reset classes
+                child.className = `p-3 rounded-lg cursor-pointer transition-all duration-200 group flex items-center gap-3 text-gray-400 hover:text-gray-200 hover:bg-white/5`;
+            });
+            // We'll rely on the item ordering to highlight - this is a simplification
+        }
+
+        async function confirmBulkDelete() {
+            if (!confirm("Are you sure you want to delete ALL chat history? This cannot be undone.")) return;
+
+            if (window.authClient && window.authClient.isAuthenticated()) {
+                try {
+                    const token = window.authClient.getToken();
+                    const response = await fetch(`${API_URL}/chat/history/delete_all`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const res = await response.json();
+
+                    if (response.ok && (res.success || res.status === 'success')) {
+                        location.reload();
+                    } else {
+                        alert("Failed to delete chats: " + (res?.error || 'Unknown error'));
+                    }
+                } catch (e) {
+                    console.error("Bulk delete error:", e);
+                    alert("Error deleting chats. Check console.");
+                }
+            } else {
+                localStorage.setItem('chatHistory', '[]');
+                loadChatHistoryLocal();
+                newChat();
+            }
+        }
+
+        async function confirmDeleteChat(chatId, title) {
+            if (!confirm(`Delete chat "${title}"?`)) return;
+
+            if (window.authClient && window.authClient.isAuthenticated()) {
+                try {
+                    let res;
+                    if (window.authClient.delete) {
+                        res = await window.authClient.delete(`/chat/history/${chatId}`);
+                    } else {
+                        // Fallback
+                        console.warn("authClient.delete not found");
+                        return;
+                    }
+
+                    if (res && res.success) {
+                        loadUserData(); // Refresh list
+                        if (window.currentConversationId == chatId) newChat();
+                    } else {
+                        alert("Failed to delete chat: " + (res?.error || 'Unknown error'));
+                    }
+                } catch (e) { console.error(e); }
+            } else {
+                let history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+                history = history.filter(c => c.id != chatId);
+                localStorage.setItem('chatHistory', JSON.stringify(history));
+                loadChatHistoryLocal();
+                if (currentChatId == chatId) newChat();
+            }
+        }
+
+        // Helper for Firebase saving
+        async function saveMessageToFirebase(userMessage, aiResponse) {
+            if (!window.authClient || !window.authClient.isAuthenticated()) return;
+            try {
+                if (!window.currentConversationId) {
+                    const conv = await window.authClient.post('/chat/history', { title: userMessage.substring(0, 50) });
+                    if (conv.success) {
+                        window.currentConversationId = conv.conversation_id;
+                        loadUserData();
+                    }
+                }
+                await window.authClient.post(`/chat/history/${window.currentConversationId}/messages`, { role: 'user', content: userMessage });
+                await window.authClient.post(`/chat/history/${window.currentConversationId}/messages`, { role: 'assistant', content: aiResponse });
+            } catch (e) { console.error(e); }
+        }
+
+        // Focus Input
+        document.getElementById('messageInput').focus();
+    </script>
+
+    <!-- Scripts -->
+    <script src="quick-search.js"></script>
+    <script src="command-palette.js"></script>
+    <script src="file-manager.js"></script>
+    <script src="../static/js/auth-client.js"></script>
+
+    <!-- Ensure overlays are hidden on load -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Hide quick search
+            const quickSearchOverlay = document.getElementById('quick-search-overlay');
+            if (quickSearchOverlay) {
+                quickSearchOverlay.classList.add('hidden');
+                quickSearchOverlay.classList.remove('active');
+            }
+
+            // Hide file manager
+            const fileManager = document.getElementById('fileManager');
+            if (fileManager) {
+                fileManager.classList.remove('open');
+            }
+
+            // Hide command palette
+            const commandPalette = document.getElementById('commandPalette');
+            if (commandPalette) {
+                commandPalette.classList.remove('active');
+                commandPalette.style.display = 'none';
+            }
+        });
+    </script>
+    <!-- ═══════════════════════════════════════════════════════════════
+         🔥 NEW BEAST MODE FEATURES - HTML COMPONENTS
+         ═══════════════════════════════════════════════════════════════ -->
+
+
+
+    <!-- Image Lightbox -->
+    <div class="lightbox-overlay" id="lightboxOverlay" onclick="closeLightbox()">
+        <button class="lightbox-close" onclick="closeLightbox()">×</button>
+        <img id="lightboxImage" class="lightbox-image" src="" alt="Full size image">
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div class="shortcuts-modal" id="shortcutsModal" onclick="if(event.target === this) closeShortcutsModal()">
+        <div class="shortcuts-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-white">⌨️ Keyboard Shortcuts</h3>
+                <button onclick="closeShortcutsModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="shortcut-row"><span class="text-gray-300">New chat</span><span class="shortcut-key">Ctrl +
+                    N</span></div>
+            <div class="shortcut-row"><span class="text-gray-300">Quick search</span><span class="shortcut-key">Ctrl +
+                    K</span></div>
+            <div class="shortcut-row"><span class="text-gray-300">Voice input</span><span class="shortcut-key">Ctrl +
+                    M</span></div>
+            <div class="shortcut-row"><span class="text-gray-300">Send message</span><span
+                    class="shortcut-key">Enter</span></div>
+            <div class="shortcut-row"><span class="text-gray-300">New line</span><span class="shortcut-key">Shift +
+                    Enter</span></div>
+            <div class="shortcut-row"><span class="text-gray-300">Show shortcuts</span><span
+                    class="shortcut-key">?</span></div>
+            <div class="shortcut-row"><span class="text-gray-300">Focus input</span><span class="shortcut-key">/</span>
+            </div>
+            <div class="shortcut-row"><span class="text-gray-300">Toggle sidebar</span><span class="shortcut-key">Ctrl +
+                    B</span></div>
+        </div>
+    </div>
+
+    <!-- Export Chat Modal -->
+    <div class="export-modal" id="exportModal" onclick="if(event.target === this) closeExportModal()">
+        <div class="export-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-white">📤 Export Chat</h3>
+                <button onclick="closeExportModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+
+            <button class="export-btn" onclick="exportChat('markdown')">
+                <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div>
+                    <div class="font-medium">Markdown</div>
+                    <div class="text-xs text-gray-500">Export as .md file</div>
+                </div>
+            </button>
+
+            <button class="export-btn" onclick="exportChat('json')">
+                <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 2H7a2 2 0 00-2 2v16l7-3 7 3V4a2 2 0 00-2-2z" />
+                </svg>
+                <div>
+                    <div class="font-medium">JSON</div>
+                    <div class="text-xs text-gray-500">Structured data format</div>
+                </div>
+            </button>
+
+            <button class="export-btn" onclick="exportChat('text')">
+                <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div>
+                    <div class="font-medium">Plain Text</div>
+                    <div class="text-xs text-gray-500">Simple text file</div>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Beast Mode Features JavaScript -->
+    <script>
+        // ═══════════════════════════════════════════════════════════════
+        // 🔥 BEAST MODE FEATURES - JAVASCRIPT
+        // ═══════════════════════════════════════════════════════════════
+
+        // Quick Actions Dropdown
+        function toggleQuickActions(e) {
+            if (e) e.stopPropagation();
+            const dropdown = document.getElementById('quickActionsDropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('hidden');
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('quickActionsDropdown');
+            const btn = document.querySelector('button[onclick="toggleQuickActions(event)"]');
+            if (dropdown && !dropdown.classList.contains('hidden') && !dropdown.contains(e.target) && (!btn || !btn.contains(e.target))) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        // Quick Actions
+        function quickAction(type) {
+            // Close dropdown
+            const dropdown = document.getElementById('quickActionsDropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+
+            const input = document.getElementById('messageInput');
+            const prompts = {
+                music: 'play ',
+                image: 'generate an image of ',
+                search: 'search for ',
+                translate: 'translate to ',
+                pdf: 'generate a pdf about ',
+                radio: 'play radio ',
+                scrape: 'scrape website ',
+                capture: 'capture website as pdf ',
+                workflow: 'start workflow '
+            };
+            input.value = prompts[type] || '';
+            input.focus();
+            autoResize(input);
+        }
+
+        // Lightbox
+        function openLightbox(src) {
+            const overlay = document.getElementById('lightboxOverlay');
+            const img = document.getElementById('lightboxImage');
+            img.src = src;
+            overlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightboxOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Shortcuts Modal
+        function openShortcutsModal() {
+            document.getElementById('shortcutsModal').classList.add('active');
+        }
+
+        function closeShortcutsModal() {
+            document.getElementById('shortcutsModal').classList.remove('active');
+        }
+
+        // Export Modal
+        function openExportModal() {
+            document.getElementById('exportModal').classList.add('active');
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').classList.remove('active');
+        }
+
+        function exportChat(format) {
+            closeExportModal();
+
+            // Collect messages from DOM
+            const messages = [];
+            const messageElements = document.querySelectorAll('#messages > div');
+
+            messageElements.forEach(el => {
+                if (el.id === 'welcome') return;
+
+                const isUser = el.querySelector('.justify-end') !== null;
+                const contentEl = el.querySelector('.prose') || el.querySelector('.text-gray-100');
+                if (contentEl) {
+                    messages.push({
+                        role: isUser ? 'user' : 'assistant',
+                        content: contentEl.innerText || contentEl.textContent
+                    });
+                }
+            });
+
+            if (messages.length === 0) {
+                alert('No messages to export!');
+                return;
+            }
+
+            let content, filename, mimeType;
+            const date = new Date().toISOString().split('T')[0];
+
+            if (format === 'markdown') {
+                content = '# KAI Chat Export\n\n';
+                content += `*Exported on ${new Date().toLocaleString()}*\n\n---\n\n`;
+                messages.forEach(msg => {
+                    if (msg.role === 'user') {
+                        content += `## 👤 You\n\n${msg.content}\n\n`;
+                    } else {
+                        content += `## 🤖 KAI\n\n${msg.content}\n\n`;
+                    }
+                    content += '---\n\n';
+                });
+                filename = `kai-chat-${date}.md`;
+                mimeType = 'text/markdown';
+            } else if (format === 'json') {
+                content = JSON.stringify({
+                    exported_at: new Date().toISOString(),
+                    messages: messages
+                }, null, 2);
+                filename = `kai-chat-${date}.json`;
+                mimeType = 'application/json';
+            } else {
+                content = `KAI Chat Export - ${new Date().toLocaleString()}\n${'='.repeat(50)}\n\n`;
+                messages.forEach(msg => {
+                    content += `[${msg.role === 'user' ? 'You' : 'KAI'}]:\n${msg.content}\n\n`;
+                });
+                filename = `kai-chat-${date}.txt`;
+                mimeType = 'text/plain';
+            }
+
+            // Download
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Copy Message
+        function copyMessage(btn, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                btn.classList.add('copied');
+                btn.innerHTML = '✓ Copied';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy';
+                }, 2000);
+            });
+        }
+
+        // Global Keyboard Shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Show shortcuts with ?
+            if (e.key === '?' && !e.target.matches('input, textarea')) {
+                e.preventDefault();
+                openShortcutsModal();
+            }
+
+            // Focus input with /
+            if (e.key === '/' && !e.target.matches('input, textarea')) {
+                e.preventDefault();
+                document.getElementById('messageInput').focus();
+            }
+
+            // Ctrl + N = New chat
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                newChat();
+            }
+
+            // Ctrl + B = Toggle sidebar
+            if (e.ctrlKey && e.key === 'b') {
+                e.preventDefault();
+                toggleSidebar();
+            }
+
+            // Ctrl + M = Voice
+            if (e.ctrlKey && e.key === 'm') {
+                e.preventDefault();
+                toggleVoice();
+            }
+
+            // Escape = Close modals
+            if (e.key === 'Escape') {
+                closeLightbox();
+                closeShortcutsModal();
+            }
+        });
+
+        // Make images clickable for lightbox
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG' && e.target.closest('#messages')) {
+                openLightbox(e.target.src);
+            }
+        });
+
+        // Response timer
+        let responseStartTime = null;
+
+        function startResponseTimer() {
+            responseStartTime = Date.now();
+        }
+
+        function getResponseTime() {
+            if (!responseStartTime) return null;
+            const elapsed = Date.now() - responseStartTime;
+            responseStartTime = null;
+            if (elapsed < 1000) return `${elapsed}ms`;
+            return `${(elapsed / 1000).toFixed(1)}s`;
+        }
+
+        // Smart Suggestions
+        function updateSmartSuggestions(context = 'initial') {
+            const container = document.getElementById('smartSuggestions');
+            if (!container) return;
+
+            let suggestions = [];
+
+            if (context === 'initial') {
+                return; // No initial suggestions as per user request
+            } else if (context === 'assistant') {
+                suggestions = ['Explain more 🧠', 'Summarize this 📝', 'Give an example 💡', 'Another topic 🔄'];
+            } else if (context === 'image') {
+                suggestions = ['Make it realistic 📸', 'Cyberpunk style 🌆', 'Anime style 🎨', 'Another one 🔄'];
+            }
+
+            container.innerHTML = suggestions.map(text =>
+                `<button onclick="sendQuickMessage('${text}')" class="suggestion-chip animate-fade-in">${text}</button>`
+            ).join('');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSmartSuggestions('initial');
+        });
+
+        console.log('🔥 KAI Beast Mode Features Loaded!');
+    </script>
+
+    <!-- Beast Mode Enhancements -->
+    <script src="kai-beast-mode.js"></script>
+</body>
+
+</html>
