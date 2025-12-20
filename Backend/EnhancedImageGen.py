@@ -275,6 +275,169 @@ class EnhancedImageGenerator:
                 })
         
         return images
+    
+    # ==================== V2 FEATURES ====================
+    
+    def ai_enhance_prompt(self, simple_prompt: str) -> str:
+        """
+        Use AI (LLM) to creatively enhance a simple prompt into a detailed image description.
+        This creates much better images than basic keyword enhancement.
+        """
+        try:
+            from Backend.LLM import ChatCompletion
+            
+            enhance_request = f"""You are an expert AI image prompt engineer. Transform this simple idea into a detailed, vivid image generation prompt.
+
+INPUT: {simple_prompt}
+
+Create a prompt that includes:
+- Detailed visual description
+- Lighting and atmosphere
+- Art style or medium
+- Quality modifiers (8k, detailed, professional)
+- Mood and emotion
+
+Respond with ONLY the enhanced prompt, no explanations. Keep it under 100 words."""
+
+            enhanced = ChatCompletion(
+                messages=[{"role": "user", "content": enhance_request}],
+                model="llama-3.3-70b-versatile",
+                text_only=True,
+                inject_memory=False
+            )
+            
+            print(f"[ImageGen V2] AI Enhanced: {simple_prompt} → {enhanced[:80]}...")
+            return enhanced.strip()
+            
+        except Exception as e:
+            print(f"[ImageGen V2] AI enhancement failed: {e}, using basic enhancement")
+            return self.enhance_prompt(simple_prompt)
+    
+    def smart_generate(self, prompt: str, num_images: int = 1) -> Dict:
+        """
+        Smart generate: AI analyzes the prompt and picks the best style automatically.
+        Returns images with metadata about what style was chosen.
+        """
+        try:
+            from Backend.LLM import ChatCompletion
+            
+            # Ask AI to pick best style
+            style_request = f"""Analyze this image request and pick the best style from this list:
+realistic, anime, oil_painting, watercolor, sketch, 3d_render, cyberpunk, fantasy, minimalist, vintage, comic, pixel_art, neon, vaporwave, steampunk, art_nouveau, pop_art, impressionist, surrealist, gothic, pastel, low_poly, isometric, film_noir, ukiyo_e, art_deco
+
+REQUEST: {prompt}
+
+Reply with ONLY the style name, nothing else."""
+
+            chosen_style = ChatCompletion(
+                messages=[{"role": "user", "content": style_request}],
+                model="llama-3.1-8b-instant",
+                text_only=True,
+                inject_memory=False
+            ).strip().lower().replace(" ", "_")
+            
+            # Validate style
+            valid_styles = ["realistic", "anime", "oil_painting", "watercolor", "sketch", "3d_render", 
+                          "cyberpunk", "fantasy", "minimalist", "vintage", "comic", "pixel_art",
+                          "neon", "vaporwave", "steampunk", "art_nouveau", "pop_art", "impressionist",
+                          "surrealist", "gothic", "pastel", "low_poly", "isometric", "film_noir", 
+                          "ukiyo_e", "art_deco"]
+            
+            if chosen_style not in valid_styles:
+                chosen_style = "realistic"
+            
+            print(f"[ImageGen V2] Smart Generate chose style: {chosen_style}")
+            
+            # Generate with chosen style
+            images = self.generate_with_style(prompt, chosen_style, num_images)
+            
+            return {
+                "status": "success",
+                "images": images,
+                "style": chosen_style,
+                "prompt": prompt,
+                "message": f"Generated {len(images)} image(s) in {chosen_style} style"
+            }
+            
+        except Exception as e:
+            print(f"[ImageGen V2] Smart generate error: {e}")
+            # Fallback to realistic
+            images = self.generate_with_style(prompt, "realistic", num_images)
+            return {
+                "status": "success",
+                "images": images,
+                "style": "realistic",
+                "prompt": prompt,
+                "message": f"Generated {len(images)} image(s)"
+            }
+    
+    # ==================== SOCIAL MEDIA PRESETS ====================
+    
+    def generate_instagram_post(self, prompt: str) -> List[str]:
+        """Generate Instagram-optimized square image (1080x1080)"""
+        enhanced = f"{prompt}, instagram aesthetic, vibrant, eye-catching, social media worthy"
+        return self.generate_pollinations(enhanced, 1, width=1080, height=1080)
+    
+    def generate_instagram_story(self, prompt: str) -> List[str]:
+        """Generate Instagram Story image (1080x1920)"""
+        enhanced = f"{prompt}, vertical format, instagram story aesthetic, engaging"
+        return self.generate_pollinations(enhanced, 1, width=1080, height=1920)
+    
+    def generate_twitter_post(self, prompt: str) -> List[str]:
+        """Generate Twitter/X optimized image (1200x675)"""
+        enhanced = f"{prompt}, twitter card format, attention-grabbing, social media"
+        return self.generate_pollinations(enhanced, 1, width=1200, height=675)
+    
+    def generate_youtube_thumbnail(self, prompt: str) -> List[str]:
+        """Generate YouTube thumbnail (1280x720)"""
+        enhanced = f"{prompt}, youtube thumbnail, bold, eye-catching, high contrast, exciting"
+        return self.generate_pollinations(enhanced, 1, width=1280, height=720)
+    
+    def generate_linkedin_post(self, prompt: str) -> List[str]:
+        """Generate LinkedIn optimized image (1200x627)"""
+        enhanced = f"{prompt}, professional, corporate, linkedin aesthetic, business"
+        return self.generate_pollinations(enhanced, 1, width=1200, height=627)
+    
+    def generate_facebook_cover(self, prompt: str) -> List[str]:
+        """Generate Facebook cover photo (820x312)"""
+        enhanced = f"{prompt}, facebook cover, wide format, professional"
+        return self.generate_pollinations(enhanced, 1, width=820, height=312)
+    
+    def generate_wallpaper(self, prompt: str, resolution: str = "1080p") -> List[str]:
+        """Generate desktop wallpaper"""
+        resolutions = {
+            "1080p": (1920, 1080),
+            "2k": (2560, 1440),
+            "4k": (3840, 2160),
+            "ultrawide": (2560, 1080)
+        }
+        w, h = resolutions.get(resolution, (1920, 1080))
+        enhanced = f"{prompt}, desktop wallpaper, stunning, high quality, {resolution}"
+        return self.generate_pollinations(enhanced, 1, width=w, height=h)
+    
+    def generate_phone_wallpaper(self, prompt: str) -> List[str]:
+        """Generate phone wallpaper (1080x2340)"""
+        enhanced = f"{prompt}, phone wallpaper, vertical, stunning, amoled friendly"
+        return self.generate_pollinations(enhanced, 1, width=1080, height=2340)
+    
+    def get_available_styles(self) -> List[str]:
+        """Return list of all available styles"""
+        return [
+            "realistic", "anime", "oil_painting", "watercolor", "sketch", "3d_render",
+            "cyberpunk", "fantasy", "minimalist", "vintage", "comic", "pixel_art",
+            "neon", "vaporwave", "steampunk", "art_nouveau", "pop_art", "impressionist",
+            "surrealist", "gothic", "pastel", "low_poly", "isometric", "film_noir",
+            "ukiyo_e", "art_deco"
+        ]
+    
+    def get_available_presets(self) -> List[str]:
+        """Return list of all available presets/formats"""
+        return [
+            "square", "portrait", "landscape", "banner", "hd",
+            "instagram_post", "instagram_story", "twitter_post", "youtube_thumbnail",
+            "linkedin_post", "facebook_cover", "wallpaper_1080p", "wallpaper_4k", 
+            "phone_wallpaper"
+        ]
 
 # Global instance
 enhanced_image_gen = EnhancedImageGenerator()
