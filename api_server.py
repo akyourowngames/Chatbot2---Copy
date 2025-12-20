@@ -5826,6 +5826,57 @@ def agent_analyze():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/v1/agents/code', methods=['POST'])
+def agent_code():
+    """
+    Access to coder agent for code writing, debugging, and execution.
+    
+    Body: {
+        "task": "write python code to sort a list",
+        "code": "optional code to run/debug",
+        "action": "write" | "debug" | "explain" | "run"
+    }
+    """
+    try:
+        from Backend.Agents.CoderAgent import coder_agent
+        
+        data = request.json
+        task = data.get('task', '')
+        code = data.get('code', '')
+        action = data.get('action', 'auto')
+        
+        if not task and not code:
+            return jsonify({"error": "Task or code is required"}), 400
+        
+        print(f"[CODER] Action: {action}, Task: {(task or code)[:50]}...")
+        
+        context = {"code": code} if code else None
+        
+        if action == "run" and code:
+            # Direct code execution
+            result = coder_agent.run(code)
+        elif action == "debug":
+            result = coder_agent._debug_code(task, context)
+        elif action == "explain":
+            result = coder_agent._explain_code(task, context)
+        else:
+            # Auto or write
+            result = coder_agent.execute(task or f"Debug this code: {code}", context)
+        
+        return jsonify({
+            "status": result.get("status"),
+            "task_type": result.get("task_type"),
+            "result": result.get("output"),
+            "code": result.get("code"),
+            "execution_time": result.get("execution_time"),
+            "error": result.get("error")
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
 # ==================== STARTUP ====================
 
 def load_all_integrations():

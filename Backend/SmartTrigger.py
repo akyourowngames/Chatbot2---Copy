@@ -451,6 +451,41 @@ class SmartTrigger:
                     "summarize url", "summarize this url", "analyze url", "read this url",
                     "add for rag", "upload for rag", "document chat", "pdf chat"
                 ]
+            },
+            
+            # Multi-Agent System (NEW)
+            "agents": {
+                "patterns": [
+                    r"(?:jarvis\s+)?(?:use\s+)?(?:agents?|team|multi.?agent)\s+(?:to\s+)?(.+)",
+                    r"(?:jarvis\s+)?(?:research\s+and\s+write|research\s+then\s+write)\s+(?:about\s+)?(.+)",
+                    r"(?:jarvis\s+)?(?:deeply?\s+)?(?:research|investigate|analyze)\s+(.+?)\s+(?:and\s+)?(?:write|create|generate)\s+(?:a\s+)?(?:report|article|summary)",
+                    r"(?:jarvis\s+)?(?:have\s+the\s+)?agents?\s+(?:work\s+on|handle|do)\s+(.+)",
+                    r"(?:jarvis\s+)?(?:full\s+)?(?:research\s+)?pipeline\s+(?:on|for|about)\s+(.+)",
+                ],
+                "keywords": [
+                    "use agents", "use the agents", "multi-agent", "agent team",
+                    "research and write", "research then write", "deeply research",
+                    "have agents", "agents work on", "full pipeline",
+                    "research pipeline", "agent pipeline", "team of agents"
+                ]
+            },
+            
+            # Code Execution (NEW)
+            "code": {
+                "patterns": [
+                    r"(?:jarvis\s+)?(?:run|execute)\s+(?:this\s+)?(?:python\s+)?code\s*:?\s*(.+)?",
+                    r"(?:jarvis\s+)?(?:write|create|generate)\s+(?:a\s+)?(?:python|javascript|code)\s+(?:for|to|that)\s+(.+)",
+                    r"(?:jarvis\s+)?(?:debug|fix)\s+(?:this\s+)?(?:code|error|bug)\s*:?\s*(.+)?",
+                    r"(?:jarvis\s+)?(?:explain|what\s+does)\s+(?:this\s+)?code\s*:?\s*(.+)?",
+                    r"(?:jarvis\s+)?(?:help\s+me\s+)?(?:code|program|write\s+a\s+script)\s+(?:for|to|that)\s+(.+)",
+                ],
+                "keywords": [
+                    "run code", "run this code", "execute code", "execute python",
+                    "write code", "write python", "create code", "generate code",
+                    "debug code", "fix code", "fix this error", "debug this",
+                    "explain code", "what does this code do", "help me code",
+                    "write a script", "code for", "program that", "python code"
+                ]
             }
         }
         self.use_classifier = use_classifier

@@ -19,6 +19,7 @@ class TaskType(Enum):
     RESEARCH = "research"
     WRITE = "write"
     ANALYZE = "analyze"
+    CODE = "code"  # Code writing, debugging, execution
     RESEARCH_AND_WRITE = "research_and_write"
     FULL_PIPELINE = "full_pipeline"  # Research → Write → Analyze
 
@@ -41,11 +42,13 @@ class AgentOrchestrator:
             from Backend.Agents.ResearchAgent import research_agent
             from Backend.Agents.WriterAgent import writer_agent
             from Backend.Agents.AnalystAgent import analyst_agent
+            from Backend.Agents.CoderAgent import coder_agent
             
             self.agents = {
                 "research": research_agent,
                 "writer": writer_agent,
-                "analyst": analyst_agent
+                "analyst": analyst_agent,
+                "coder": coder_agent
             }
             logger.info(f"[ORCHESTRATOR] Loaded {len(self.agents)} agents")
         except Exception as e:
@@ -76,11 +79,13 @@ Available agents:
 1. RESEARCH - Web search, fact-finding, data gathering
 2. WRITER - Content creation, articles, reports
 3. ANALYST - Review, improve, fact-check
+4. CODER - Code writing, debugging, execution
 
 Reply with ONLY one of these task types:
 - RESEARCH (just need facts/research)
 - WRITE (just need content creation)
 - ANALYZE (just need analysis/review)
+- CODE (code writing, debugging, or execution)
 - RESEARCH_AND_WRITE (research then write)
 - FULL_PIPELINE (research, write, then review)
 
@@ -97,6 +102,7 @@ Answer with just the type, nothing else:"""
                 "RESEARCH": TaskType.RESEARCH,
                 "WRITE": TaskType.WRITE,
                 "ANALYZE": TaskType.ANALYZE,
+                "CODE": TaskType.CODE,
                 "RESEARCH_AND_WRITE": TaskType.RESEARCH_AND_WRITE,
                 "FULL_PIPELINE": TaskType.FULL_PIPELINE
             }
@@ -110,10 +116,11 @@ Answer with just the type, nothing else:"""
         # Define steps based on task type
         steps_map = {
             TaskType.RESEARCH: ["research"],
-            TaskType.WRITE: ["write"],
-            TaskType.ANALYZE: ["analyze"],
-            TaskType.RESEARCH_AND_WRITE: ["research", "write"],
-            TaskType.FULL_PIPELINE: ["research", "write", "analyze"]
+            TaskType.WRITE: ["writer"],
+            TaskType.ANALYZE: ["analyst"],
+            TaskType.CODE: ["coder"],
+            TaskType.RESEARCH_AND_WRITE: ["research", "writer"],
+            TaskType.FULL_PIPELINE: ["research", "writer", "analyst"]
         }
         
         return {
@@ -143,12 +150,13 @@ Answer with just the type, nothing else:"""
         else:
             steps_map = {
                 TaskType.RESEARCH: ["research"],
-                TaskType.WRITE: ["write"],
-                TaskType.ANALYZE: ["analyze"],
-                TaskType.RESEARCH_AND_WRITE: ["research", "write"],
-                TaskType.FULL_PIPELINE: ["research", "write", "analyze"]
+                TaskType.WRITE: ["writer"],
+                TaskType.ANALYZE: ["analyst"],
+                TaskType.CODE: ["coder"],
+                TaskType.RESEARCH_AND_WRITE: ["research", "writer"],
+                TaskType.FULL_PIPELINE: ["research", "writer", "analyst"]
             }
-            steps = steps_map.get(task_type, ["research", "write", "analyze"])
+            steps = steps_map.get(task_type, ["research", "writer", "analyst"])
         
         logger.info(f"[ORCHESTRATOR] Execution plan: {steps}")
         
@@ -167,9 +175,9 @@ Answer with just the type, nothing else:"""
             # Add previous results to context
             if results:
                 context["previous_results"] = results[-1].get("output", "")
-                if step == "write":
+                if step == "writer":
                     context["research"] = results[-1].get("output", "")
-                elif step == "analyze":
+                elif step == "analyst":
                     context["content"] = results[-1].get("output", "")
             
             result = agent.execute(task, context)
@@ -200,17 +208,36 @@ Answer with just the type, nothing else:"""
         return final_result
     
     def _log_execution(self, task: str, result: Dict):
-        """Log execution for history."""
-        self.execution_log.append({
+        """Log execution for history and save to Supabase."""
+        log_entry = {
             "task": task[:100],
             "status": result.get("status"),
             "steps": result.get("steps_executed"),
             "time": result.get("execution_time_seconds"),
             "timestamp": result.get("timestamp")
-        })
-        # Keep last 50 executions
+        }
+        
+        self.execution_log.append(log_entry)
+        
+        # Keep last 50 executions in memory
         if len(self.execution_log) > 50:
             self.execution_log = self.execution_log[-50:]
+        
+        # Save to Supabase for persistent history
+        try:
+            from Backend.SupabaseDB import supabase_db
+            if supabase_db and supabase_db.client:
+                supabase_db.client.table('agent_logs').insert({
+                    'task': task[:500],
+                    'status': result.get('status'),
+                    'task_type': result.get('task_type'),
+                    'steps': ','.join(result.get('steps_executed', [])),
+                    'execution_time': result.get('execution_time_seconds'),
+                    'output_preview': result.get('final_output', '')[:1000]
+                }).execute()
+                logger.info("[ORCHESTRATOR] Logged to Supabase")
+        except Exception as e:
+            logger.debug(f"[ORCHESTRATOR] Supabase logging skipped: {e}")
     
     def get_status(self) -> Dict[str, Any]:
         """Get orchestrator and agent status."""
@@ -239,6 +266,10 @@ Answer with just the type, nothing else:"""
     def full_pipeline(self, task: str) -> Dict[str, Any]:
         """Shortcut: Full pipeline (research → write → analyze)."""
         return self.execute(task, TaskType.FULL_PIPELINE)
+    
+    def code(self, code_task: str) -> Dict[str, Any]:
+        """Shortcut: Run coder agent only."""
+        return self.execute(code_task, TaskType.CODE)
 
 
 # Global instance
@@ -261,6 +292,7 @@ def run_multi_agent_task(task: str, mode: str = "auto") -> Dict[str, Any]:
         "research": TaskType.RESEARCH,
         "write": TaskType.WRITE,
         "analyze": TaskType.ANALYZE,
+        "code": TaskType.CODE,
         "research_write": TaskType.RESEARCH_AND_WRITE,
         "full": TaskType.FULL_PIPELINE
     }

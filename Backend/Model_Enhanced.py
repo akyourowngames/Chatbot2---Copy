@@ -176,6 +176,14 @@ def FirstLayerDMM(prompt: str = "test"):
         elif trigger_type == "rag":
             # Handle RAG (Chat with Documents) - NEW
             return [f"rag {command}"]
+        
+        elif trigger_type == "agents":
+            # Handle Multi-Agent System - NEW
+            return [f"agents {command}"]
+        
+        elif trigger_type == "code":
+            # Handle Code Execution - NEW
+            return [f"code {command}"]
     
     # AUTO-DETECT PDF/SUPABASE URLs in message (for direct URL summarization)
     import re
@@ -187,6 +195,16 @@ def FirstLayerDMM(prompt: str = "test"):
         # Check if user wants to summarize or chat with it
         if any(word in prompt_lower for word in ['summarize', 'summarise', 'sum up', 'summary', 'chat', 'read', 'add', 'upload', 'analyze', 'analyse']):
             return [f"rag upload {matched_url}"]
+    
+    # AUTO-DETECT MULTI-AGENT REQUESTS
+    agent_keywords = ["research and write", "research then write", "deeply research", "full pipeline", "use agents"]
+    if any(kw in prompt_lower for kw in agent_keywords):
+        return [f"agents {prompt}"]
+    
+    # AUTO-DETECT CODE REQUESTS
+    code_keywords = ["run this code", "execute code", "write python", "debug code", "fix this error"]
+    if any(kw in prompt_lower for kw in code_keywords):
+        return [f"code {prompt}"]
     
     # FAST REGEX PATTERNS (50-100ms response)
     if "time" in prompt_lower and "what" in prompt_lower:
