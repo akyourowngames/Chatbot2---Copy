@@ -2420,6 +2420,133 @@ def chat():
                      except Exception as e:
                          response_text = f"❌ Form fill failed: {e}"
 
+                 # Handle ANIME commands - NEW
+                 elif trigger_type == "anime":
+                     try:
+                         from Backend.AnimeStreaming import anime_system
+                         import re
+                         
+                         query_lower = query.lower()
+                         
+                         # Watch anime
+                         if "watch" in query_lower or "play" in query_lower or "stream" in query_lower:
+                             # Extract anime name and episode
+                             ep_match = re.search(r'episode\s*(\d+)', query_lower)
+                             episode = int(ep_match.group(1)) if ep_match else 1
+                             
+                             # Clean anime name
+                             anime_name = re.sub(r'(watch|play|stream|anime|episode\s*\d+)', '', query_lower).strip()
+                             anime_name = anime_name.replace('jarvis', '').strip()
+                             
+                             if anime_name:
+                                 result = anime_system.watch_anime(anime_name, episode)
+                                 if result.get("status") == "success":
+                                     anime_info = result.get("anime", {})
+                                     streams = result.get("streams", [])
+                                     stream_url = streams[0].get("url") if streams else "No stream"
+                                     response_text = f"""🎬 **{anime_info.get('title', anime_name)}** - Episode {episode}
+
+📺 **Found {len(streams)} streaming sources!**
+▶️ Quality: {streams[0].get('quality', 'HD') if streams else 'HD'}
+
+🔗 Stream ready! Use the anime player to watch."""
+                                 else:
+                                     response_text = f"❌ {result.get('message', 'Anime not found')}"
+                             else:
+                                 response_text = "❓ What anime do you want to watch? Try: 'Watch Demon Slayer episode 5'"
+                         
+                         # Trending anime
+                         elif "trending" in query_lower or "popular" in query_lower:
+                             result = anime_system.get_trending()
+                             if result.get("status") == "success":
+                                 trending = result.get("trending", [])[:5]
+                                 anime_list = "\n".join([f"• **{a.get('title')}** ⭐{a.get('score', 'N/A')}" for a in trending])
+                                 response_text = f"🔥 **Trending Anime:**\n\n{anime_list}\n\nSay 'watch [name]' to start streaming!"
+                             else:
+                                 response_text = "❌ Could not fetch trending anime"
+                         
+                         # Search anime
+                         elif "search" in query_lower or "find" in query_lower:
+                             search_query = re.sub(r'(search|find|anime|jarvis)', '', query_lower).strip()
+                             if search_query:
+                                 result = anime_system.search_anime(search_query, 5)
+                                 results = result.get("results", [])
+                                 if results:
+                                     anime_list = "\n".join([f"• **{a.get('title')}**" for a in results[:5]])
+                                     response_text = f"🔍 **Found {len(results)} anime:**\n\n{anime_list}\n\nSay 'watch [name]' to stream!"
+                                 else:
+                                     response_text = f"❌ No anime found for '{search_query}'"
+                             else:
+                                 response_text = "❓ What anime are you looking for?"
+                         
+                         # Info
+                         elif "info" in query_lower or "about" in query_lower:
+                             info_query = re.sub(r'(info|about|anime|jarvis|details)', '', query_lower).strip()
+                             if info_query:
+                                 result = anime_system.get_anime_info(info_query)
+                                 if result.get("status") == "success":
+                                     anime = result.get("anime", {})
+                                     response_text = f"""📺 **{anime.get('title')}**
+
+⭐ Score: {anime.get('score', 'N/A')}/10
+📺 Episodes: {anime.get('episodes', 'Unknown')}
+🎭 Genres: {', '.join(anime.get('genres', [])[:3])}
+
+📝 {anime.get('synopsis', 'No synopsis')[:300]}..."""
+                                 else:
+                                     response_text = f"❌ No info found for '{info_query}'"
+                             else:
+                                 response_text = "❓ Which anime do you want info about?"
+                         
+                         else:
+                             response_text = """🎬 **Anime Commands:**
+• "Watch [anime] episode [num]" - Stream anime
+• "Trending anime" - See what's popular
+• "Search anime [name]" - Find anime
+• "Anime info [name]" - Get details"""
+                     
+                     except Exception as e:
+                         print(f"[ANIME] Error: {e}")
+                         import traceback
+                         traceback.print_exc()
+                         response_text = f"❌ Anime error: {e}"
+
+                 # Handle AGENTS commands - NEW  
+                 elif trigger_type == "agents":
+                     try:
+                         from Backend.Agents.AgentOrchestrator import run_multi_agent_task
+                         result = run_multi_agent_task(command, "auto")
+                         if result.get("status") == "success":
+                             output = result.get("final_output", "")[:1000]
+                             steps = ", ".join(result.get("steps_executed", []))
+                             response_text = f"""🤖 **Multi-Agent Task Complete!**
+
+📋 Steps: {steps}
+⏱️ Time: {result.get('execution_time_seconds', 0)}s
+
+{output}"""
+                         else:
+                             response_text = f"❌ Agent error: {result.get('message', 'Unknown')}"
+                     except Exception as e:
+                         response_text = f"❌ Agent system error: {e}"
+
+                 # Handle CODE commands - NEW
+                 elif trigger_type == "code":
+                     try:
+                         from Backend.Agents.CoderAgent import coder_agent
+                         result = coder_agent.execute(command)
+                         if result.get("status") == "success":
+                             output = result.get("output", "")[:1500]
+                             response_text = f"""💻 **Code Result:**
+
+{output}"""
+                             if result.get("execution_time"):
+                                 response_text += f"\n\n⏱️ Executed in {result.get('execution_time')}s"
+                         else:
+                             response_text = f"❌ Code error: {result.get('error', 'Unknown')}"
+                     except Exception as e:
+                         response_text = f"❌ Coder error: {e}"
+
                  # Handle other types with Automation
                  else:
                      if Automation:
