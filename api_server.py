@@ -6077,6 +6077,177 @@ def get_practice_question():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ==================== ANIME STREAMING ====================
+# 🎬 Watch anime directly with KAI
+
+@app.route('/api/v1/anime/search', methods=['GET', 'POST'])
+def search_anime_endpoint():
+    """
+    Search for anime.
+    
+    GET: /api/v1/anime/search?q=naruto
+    POST: {"query": "naruto", "limit": 10}
+    """
+    try:
+        from Backend.AnimeStreaming import anime_system
+        
+        if request.method == 'GET':
+            query = request.args.get('q', '')
+            limit = int(request.args.get('limit', 10))
+        else:
+            data = request.json
+            query = data.get('query', '')
+            limit = data.get('limit', 10)
+        
+        if not query:
+            return jsonify({"error": "Query is required"}), 400
+        
+        result = anime_system.search_anime(query, limit)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/anime/watch', methods=['POST'])
+def watch_anime_endpoint():
+    """
+    Get streaming links for an anime episode.
+    
+    Body: {
+        "anime": "Demon Slayer",
+        "episode": 1
+    }
+    """
+    try:
+        from Backend.AnimeStreaming import anime_system
+        
+        data = request.json
+        anime_name = data.get('anime', '')
+        episode = data.get('episode', 1)
+        
+        if not anime_name:
+            return jsonify({"error": "Anime name is required"}), 400
+        
+        result = anime_system.watch_anime(anime_name, episode)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/anime/episodes/<anime_id>', methods=['GET'])
+def get_anime_episodes(anime_id):
+    """Get all episodes for an anime."""
+    try:
+        from Backend.AnimeStreaming import anime_system
+        
+        result = anime_system.get_episodes(anime_id)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/anime/stream/<episode_id>', methods=['GET'])
+def get_stream_links(episode_id):
+    """Get streaming links for a specific episode."""
+    try:
+        from Backend.AnimeStreaming import anime_system
+        
+        result = anime_system.get_streaming_links(episode_id)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/anime/info', methods=['GET', 'POST'])
+def anime_info_endpoint():
+    """
+    Get detailed anime information.
+    
+    GET: /api/v1/anime/info?name=naruto
+    POST: {"name": "naruto"}
+    """
+    try:
+        from Backend.AnimeStreaming import anime_system
+        
+        if request.method == 'GET':
+            name = request.args.get('name', '')
+        else:
+            data = request.json
+            name = data.get('name', '')
+        
+        if not name:
+            return jsonify({"error": "Anime name is required"}), 400
+        
+        result = anime_system.get_anime_info(name)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/anime/trending', methods=['GET'])
+def anime_trending_endpoint():
+    """Get trending anime."""
+    try:
+        from Backend.AnimeStreaming import anime_system
+        
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('limit', 10))
+        
+        result = anime_system.get_trending(page, per_page)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/anime/seasonal', methods=['GET'])
+def anime_seasonal_endpoint():
+    """Get popular anime this season."""
+    try:
+        from Backend.AnimeStreaming import anime_system
+        
+        result = anime_system.get_popular_this_season()
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/anime/watchlist', methods=['GET', 'POST', 'DELETE'])
+def anime_watchlist_endpoint():
+    """
+    Manage anime watchlist.
+    
+    GET: Get watchlist
+    POST: Add to watchlist {"anime": "Naruto"}
+    DELETE: Remove from watchlist {"anime": "Naruto"}
+    """
+    try:
+        from Backend.AnimeStreaming import anime_system
+        
+        user_id = request.args.get('user_id', 'default')
+        
+        if request.method == 'GET':
+            result = anime_system.get_watchlist(user_id)
+        elif request.method == 'POST':
+            data = request.json
+            anime_name = data.get('anime', '')
+            anime_id = data.get('id')
+            if not anime_name:
+                return jsonify({"error": "Anime name required"}), 400
+            result = anime_system.add_to_watchlist(user_id, anime_name, anime_id)
+        else:  # DELETE
+            data = request.json
+            anime_name = data.get('anime', '')
+            if not anime_name:
+                return jsonify({"error": "Anime name required"}), 400
+            result = anime_system.remove_from_watchlist(user_id, anime_name)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ==================== STARTUP ====================
 
 def load_all_integrations():

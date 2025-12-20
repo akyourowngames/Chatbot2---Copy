@@ -486,6 +486,23 @@ class SmartTrigger:
                     "explain code", "what does this code do", "help me code",
                     "write a script", "code for", "program that", "python code"
                 ]
+            },
+            
+            # Anime Streaming (NEW)
+            "anime": {
+                "patterns": [
+                    r"(?:jarvis\s+)?(?:watch|play|stream)\s+(?:anime\s+)?(.+?)(?:\s+episode\s+(\d+))?",
+                    r"(?:jarvis\s+)?(?:search|find)\s+(?:anime\s+)?(.+)",
+                    r"(?:jarvis\s+)?(?:trending|popular)\s+anime",
+                    r"(?:jarvis\s+)?(?:anime\s+)?(?:info|details|about)\s+(.+)",
+                    r"(?:jarvis\s+)?(?:what|which)\s+anime\s+(?:to watch|is good|is trending)",
+                ],
+                "keywords": [
+                    "watch anime", "play anime", "stream anime", "anime episode",
+                    "search anime", "find anime", "trending anime", "popular anime",
+                    "anime info", "anime details", "anime this season",
+                    "what anime", "which anime", "best anime", "new anime"
+                ]
             }
         }
         self.use_classifier = use_classifier
