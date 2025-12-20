@@ -217,30 +217,24 @@ class DocumentGenerator:
 
         doc.build(elements, onFirstPage=self._add_header_footer, onLaterPages=self._add_header_footer)
         
-        # Upload to Supabase in production
-        pdf_url = None
-        if os.getenv('FLASK_ENV') == 'production' or os.getenv('USE_SUPABASE_STORAGE', 'false').lower() == 'true':
-            try:
-                from Backend.SupabaseDB import supabase_db
-                if supabase_db:
-                    print(f"[DocumentGenerator] Uploading PDF to Supabase...")
-                    pdf_url = supabase_db.upload_pdf(filepath, folder='documents')
-                    if pdf_url:
-                        print(f"[DocumentGenerator] Uploaded to: {pdf_url}")
-                        # Delete local file after upload
-                        os.remove(filepath)
-                    else:
-                        print(f"[DocumentGenerator] Upload failed, keeping local file")
-                        pdf_url = f"/data/Documents/{filename}"
-            except Exception as e:
-                print(f"[DocumentGenerator] Supabase upload error: {e}, using local path")
-                pdf_url = f"/data/Documents/{filename}"
-        else:
-            # Local development - use local path
-            pdf_url = f"/data/Documents/{filename}"
+        # Always upload to Supabase Storage (kai-images bucket)
+        pdf_url = f"/data/Documents/{filename}"  # Default fallback
+        try:
+            from Backend.SupabaseDB import supabase_db
+            if supabase_db:
+                print(f"[DocumentGenerator] Uploading PDF to Supabase (kai-images bucket)...")
+                cloud_url = supabase_db.upload_pdf(filepath, folder='documents')
+                if cloud_url:
+                    print(f"[DocumentGenerator] Uploaded to: {cloud_url}")
+                    pdf_url = cloud_url
+                    # Keep local file as backup (don't delete)
+                else:
+                    print(f"[DocumentGenerator] Upload failed, using local path")
+        except Exception as e:
+            print(f"[DocumentGenerator] Supabase upload error: {e}, using local path")
         
         return {
-            "filepath": filepath if os.path.exists(filepath) else None,
+            "filepath": filepath,
             "url": pdf_url,
             "filename": filename,
             "title": title

@@ -342,7 +342,7 @@ class SupabaseDB:
         """
         filename = os.path.basename(file_path)
         storage_path = f"{folder}/{filename}"
-        return self.upload_file(file_path, storage_path, bucket='kai-pdfs', content_type='application/pdf')
+        return self.upload_file(file_path, storage_path, bucket='kai-images', content_type='application/pdf')
     
     def upload_image(self, file_path: str, folder: str = 'generated') -> str:
         """
