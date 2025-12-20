@@ -4280,6 +4280,123 @@ def list_generated_images():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ==================== RAG - CHAT WITH DOCUMENTS ====================
+
+# Global RAG instance (lazy loaded)
+document_rag = None
+
+def get_document_rag():
+    """Lazy load DocumentRAG module."""
+    global document_rag
+    if document_rag is None:
+        try:
+            from Backend.DocumentRAG import document_rag as rag
+            document_rag = rag
+        except Exception as e:
+            print(f"[WARN] DocumentRAG not available: {e}")
+            return None
+    return document_rag
+
+@app.route('/api/v1/rag/upload-url', methods=['POST'])
+@require_api_key
+def rag_upload_url():
+    """Upload a URL for RAG (Chat with Documents)"""
+    rag = get_document_rag()
+    if not rag:
+        return jsonify({"error": "RAG module not available"}), 503
+    
+    try:
+        data = request.json
+        url = data.get('url', '').strip()
+        
+        if not url:
+            return jsonify({"error": "URL required"}), 400
+        
+        # Validate URL format
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        
+        result = rag.upload_url(url)
+        
+        if result.get("status") == "success":
+            return jsonify({
+                "status": "success",
+                "type": "rag_upload",
+                "doc_id": result.get("doc_id"),
+                "title": result.get("title"),
+                "char_count": result.get("char_count"),
+                "message": result.get("message")
+            })
+        else:
+            return jsonify({"error": result.get("message", "Upload failed")}), 400
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/rag/chat', methods=['POST'])
+@require_api_key
+def rag_chat():
+    """Chat with an uploaded document"""
+    rag = get_document_rag()
+    if not rag:
+        return jsonify({"error": "RAG module not available"}), 503
+    
+    try:
+        data = request.json
+        query = data.get('query', '').strip()
+        doc_id = data.get('doc_id')  # Optional - uses active document if not provided
+        
+        if not query:
+            return jsonify({"error": "Query required"}), 400
+        
+        result = rag.chat_with_document(query, doc_id)
+        
+        if result.get("status") == "success":
+            return jsonify({
+                "status": "success",
+                "type": "rag_response",
+                "response": result.get("response"),
+                "document_title": result.get("document_title"),
+                "doc_id": result.get("doc_id")
+            })
+        else:
+            return jsonify({"error": result.get("message", "Chat failed")}), 400
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/rag/documents', methods=['GET'])
+@require_api_key
+def rag_list_documents():
+    """List uploaded RAG documents"""
+    rag = get_document_rag()
+    if not rag:
+        return jsonify({"error": "RAG module not available"}), 503
+    
+    try:
+        documents = rag.list_documents()
+        return jsonify({
+            "status": "success",
+            "count": len(documents),
+            "documents": documents
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/rag/document/<doc_id>', methods=['DELETE'])
+@require_api_key
+def rag_delete_document(doc_id):
+    """Delete a RAG document"""
+    rag = get_document_rag()
+    if not rag:
+        return jsonify({"error": "RAG module not available"}), 503
+    
+    try:
+        result = rag.delete_document(doc_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ==================== BEAST-LEVEL FEATURES ====================
 
 # --- MULTI-SOURCE MUSIC PLAYER ---

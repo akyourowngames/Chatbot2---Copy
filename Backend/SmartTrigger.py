@@ -430,6 +430,27 @@ class SmartTrigger:
                     r"(?:start|stop)\s+(?:instagram\s+)?(?:monitoring|dm monitoring)",
                 ],
                 "keywords": ["instagram", "insta", "ig", "dm", "follow", "unfollow", "instagram post", "instagram message"]
+            },
+            
+            # RAG - Chat with Documents (NEW)
+            "rag": {
+                "patterns": [
+                    r"(?:jarvis\s+)?(?:add|upload|use)\s+(?:this\s+)?(?:url|link|website|page)\s+(?:for\s+)?(?:chat|questions?|rag)\s*:?\s*(.+)?",
+                    r"(?:jarvis\s+)?(?:chat|talk)\s+(?:with|about)\s+(?:my\s+)?(?:document|pdf|file|url)",
+                    r"(?:jarvis\s+)?(?:what|tell me|explain)\s+(?:does|about)\s+(?:the\s+)?(?:document|pdf|article)\s+(?:say|mention|describe)\s+(?:about\s+)?(.+)?",
+                    r"(?:jarvis\s+)?(?:ask|question)\s+(?:the\s+)?(?:document|pdf|article)\s+(?:about\s+)?(.+)?",
+                    r"(?:jarvis\s+)?(?:summarize|analyze|read)\s+(?:this\s+)?(?:url|link|page|website)\s*:?\s*(.+)?",
+                    r"(?:jarvis\s+)?(?:add|upload)\s+(.+?)\s+(?:for|to)\s+(?:chat|rag|questions?)",
+                ],
+                "keywords": [
+                    "add url for chat", "upload url for chat", "use url for chat",
+                    "add link for chat", "upload link for questions", "add website for chat",
+                    "chat with document", "chat with my document", "talk to document",
+                    "chat with pdf", "talk to pdf", "ask document", "ask pdf",
+                    "what does the document say", "what does my pdf say",
+                    "summarize url", "summarize this url", "analyze url", "read this url",
+                    "add for rag", "upload for rag", "document chat", "pdf chat"
+                ]
             }
         }
         self.use_classifier = use_classifier
