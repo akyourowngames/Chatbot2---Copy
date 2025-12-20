@@ -2547,19 +2547,26 @@ def chat():
                      except Exception as e:
                          response_text = f"❌ Coder error: {e}"
 
-                 # Handle other types with Automation
+                 # Handle unknown trigger types - Show helpful response
                  else:
-                     if Automation:
-                         asyncio.run(Automation([command]))
-                         response_text = f"✅ Executed {trigger_type} command: {command}"
-                     else:
-                         response_text = "Automation module is not loaded."
-                         
+                     response_text = f"""🤔 I didn't recognize that command type: '{trigger_type}'
+
+💡 **Try these instead:**
+• "Watch [anime name]" - Stream anime
+• "Trending anime" - Popular shows
+• "Generate image of..." - Create images
+• "Translate [text] to [language]" - Translate
+• "Search [query]" - Web search
+• "Write code to..." - Code generation
+• "Research and write about..." - Multi-agent task
+
+What would you like me to do?"""
+                          
              except Exception as e:
-                 print(f"[ERROR] Automation error: {e}")
+                 print(f"[ERROR] Command processing error: {e}")
                  import traceback
                  traceback.print_exc()
-                 response_text = f"Automation error: {str(e)}"
+                 response_text = f"Command processing error: {str(e)}"
         
         # 7. FILE OPERATIONS
         elif trigger_type == "file":
