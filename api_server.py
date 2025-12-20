@@ -5877,6 +5877,206 @@ def agent_code():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+# ==================== MIND-BLOWING FEATURES ====================
+
+# --- AI DEBATE ARENA ---
+@app.route('/api/v1/debate', methods=['POST'])
+def start_debate():
+    """
+    Start an AI debate on any topic.
+    
+    Body: {
+        "topic": "Should AI be regulated?",
+        "rounds": 3  // optional, default 3
+    }
+    """
+    try:
+        from Backend.DebateArena import debate_arena
+        
+        data = request.json
+        topic = data.get('topic', '')
+        rounds = data.get('rounds', 3)
+        
+        if not topic:
+            return jsonify({"error": "Topic is required"}), 400
+        
+        print(f"[DEBATE] Starting: {topic}")
+        result = debate_arena.start_debate(topic, rounds)
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/debate/quick', methods=['POST'])
+def quick_debate():
+    """Quick 1-round debate summary."""
+    try:
+        from Backend.DebateArena import debate_arena
+        
+        data = request.json
+        topic = data.get('topic', '')
+        
+        if not topic:
+            return jsonify({"error": "Topic is required"}), 400
+        
+        result = debate_arena.quick_debate(topic)
+        return jsonify({"status": "success", "debate": result}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- PERSONALITY CLONE ---
+@app.route('/api/v1/clone/create', methods=['POST'])
+def create_personality_clone():
+    """
+    Create a personality clone from messages.
+    
+    Body: {
+        "messages": ["msg1", "msg2", ...],  // OR
+        "text": "block of text to analyze",
+        "user_id": "optional_id"
+    }
+    """
+    try:
+        from Backend.PersonalityClone import personality_clone
+        
+        data = request.json
+        messages = data.get('messages', [])
+        text = data.get('text', '')
+        user_id = data.get('user_id', 'default')
+        
+        if text and not messages:
+            result = personality_clone.create_clone_from_text(text, user_id)
+        elif messages:
+            result = personality_clone.analyze_messages(messages, user_id)
+        else:
+            return jsonify({"error": "Provide 'messages' array or 'text' block"}), 400
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/clone/chat', methods=['POST'])
+def chat_with_clone():
+    """
+    Chat with a personality clone.
+    
+    Body: {
+        "message": "What do you think about...?",
+        "user_id": "the_clone_id"
+    }
+    """
+    try:
+        from Backend.PersonalityClone import personality_clone
+        
+        data = request.json
+        message = data.get('message', '')
+        user_id = data.get('user_id', 'default')
+        
+        if not message:
+            return jsonify({"error": "Message is required"}), 400
+        
+        response = personality_clone.chat_as_clone(user_id, message)
+        return jsonify({"status": "success", "response": response}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/clone/profile/<user_id>', methods=['GET'])
+def get_clone_profile(user_id):
+    """Get a personality clone's profile."""
+    try:
+        from Backend.PersonalityClone import personality_clone
+        
+        profile = personality_clone.get_profile(user_id)
+        if profile:
+            return jsonify({"status": "success", "profile": profile}), 200
+        else:
+            return jsonify({"error": "Clone not found"}), 404
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- AI JOB INTERVIEWER ---
+@app.route('/api/v1/interview/start', methods=['POST'])
+def start_interview_session():
+    """
+    Start a job interview session.
+    
+    Body: {
+        "job_role": "Software Engineer",
+        "company": "Google",  // optional
+        "experience": "mid",  // junior/mid/senior
+        "user_id": "optional"
+    }
+    """
+    try:
+        from Backend.JobInterviewer import job_interviewer
+        
+        data = request.json
+        job_role = data.get('job_role', '')
+        company = data.get('company', 'a top company')
+        experience = data.get('experience', 'mid')
+        user_id = data.get('user_id', 'default')
+        
+        if not job_role:
+            return jsonify({"error": "job_role is required"}), 400
+        
+        result = job_interviewer.start_interview(job_role, company, experience, user_id)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/interview/answer', methods=['POST'])
+def submit_interview_answer():
+    """
+    Submit an answer to the current interview question.
+    
+    Body: {
+        "answer": "Your answer here...",
+        "user_id": "optional"
+    }
+    """
+    try:
+        from Backend.JobInterviewer import job_interviewer
+        
+        data = request.json
+        answer = data.get('answer', '')
+        user_id = data.get('user_id', 'default')
+        
+        if not answer:
+            return jsonify({"error": "Answer is required"}), 400
+        
+        result = job_interviewer.answer_question(answer, user_id)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/interview/question', methods=['POST'])
+def get_practice_question():
+    """Get a random practice interview question."""
+    try:
+        from Backend.JobInterviewer import job_interviewer
+        
+        data = request.json
+        job_role = data.get('job_role', 'Software Engineer')
+        
+        result = job_interviewer.quick_question(job_role)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ==================== STARTUP ====================
 
 def load_all_integrations():
