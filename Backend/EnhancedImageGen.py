@@ -70,23 +70,27 @@ class EnhancedImageGenerator:
                                     # Delete local file after upload
                                     os.remove(filepath)
                                     images.append(cloud_url)
-                                    print(f"✓ Generated and uploaded image {i+1}/{num_images}")
+                                    print(f"[OK] Generated and uploaded image {i+1}/{num_images}: {cloud_url}")
                                 else:
                                     # Upload failed, use local path
                                     images.append(f"/data/Images/{filename}")
-                                    print(f"✓ Generated image {i+1}/{num_images} (local)")
-                        except Exception as upload_error:
-                            print(f"[EnhancedImageGen] Upload error: {upload_error}, using local path")
+                                    print(f"[WARN] Upload returned None, using local: {filename}")
+                            else:
+                                print("[WARN] supabase_db is None, using local path")
+                                images.append(f"/data/Images/{filename}")
+                                
+                        except Exception as upload_err:
+                            print(f"[WARN] Supabase Upload Error: {upload_err}")
                             images.append(f"/data/Images/{filename}")
                     else:
                         # Local development - use local path
                         images.append(filepath)
-                        print(f"✓ Generated image {i+1}/{num_images}")
+                        print(f"[OK] Generated image {i+1}/{num_images} (local)")
                 else:
-                    print(f"✗ Failed to generate image {i+1}")
+                    print(f"[FAIL] Failed to generate image {i+1}")
                     
             except Exception as e:
-                print(f"Error generating image {i+1}: {e}")
+                print(f"[ERROR] Error generating image {i+1}: {e}")
         
         return images
     

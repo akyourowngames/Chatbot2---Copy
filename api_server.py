@@ -137,6 +137,9 @@ for key, value in _env.items():
         if len(parts) >= 2:
             API_KEYS[parts[0]] = {"name": parts[1], "tier": parts[2] if len(parts) > 2 else "free"}
 
+# Debug: Print loaded API keys (keys only, not full config for security)
+print(f"[AUTH] Loaded {len(API_KEYS)} API key(s): {list(API_KEYS.keys())}")
+
 # ==================== BACKEND IMPORTS ====================
 # Importing backend modules with error handling to avoid server crash
 
@@ -1060,7 +1063,7 @@ def web_music_play():
 # ==================== NEW FEATURE ENDPOINTS ====================
 
 @app.route('/api/v1/image/generate', methods=['POST'])
-@require_auth
+@require_api_key
 @rate_limit("image_gen")
 def generate_image_api():
     """Generate an image from prompt"""
@@ -3006,51 +3009,7 @@ def vision_analyze():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/v1/image/generate', methods=['POST'])
-@require_api_key
-def image_generate():
-    data = request.json
-    prompt = data.get('prompt', '')
-    if not prompt: return jsonify({"error": "Prompt required"}), 400
-    
-    try:
-        # Try enhanced image gen first
-        if enhanced_image_gen:
-            style = data.get('style', 'realistic')
-            images = enhanced_image_gen.generate_with_style(prompt, style, num_images=1)
-            if images:
-                image_urls = []
-                for img_path in images:
-                    img_filename = os.path.basename(img_path)
-                    image_urls.append(f"/data/{img_filename}")
-                # Save to history for context
-                try:
-                    from Backend.Chatbot_Enhanced import add_interaction_to_history
-                    cmd = f"Generate {style} image of {prompt}"
-                    # Add image markdown to response for history
-                    response_md = f"Generated {style} image of {prompt}:\n\n![Generated Image]({image_urls[0]})"
-                    add_interaction_to_history(cmd, response_md)
-                except Exception:
-                    pass
-                return jsonify({"status": "success", "images": image_urls})
-        
-        # Fallback to standard image generation
-        if GenerateImages:
-            GenerateImages(prompt)
-            
-            # Find generated images
-            safe_prompt = prompt.replace(" ", "_")[:30]
-            images = []
-            for i in range(1, 5):
-                filename = f"{safe_prompt}{i}.jpg"
-                if os.path.exists(os.path.join(DATA_DIR, filename)):
-                    images.append(f"/data/{filename}")
-            
-            return jsonify({"status": "success", "images": images})
-        else:
-            return jsonify({"error": "ImageGen module not loaded"}), 503
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
 
 # --- VISUAL QUESTION ANSWERING (VQA) ---
 @app.route('/vqa', methods=['POST'])

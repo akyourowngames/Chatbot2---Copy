@@ -509,6 +509,8 @@ try:
     supabase_db = SupabaseDB()
 except Exception as e:
     logger.error(f"[SUPABASE] Failed to initialize: {e}")
+    with open("debug_supabase_init.txt", "a") as f:
+        f.write(f"[Init Fail] {e}\n")
     supabase_db = None
 
 if __name__ == "__main__":
