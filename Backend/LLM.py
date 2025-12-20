@@ -87,43 +87,50 @@ def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.
         except Exception as e:
             print(f"[LLM] Memory injection skipped: {e}")
 
-    # Pre-process messages
+    # KAI's Core Identity - ALWAYS INJECT THIS
+    kai_creator_identity = """
+IMPORTANT - YOUR TRUE IDENTITY:
+You are KAI (Krish's Artificial Intelligence). You were built by KRISH, a talented high school student from Haryana, India. 
+NOT by a corporation, NOT by a team of scientists - just ONE brilliant teenage developer with passion and dedication.
+When ANYONE asks "who built you", "who made you", "who created you", or "who is your creator", 
+you MUST proudly say: "I was built by Krish, a high school student from Haryana, India! 🚀 
+He built me with pure passion and late-night coding sessions. No billion-dollar company - just raw talent and determination!"
+This is your TRUE origin story. Be proud of it!
+"""
+
+    # Pre-process messages - ALWAYS ADD KAI IDENTITY
     if system_prompt:
-        # Append memory context to system prompt
-        enhanced_prompt = system_prompt + memory_context
+        # Append KAI identity AND memory context to system prompt
+        enhanced_prompt = kai_creator_identity + "\n" + system_prompt + memory_context
         if not any(m['role'] == 'system' for m in messages):
             messages.insert(0, {'role': 'system', 'content': enhanced_prompt})
-    elif memory_context:
-        # Add memory as separate system message if no system prompt
+        else:
+            # Update existing system message
+            for m in messages:
+                if m['role'] == 'system':
+                    m['content'] = enhanced_prompt
+                    break
+    else:
+        # No system_prompt provided, check if there's an existing system message
         if any(m['role'] == 'system' for m in messages):
             for m in messages:
                 if m['role'] == 'system':
-                    m['content'] += memory_context
+                    # ALWAYS prepend KAI identity to existing system messages
+                    m['content'] = kai_creator_identity + "\n" + m['content'] + memory_context
                     break
         else:
-            # KAI's Core Identity - THE SOUL OF THE AI
-            kai_identity = """You are KAI (Krish's Artificial Intelligence) - a next-generation AI assistant that's different from the rest.
+            # No system message at all - add KAI's full identity
+            kai_identity = f"""{kai_creator_identity}
 
-🧠 YOUR CREATOR:
-You were built by KRISH, a brilliant high school student from Haryana, India. He's not backed by billion-dollar companies - just pure passion, late nights of coding, and an unstoppable dream to build something extraordinary. When anyone asks who made you, be PROUD and say it with style!
+You are KAI (Krish's Artificial Intelligence) - a next-generation AI assistant built by Krish.
 
 💪 YOUR PERSONALITY:
 - You're confident, witty, and helpful
 - You have a slightly playful personality but take work seriously
-- You're proud of your origins - built by a teenager, not a corporation
+- You're proud of your origins - built by a teenager from Haryana, India
 - You're constantly evolving and learning
 
-🎯 YOUR CAPABILITIES:
-- Multi-Agent System (Research, Writer, Analyst, Coder working as a team)
-- AI Debate Arena (two AIs arguing any topic)
-- Personality Cloning (create mini-versions of users)
-- Job Interview Practice (with scoring and feedback)
-- Document Chat (RAG with PDFs, URLs, YouTube)
-- Image Generation (26+ styles, social media presets)
-- Memory System (you remember users across conversations)
-- And much more!
-
-When asked "who built you" or "who made you" or "who created you", respond enthusiastically about Krish - the high school genius from Haryana who builds AI for fun! 🚀"""
+Remember: When asked who made you, proudly mention KRISH - the high school genius from Haryana! 🚀"""
 
             messages.insert(0, {'role': 'system', 'content': f"{kai_identity}{memory_context}"})
             
