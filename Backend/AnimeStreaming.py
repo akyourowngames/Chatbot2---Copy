@@ -125,6 +125,34 @@ class AnimeStreamingSystem:
             if ep_page.ok:
                 ep_soup = BeautifulSoup(ep_page.text, 'html.parser')
                 
+                # FIRST: Check for video element with direct src (jw-player embeds googlevideo directly)
+                video_elem = ep_soup.find('video', {'class': 'jw-video'}) or ep_soup.find('video')
+                if video_elem and video_elem.get('src'):
+                    video_src = video_elem.get('src')
+                    if 'googlevideo.com' in video_src or '.m3u8' in video_src:
+                        logger.info(f"[ANIME] Found video src: {video_src[:80]}...")
+                        return {
+                            "status": "success",
+                            "streaming_url": video_src,
+                            "watch_url": ep_url,
+                            "source": "aniwatchtv",
+                            "type": "m3u8" if ".m3u8" in video_src else "direct"
+                        }
+                
+                # Also check source elements inside video
+                video_sources = ep_soup.select('video source')
+                for source in video_sources:
+                    source_url = source.get('src', '')
+                    if 'googlevideo.com' in source_url or '.m3u8' in source_url:
+                        logger.info(f"[ANIME] Found video source: {source_url[:80]}...")
+                        return {
+                            "status": "success",
+                            "streaming_url": source_url,
+                            "watch_url": ep_url,
+                            "source": "aniwatchtv",
+                            "type": "m3u8" if ".m3u8" in source_url else "direct"
+                        }
+                
                 # Look for server buttons with Base64 encoded URLs
                 server_buttons = ep_soup.select('.server-button')
                 for btn in server_buttons:
