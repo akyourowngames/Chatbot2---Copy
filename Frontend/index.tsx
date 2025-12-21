@@ -498,7 +498,8 @@ async function loadChat(id: string) {
     }
     chatHistory.filter(h => h.id === id).forEach(h => {
         addMessage('user', h.user);
-        addMessage('assistant', h.assistant);
+        // Pass saved metadata to restore PDF/Spotify/Anime previews
+        addMessage('assistant', h.assistant, null, h.metadata || null);
     });
 }
 
@@ -611,7 +612,7 @@ if (auth) {
             (window as any).speak(data.response);
         }
 
-        const historyItem = { timestamp: Date.now(), user: queryStr, assistant: data.response, id: currentChatId, uid: auth?.currentUser?.uid };
+        const historyItem = { timestamp: Date.now(), user: queryStr, assistant: data.response, id: currentChatId, uid: auth?.currentUser?.uid, metadata: data };
         chatHistory.push(historyItem);
         localStorage.setItem('kai_chat_history', JSON.stringify(chatHistory));
         renderHistory();
