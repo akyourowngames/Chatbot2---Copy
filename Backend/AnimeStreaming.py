@@ -106,34 +106,32 @@ class AnimeStreamingSystem:
         return results
     
     def _search_consumet(self, query: str, limit: int = 10) -> List[Dict]:
-        """Search via Consumet API (Try multiple providers/mirrors)."""
-        providers = ["gogoanime", "zoro"]
+        """Search via Consumet API using AnimeKai provider."""
+        # AnimeKai is the most reliable provider
+        try:
+            # AnimeKai search endpoint: /anime/animekai/{query}
+            url = f"{self.consumet_base}/anime/animekai/{query}"
+            logger.info(f"[ANIME] Searching: {url}")
+            data = self._sync_request(url)
+            
+            if data and "results" in data and len(data["results"]) > 0:
+                logger.info(f"[ANIME] Found {len(data['results'])} results via animekai")
+                results = []
+                for item in data["results"][:limit]:
+                    results.append({
+                        "id": item.get("id"),
+                        "title": item.get("title"),
+                        "image": item.get("image"),
+                        "release_date": item.get("releaseDate"),
+                        "sub_or_dub": item.get("subOrDub", "sub"),
+                        "source": "consumet",
+                        "provider": "animekai",  # Use animekai
+                        "streamable": True
+                    })
+                return results
+        except Exception as e:
+            logger.error(f"[ANIME] AnimeKai search error: {e}")
         
-        for mirror in self.mirrors:
-            self.consumet_base = mirror # Update base if we switch
-            for provider in providers:
-                try:
-                    url = f"{mirror}/anime/{provider}/{query}"
-                    data = self._sync_request(url)
-                    
-                    if data and "results" in data and len(data["results"]) > 0:
-                        logger.info(f"[ANIME] Found results on {mirror} via {provider}")
-                        results = []
-                        for item in data["results"][:limit]:
-                            results.append({
-                                "id": item.get("id"),
-                                "title": item.get("title"),
-                                "image": item.get("image"),
-                                "release_date": item.get("releaseDate"),
-                                "sub_or_dub": item.get("subOrDub"),
-                                "source": "consumet",
-                                "provider": provider, # CRITICAL: Store provider
-                                "streamable": True
-                            })
-                        return results
-                except Exception as e:
-                    logger.error(f"[ANIME] Error {mirror}/{provider}: {e}")
-                    
         return []
     
     def _search_jikan(self, query: str, limit: int = 10) -> List[Dict]:
@@ -166,13 +164,14 @@ class AnimeStreamingSystem:
     
     # ==================== WATCH/STREAM ====================
     
-    def get_episodes(self, anime_id: str, provider: str = "gogoanime") -> Dict[str, Any]:
-        """Get all episodes for an anime."""
-        logger.info(f"[ANIME] Getting episodes for: {anime_id} via {provider}")
+    def get_episodes(self, anime_id: str, provider: str = "animekai") -> Dict[str, Any]:
+        """Get all episodes for an anime using AnimeKai."""
+        logger.info(f"[ANIME] Getting episodes for: {anime_id}")
         
         try:
-            # Use current working base or try all if needed (simplified: use current)
-            url = f"{self.consumet_base}/anime/{provider}/info/{anime_id}"
+            # AnimeKai info endpoint: /anime/animekai/info/{id}
+            url = f"{self.consumet_base}/anime/animekai/info/{anime_id}"
+            logger.info(f"[ANIME] Info URL: {url}")
             data = self._sync_request(url)
             
             if data:
@@ -184,7 +183,7 @@ class AnimeStreamingSystem:
                     "description": data.get("description"),
                     "type": data.get("type"),
                     "release_date": data.get("releaseDate"),
-                    "status": data.get("status"),
+                    "anime_status": data.get("status"),
                     "total_episodes": data.get("totalEpisodes"),
                     "episodes": data.get("episodes", [])
                 }
@@ -193,44 +192,38 @@ class AnimeStreamingSystem:
         
         return {"status": "error", "message": "Failed to get episodes"}
     
-    def get_streaming_links(self, episode_id: str, provider: str = "gogoanime") -> Dict[str, Any]:
-        """Get streaming links."""
-        logger.info(f"[ANIME] Getting stream for: {episode_id} via {provider}")
+    def get_streaming_links(self, episode_id: str, provider: str = "animekai", server: str = "vidstreaming") -> Dict[str, Any]:
+        """Get streaming links using AnimeKai."""
+        logger.info(f"[ANIME] Getting stream for: {episode_id}")
         
         try:
-            url = f"{self.consumet_base}/anime/{provider}/watch/{episode_id}"
-            if provider == "zoro":
-                 # Zoro might use ?episodeId=... depending on endpoint, 
-                 # but standard Consumet format is /watch/{id}. 
-                 # Wait, debug output showed /watch?episodeId=... for Zoro.
-                 # Let's handle generic case or specific.
-                 # Consumet V2 usually normalizes to /watch/{id}.
-                 # But Vercel mirror might be V1? 
-                 # Let's try standard first.
-                 pass
+            # AnimeKai watch endpoint: /anime/animekai/watch/{episodeId}
+            url = f"{self.consumet_base}/anime/animekai/watch/{episode_id}"
+            logger.info(f"[ANIME] Watch URL: {url}")
             
-            data = self._sync_request(url)
-            # If standard failed, try query param style if zoro
-            if not data and provider == "zoro":
-                 url = f"{self.consumet_base}/anime/{provider}/watch?episodeId={episode_id}"
-                 data = self._sync_request(url)
-
-            if data and "sources" in data:
-                sources = []
-                for src in data.get("sources", []):
-                    sources.append({
-                        "url": src.get("url"),
-                        "quality": src.get("quality"),
-                        "is_m3u8": src.get("isM3U8", False)
-                    })
+            # Request with server and dub params
+            import requests
+            response = requests.get(url, params={"server": server, "dub": False}, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
                 
-                return {
-                    "status": "success",
-                    "episode_id": episode_id,
-                    "sources": sources,
-                    "download": data.get("download"),
-                    "headers": data.get("headers", {})
-                }
+                if data and "sources" in data:
+                    sources = []
+                    for src in data.get("sources", []):
+                        sources.append({
+                            "url": src.get("url"),
+                            "quality": src.get("quality", "auto"),
+                            "is_m3u8": src.get("isM3U8", True)
+                        })
+                    
+                    return {
+                        "status": "success",
+                        "episode_id": episode_id,
+                        "sources": sources,
+                        "download": data.get("download"),
+                        "headers": data.get("headers", {})
+                    }
         except Exception as e:
             logger.error(f"[ANIME] Stream error: {e}")
         

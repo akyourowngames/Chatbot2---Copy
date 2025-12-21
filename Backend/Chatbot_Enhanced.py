@@ -204,30 +204,11 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
             is_thinking_mode = False
             routing_analysis = {}
         
-        # ===== 2. KNOWLEDGE GROUNDING (Auto-search for factual Qs) =====
+        # ===== 2. KNOWLEDGE GROUNDING (DISABLED for speed) =====
+        # Auto-grounding was slowing down responses. Users can use explicit
+        # "search for X" commands instead.
         grounding_context = ""
-        factual_patterns = [
-            r"\b(who is|who was|who are)\b",
-            r"\b(what is|what are|what was)\b",
-            r"\b(when did|when was|when is)\b",
-            r"\b(where is|where was|where are)\b",
-            r"\b(current|latest|recent|today's|today|now)\b",
-            r"\b(price|weather|news|score|result)\b",
-        ]
-        
-        query_lower = Query.lower()
-        needs_grounding = any(re.search(p, query_lower) for p in factual_patterns)
-        
-        if needs_grounding:
-            try:
-                from Backend.RealtimeSearchEngine import RealtimeSearchEngine
-                print("[CHAT] Grounding with web search...")
-                search_result = RealtimeSearchEngine(Query)
-                if search_result and len(search_result) > 50:
-                    grounding_context = f"\n\n[REAL-TIME DATA - Use this for accuracy]:\n{search_result[:2000]}"
-                    print(f"[CHAT] Grounded with {len(search_result)} chars of context")
-            except Exception as e:
-                print(f"[CHAT] Grounding skipped: {e}")
+        # Grounding disabled for instant responses
         
         # ===== 3. LOAD CHAT HISTORY =====
         try:
