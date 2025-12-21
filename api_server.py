@@ -3212,7 +3212,7 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
                      "response": f"📄 Generated PDF: **{pdf_title}**",
                      "type": "pdf",
                      "title": pdf_title,
-                     "pdf_path": pdf_url
+                     "url": pdf_url  # Fixed: 'url' instead of 'pdf_path' for frontend
                  }), 200
              except Exception as e:
                  print(f"[ERROR] Document generation failed: {e}")
