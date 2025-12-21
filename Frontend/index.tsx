@@ -331,8 +331,9 @@ function addMessage(role: string, content: string, attachedFile: string | null =
         renderAnimePlayer(body, metadata.anime);
     }
 
-    // 🎵 SPOTIFY PLAYER
-    if (metadata && metadata.type === 'spotify' && metadata.spotify) {
+    // 🎵 SPOTIFY PLAYER - handle both 'spotify' AND 'music' types with spotify data
+    if (metadata && (metadata.type === 'spotify' || metadata.type === 'music') && metadata.spotify) {
+        LOG.info('SPOTIFY', 'Rendering player', metadata.spotify);
         renderSpotifyPlayer(body, metadata.spotify);
     }
 
@@ -464,7 +465,8 @@ if (auth) {
 
         // 🔍 DEBUG: Log API response to trace Spotify/media metadata
         LOG.info('API', 'Response received', { type: data.type, hasSpotify: !!data.spotify, hasAnime: !!data.anime });
-        if (data.type === 'spotify') {
+        if (data.type === 'spotify' || data.type === 'music') {
+            LOG.info('SPOTIFY', 'Full response data', data);
             LOG.info('SPOTIFY', 'Embed URL', data.spotify?.embed_url);
         }
 
