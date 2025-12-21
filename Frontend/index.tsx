@@ -1268,54 +1268,84 @@ function stopListening() {
 
 
 
-// === 🏷️ @MENTION AUTOCOMPLETE ===
+// === 🏷️ @MENTION AUTOCOMPLETE (Premium Redesign) ===
 const mentionOptions = [
-    { id: 'figma', label: '@figma', icon: '🎨', desc: 'Design files' },
-    { id: 'notion', label: '@notion', icon: '📝', desc: 'Workspace pages' },
-    { id: 'slack', label: '@slack', icon: '💬', desc: 'Send messages' },
-    { id: 'trello', label: '@trello', icon: '📋', desc: 'Boards & cards' },
-    { id: 'calendar', label: '@calendar', icon: '📅', desc: 'Events' },
-    { id: 'weather', label: '@weather', icon: '🌤️', desc: 'Forecast' },
-    { id: 'news', label: '@news', icon: '📰', desc: 'Headlines' },
-    { id: 'crypto', label: '@crypto', icon: '₿', desc: 'Prices' },
-    { id: 'github', label: '@github', icon: '🐙', desc: 'Repos' },
-    { id: 'pdf', label: '@pdf', icon: '📄', desc: 'Generate document' },
-    { id: 'image', label: '@image', icon: '🖼️', desc: 'Generate image' },
-    { id: 'spotify', label: '@spotify', icon: '🎵', desc: 'Play music' },
+    { id: 'figma', label: '@figma', icon: '🎨', desc: 'Design files', color: 'from-pink-500/20 to-purple-500/20' },
+    { id: 'notion', label: '@notion', icon: '📝', desc: 'Workspace', color: 'from-gray-500/20 to-gray-600/20' },
+    { id: 'slack', label: '@slack', icon: '💬', desc: 'Messages', color: 'from-purple-500/20 to-violet-500/20' },
+    { id: 'trello', label: '@trello', icon: '📋', desc: 'Boards', color: 'from-blue-500/20 to-cyan-500/20' },
+    { id: 'calendar', label: '@calendar', icon: '📅', desc: 'Events', color: 'from-green-500/20 to-emerald-500/20' },
+    { id: 'weather', label: '@weather', icon: '🌤️', desc: 'Forecast', color: 'from-yellow-500/20 to-orange-500/20' },
+    { id: 'news', label: '@news', icon: '📰', desc: 'Headlines', color: 'from-red-500/20 to-pink-500/20' },
+    { id: 'crypto', label: '@crypto', icon: '₿', desc: 'Prices', color: 'from-amber-500/20 to-yellow-500/20' },
+    { id: 'github', label: '@github', icon: '🐙', desc: 'Repos', color: 'from-gray-600/20 to-gray-700/20' },
+    { id: 'pdf', label: '@pdf', icon: '📄', desc: 'Document', color: 'from-red-600/20 to-red-700/20' },
+    { id: 'image', label: '@image', icon: '🖼️', desc: 'Generate', color: 'from-indigo-500/20 to-blue-500/20' },
+    { id: 'spotify', label: '@spotify', icon: '🎵', desc: 'Music', color: 'from-green-600/20 to-green-700/20' },
 ];
 
-// Create dropdown
+// Create premium dropdown container
 const mentionDropdown = document.createElement('div');
 mentionDropdown.id = 'mention-dropdown';
-mentionDropdown.className = 'hidden absolute bottom-full left-0 mb-2 w-64 max-h-64 overflow-y-auto bg-[#1a1a2e]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl z-50';
-
-// Append to input's parent (make it relative first)
-const inputParent = messageInput?.parentElement;
-if (inputParent) {
-    inputParent.style.position = 'relative';
-    inputParent.appendChild(mentionDropdown);
-    console.log('[MENTION] Dropdown appended to input parent');
-} else {
-    document.body.appendChild(mentionDropdown);
-    console.log('[MENTION] Fallback: Dropdown appended to body');
-}
+mentionDropdown.style.cssText = `
+    display: none;
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 600px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: rgba(15, 15, 25, 0.98);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.15);
+    z-index: 9999;
+    padding: 12px;
+`;
+document.body.appendChild(mentionDropdown);
 
 function showMentionDropdown(filter: string = '') {
-    console.log('[MENTION] showMentionDropdown called with:', filter);
     const filtered = mentionOptions.filter(o => o.label.toLowerCase().includes(filter.toLowerCase()));
-    if (filtered.length === 0) { mentionDropdown.classList.add('hidden'); return; }
+    if (filtered.length === 0) {
+        mentionDropdown.style.display = 'none';
+        return;
+    }
 
-    mentionDropdown.innerHTML = filtered.map((opt, i) => `
-        <div class="mention-option flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 cursor-pointer transition-colors ${i === 0 ? 'bg-white/5' : ''}" data-mention="${opt.label}">
-            <span class="text-lg">${opt.icon}</span>
-            <div class="flex-1">
-                <div class="text-sm font-semibold text-white">${opt.label}</div>
-                <div class="text-[10px] text-white/40">${opt.desc}</div>
-            </div>
+    mentionDropdown.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <span style="font-size: 10px; font-weight: 800; color: rgba(99, 102, 241, 0.8); text-transform: uppercase; letter-spacing: 0.15em;">Quick Actions</span>
+            <span style="font-size: 9px; color: rgba(255,255,255,0.3);">TAB to select</span>
         </div>
-    `).join('');
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;">
+            ${filtered.map((opt, i) => `
+                <div class="mention-option" data-mention="${opt.label}" style="
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 12px 14px;
+                    background: linear-gradient(135deg, ${opt.color.replace('from-', '').replace(' to-', ', ').replace(/\//g, ' ').replace(/-/g, '')});
+                    background: rgba(255,255,255,0.03);
+                    border: 1px solid rgba(255,255,255,${i === 0 ? '0.15' : '0.05'});
+                    border-radius: 10px;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                    ${i === 0 ? 'background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4);' : ''}
+                " onmouseover="this.style.background='rgba(99, 102, 241, 0.15)'; this.style.borderColor='rgba(99, 102, 241, 0.4)'; this.style.transform='scale(1.02)';"
+                   onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.borderColor='rgba(255,255,255,0.05)'; this.style.transform='scale(1)';">
+                    <span style="font-size: 20px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">${opt.icon}</span>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 13px; font-weight: 600; color: white; font-family: 'JetBrains Mono', monospace;">${opt.label}</div>
+                        <div style="font-size: 10px; color: rgba(255,255,255,0.4);">${opt.desc}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
 
-    mentionDropdown.classList.remove('hidden');
+    mentionDropdown.style.display = 'block';
 
     // Add click handlers
     mentionDropdown.querySelectorAll('.mention-option').forEach(el => {
@@ -1326,7 +1356,7 @@ function showMentionDropdown(filter: string = '') {
                 const atIndex = currentValue.lastIndexOf('@');
                 messageInput.value = currentValue.substring(0, atIndex) + mention + ' ';
                 messageInput.focus();
-                mentionDropdown.classList.add('hidden');
+                mentionDropdown.style.display = 'none';
             }
         });
     });
@@ -1344,39 +1374,45 @@ messageInput?.addEventListener('input', (e) => {
             return;
         }
     }
-    mentionDropdown.classList.add('hidden');
+    mentionDropdown.style.display = 'none';
 });
 
 // Close dropdown on blur
 messageInput?.addEventListener('blur', () => {
-    setTimeout(() => mentionDropdown.classList.add('hidden'), 150);
+    setTimeout(() => mentionDropdown.style.display = 'none', 200);
 });
 
-// Keyboard navigation for dropdown
+// Keyboard navigation
 messageInput?.addEventListener('keydown', (e) => {
-    if (mentionDropdown.classList.contains('hidden')) return;
+    if (mentionDropdown.style.display === 'none') return;
 
-    const options = mentionDropdown.querySelectorAll('.mention-option');
-    const currentActive = mentionDropdown.querySelector('.bg-white\\/5');
-    let currentIndex = Array.from(options).indexOf(currentActive as Element);
+    const options = Array.from(mentionDropdown.querySelectorAll('.mention-option'));
+    if (options.length === 0) return;
 
-    if (e.key === 'ArrowDown') {
+    let currentIndex = options.findIndex(el => (el as HTMLElement).style.borderColor?.includes('241'));
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault();
-        currentActive?.classList.remove('bg-white/5');
         const nextIndex = (currentIndex + 1) % options.length;
-        options[nextIndex]?.classList.add('bg-white/5');
-    } else if (e.key === 'ArrowUp') {
+        options.forEach((el, i) => {
+            (el as HTMLElement).style.background = i === nextIndex ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.03)';
+            (el as HTMLElement).style.borderColor = i === nextIndex ? 'rgba(99, 102, 241, 0.4)' : 'rgba(255,255,255,0.05)';
+        });
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        currentActive?.classList.remove('bg-white/5');
         const prevIndex = (currentIndex - 1 + options.length) % options.length;
-        options[prevIndex]?.classList.add('bg-white/5');
+        options.forEach((el, i) => {
+            (el as HTMLElement).style.background = i === prevIndex ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.03)';
+            (el as HTMLElement).style.borderColor = i === prevIndex ? 'rgba(99, 102, 241, 0.4)' : 'rgba(255,255,255,0.05)';
+        });
     } else if (e.key === 'Tab' || e.key === 'Enter') {
-        if (currentActive) {
-            e.preventDefault();
-            (currentActive as HTMLElement).click();
+        e.preventDefault();
+        const activeOption = options.find(el => (el as HTMLElement).style.borderColor?.includes('241'));
+        if (activeOption) {
+            (activeOption as HTMLElement).click();
         }
     } else if (e.key === 'Escape') {
-        mentionDropdown.classList.add('hidden');
+        mentionDropdown.style.display = 'none';
     }
 });
 
