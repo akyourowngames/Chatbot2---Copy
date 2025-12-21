@@ -331,9 +331,14 @@ function addMessage(role: string, content: string, attachedFile: string | null =
         renderAnimePlayer(body, metadata.anime);
     }
 
-    // 🎵 SPOTIFY PLAYER - handle both 'spotify' AND 'music' types with spotify data
-    if (metadata && (metadata.type === 'spotify' || metadata.type === 'music') && metadata.spotify) {
-        LOG.info('SPOTIFY', 'Rendering player', metadata.spotify);
+    // 🎵 SPOTIFY PLAYER - Spotify only, no other fallbacks
+    // Check for spotify data in metadata (preferred) or look for spotify embed URL in music object
+    if (metadata && metadata.type === 'spotify' && metadata.spotify) {
+        LOG.info('SPOTIFY', 'Rendering player from spotify type', metadata.spotify);
+        renderSpotifyPlayer(body, metadata.spotify);
+    } else if (metadata && metadata.spotify && metadata.spotify.embed_url) {
+        // Direct spotify data in response
+        LOG.info('SPOTIFY', 'Rendering player from direct spotify data', metadata.spotify);
         renderSpotifyPlayer(body, metadata.spotify);
     }
 

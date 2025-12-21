@@ -1346,24 +1346,8 @@ def chat():
     
     query_lower = query.lower().strip()
     
-    # === WEB MUSIC PLAYER (Works in Cloud!) ===
-    music_triggers = ["play music", "play song", "play ", "listen to", "play me"]
-    if any(trigger in query_lower for trigger in music_triggers):
-        try:
-            from Backend.WebMusicPlayer import get_music_response
-            music_result = get_music_response(query)
-            if music_result.get("status") == "success":
-                return jsonify({
-                    "response": music_result["message"],
-                    "music": {
-                        "video_id": music_result.get("video_id"),
-                        "embed_url": music_result.get("embed_url"),
-                        "thumbnail": music_result.get("thumbnail")
-                    },
-                    "type": "music"
-                }), 200
-        except Exception as music_err:
-            print(f"[MUSIC] Web music error: {music_err}")
+    # === SPOTIFY MUSIC PLAYER (Cloud Ready - No YouTube Fallback) ===
+    # Music requests are now routed through SmartTrigger to use Spotify only
     
     try:
         # === CHAT CONTEXT FOR CONTINUOUS FLOW ===
@@ -1716,11 +1700,10 @@ def chat():
                          "type": "spotify"
                      }), 200
                  else:
-                     # Log why Spotify failed
+                     # Log why Spotify failed - NO YouTube fallback
                      error_msg = result.get("error", result.get("message", "Unknown error"))
                      print(f"[SPOTIFY] ❌ Failed: {error_msg}")
-                     print(f"[SPOTIFY] Falling back to YouTube...")
-                     response_text = f"Spotify search failed ({error_msg}), using YouTube instead"
+                     response_text = result.get("message", f"Could not find '{search_query}' on Spotify. Try a different search term.")
              except Exception as e:
                  print(f"[ERROR] Spotify error: {e}")
                  import traceback
