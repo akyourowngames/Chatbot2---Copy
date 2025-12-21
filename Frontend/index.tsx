@@ -178,26 +178,42 @@ function renderAnimePlayer(container: HTMLElement, anime: any) {
     const quality = anime.quality || 'HD';
     const isFallback = anime.fallback === true;
 
-    // PRIORITY 1: Show watch links card (most reliable - embeds are often blocked by CORS)
-    if (watchLinks.length > 0) {
+    // PRIORITY 1: Iframe embed player (using embtaku.pro which allows embedding)
+    if (anime.embed_url || (anime.streams && anime.streams[0]?.embed)) {
+        const embedUrl = anime.embed_url || anime.streams[0].embed;
         const html = `
-        <div class="mt-4 rounded-lg overflow-hidden border border-indigo-500/30 bg-gradient-to-br from-indigo-900/20 to-black shadow-lg shadow-indigo-500/10 animate-in fade-in duration-500">
-            <div class="relative aspect-video flex items-center justify-center" style="background-image: url('${thumbnail}'); background-size: cover; background-position: center;">
-                <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-                <div class="relative z-10 text-center p-6">
-                    <i data-lucide="play-circle" class="w-16 h-16 text-indigo-400 mx-auto mb-4"></i>
-                    <div class="text-white font-bold text-lg mb-2">${title}</div>
-                    <div class="text-white/60 text-sm mb-4">Episode ${episode}</div>
-                    <div class="flex gap-3 justify-center flex-wrap">
+        <div class="mt-4 rounded-lg overflow-hidden border border-indigo-500/30 bg-black shadow-lg shadow-indigo-500/10 animate-in fade-in duration-500">
+            <div class="relative aspect-video">
+                <iframe 
+                    src="${embedUrl}" 
+                    class="w-full h-full" 
+                    frameborder="0" 
+                    scrolling="no"
+                    allowfullscreen 
+                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="p-3 bg-indigo-900/10 border-t border-white/5">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="tv" class="w-4 h-4 text-indigo-400"></i>
+                        <span class="text-xs font-mono text-indigo-200">${title} - Episode ${episode}</span>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 bg-indigo-500/20 rounded text-indigo-300">${quality}</span>
+                </div>
+                ${watchLinks.length > 0 ? `
+                    <div class="flex gap-2 flex-wrap mt-2">
+                        <span class="text-[10px] text-white/40 mr-1">Alt sources:</span>
                         ${watchLinks.map((link: any) => `
                             <a href="${link.url}" target="_blank" 
-                               class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-sm font-medium transition-all flex items-center gap-2 shadow-lg">
-                                <i data-lucide="external-link" class="w-4 h-4"></i>
+                               class="text-[10px] px-2 py-1 bg-white/5 hover:bg-white/10 rounded border border-white/10 text-white/70 hover:text-white transition-all">
                                 ${link.name}
                             </a>
                         `).join('')}
                     </div>
-                </div>
+                ` : ''}
             </div>
         </div>`;
 
@@ -209,7 +225,7 @@ function renderAnimePlayer(container: HTMLElement, anime: any) {
         return;
     }
 
-    // PRIORITY 2: Iframe embed (rarely works due to X-Frame-Options)
+    // PRIORITY 2: Show watch links card (if no embed available)
     if (anime.embed_url || (anime.streams && anime.streams[0]?.embed)) {
         const embedUrl = anime.embed_url || anime.streams[0].embed;
         const html = `

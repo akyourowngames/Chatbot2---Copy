@@ -289,30 +289,34 @@ class AnimeStreamingSystem:
             anime_image = jikan_info[0].get("image") or jikan_info[0].get("images", {}).get("jpg", {}).get("large_image_url")
             total_eps = jikan_info[0].get("episodes", "?")
         
-        # Generate multiple embed sources
+        # Generate multiple embed sources - using sites that ALLOW iframe embedding
+        # These sites have X-Frame-Options: ALLOWALL or no restriction
         embed_sources = [
             {
                 "name": "Gogo-Stream",
+                "url": f"https://gogoanime3.co/{slug}-episode-{episode}",
+                "embed": f"https://embtaku.pro/streaming.php?id={slug}-episode-{episode}",
+                "quality": "auto",
+                "is_m3u8": False
+            },
+            {
+                "name": "Gogo-Alt",
                 "url": f"https://gogoanime.tel/{slug}-episode-{episode}",
-                "embed": f"https://s3taku.com/embedplus?id={slug}-episode-{episode}",
+                "embed": f"https://gogoanime3.co/streaming.php?id={slug}-episode-{episode}",
                 "quality": "auto",
                 "is_m3u8": False
             },
             {
-                "name": "AnimePahe",
-                "url": f"https://animepahe.ru/anime/{slug}",
-                "embed": f"https://animepahe.ru/play/{slug}/{episode}",  
-                "quality": "auto",
-                "is_m3u8": False
-            },
-            {
-                "name": "9Anime",
-                "url": f"https://9anime.to/watch/{slug}",
-                "embed": f"https://9anime.to/watch/{slug}?ep={episode}",
+                "name": "PlayTaku",
+                "url": f"https://playtaku.net/{slug}-episode-{episode}",
+                "embed": f"https://playtaku.net/streaming.php?id={slug}-episode-{episode}",
                 "quality": "auto",
                 "is_m3u8": False
             }
         ]
+        
+        # Primary embed URL - using embtaku which allows iframe
+        primary_embed = f"https://embtaku.pro/streaming.php?id={slug}-episode-{episode}"
         
         return {
             "status": "success",
@@ -324,13 +328,13 @@ class AnimeStreamingSystem:
             },
             "episode": {"number": episode},
             "streams": embed_sources,
-            "embed_url": f"https://s3taku.com/embedplus?id={slug}-episode-{episode}",
+            "embed_url": primary_embed,
             "watch_links": [
-                {"name": "GogoAnime", "url": f"https://gogoanime.tel/{slug}-episode-{episode}"},
+                {"name": "GogoAnime", "url": f"https://gogoanime3.co/{slug}-episode-{episode}"},
                 {"name": "9Anime", "url": f"https://9anime.to/watch/{slug}?ep={episode}"},
                 {"name": "AnimePahe", "url": f"https://animepahe.ru/anime/{slug}"}
             ],
-            "message": f"🎬 Watch {anime_title} Episode {episode} (click link to stream)"
+            "message": f"🎬 Now Streaming: {anime_title} Episode {episode}"
         }
     
     # ==================== INFO ====================
