@@ -375,38 +375,50 @@ class AdvancedIntegrations:
         """Get recent Figma files"""
         try:
             token = self.api_keys.get("figma", "")
-            if not token or team_id == "demo":
+            if not token:
                  # Mock data for demo if no key
                  return [
-                     {"key": "abc1", "name": "App UI Design", "last_modified": "2h ago", "thumbnail": "https://figma.com/demo1.png"},
-                     {"key": "abc2", "name": "Marketing Assets", "last_modified": "5h ago", "thumbnail": "https://figma.com/demo2.png"},
-                     {"key": "abc3", "name": "Design System", "last_modified": "1d ago", "thumbnail": "https://figma.com/demo3.png"}
+                     {"key": "abc1", "name": "App UI Design", "last_modified": "2h ago", "thumbnail": "https://figma.com/demo1.png", "url": "https://www.figma.com/file/abc1"},
+                     {"key": "abc2", "name": "Marketing Assets", "last_modified": "5h ago", "thumbnail": "https://figma.com/demo2.png", "url": "https://www.figma.com/file/abc2"},
+                     {"key": "abc3", "name": "Design System", "last_modified": "1d ago", "thumbnail": "https://figma.com/demo3.png", "url": "https://www.figma.com/file/abc3"}
                  ]
 
-            url = f"https://api.figma.com/v1/teams/{team_id}/projects"
+            # Use /me endpoint which works without team_id
+            url = "https://api.figma.com/v1/me"
             headers = {"X-Figma-Token": token}
-            response = requests.get(url, headers=headers, timeout=5)
+            me_resp = requests.get(url, headers=headers, timeout=5)
             
-            if response.status_code == 200:
-                projects = response.json().get('projects', [])
-                files = []
-                # Fetch files for first few projects
-                for proj in projects[:3]:
-                    f_url = f"https://api.figma.com/v1/projects/{proj['id']}/files"
-                    f_resp = requests.get(f_url, headers=headers)
-                    if f_resp.status_code == 200:
-                        for f in f_resp.json().get('files', [])[:2]:
-                            files.append({
-                                "key": f['key'],
-                                "name": f['name'],
-                                "last_modified": f['last_modified'],
-                                "thumbnail": f['thumbnail_url'],
-                                "url": f"https://www.figma.com/file/{f['key']}/{f['name'].replace(' ','-')}"
-                            })
-                return files
-        except:
-            pass
-        return [{"error": "Authentication failed"}]
+            if me_resp.status_code != 200:
+                return [{"error": f"Auth failed: {me_resp.status_code}"}]
+            
+            # Get recent files from all teams the user belongs to
+            user_data = me_resp.json()
+            files = []
+            
+            # Try to get files from user's teams
+            for team in user_data.get('teams', [])[:2]:  # Limit to 2 teams
+                team_url = f"https://api.figma.com/v1/teams/{team['id']}/projects"
+                team_resp = requests.get(team_url, headers=headers, timeout=5)
+                
+                if team_resp.status_code == 200:
+                    for proj in team_resp.json().get('projects', [])[:2]:
+                        files_url = f"https://api.figma.com/v1/projects/{proj['id']}/files"
+                        files_resp = requests.get(files_url, headers=headers, timeout=5)
+                        
+                        if files_resp.status_code == 200:
+                            for f in files_resp.json().get('files', [])[:3]:
+                                files.append({
+                                    "key": f['key'],
+                                    "name": f['name'],
+                                    "last_modified": f.get('last_modified', 'N/A'),
+                                    "thumbnail": f.get('thumbnail_url', ''),
+                                    "url": f"https://www.figma.com/file/{f['key']}"
+                                })
+            
+            return files if files else [{"error": "No files found in your teams"}]
+        except Exception as e:
+            return [{"error": f"Figma API error: {str(e)}"}]
+
 
     # ==================== NOTION ====================
 

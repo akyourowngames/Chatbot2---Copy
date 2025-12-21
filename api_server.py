@@ -544,6 +544,75 @@ def auth_refresh():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ==================== DOCUMENT UPLOAD ENDPOINT ====================
+
+@app.route('/api/v1/upload-document', methods=['POST'])
+@rate_limit("default")
+def upload_document():
+    """
+    Upload a document (PDF, DOCX, TXT) for text extraction and summarization.
+    Returns extracted text for AI context injection.
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        if not file.filename:
+            return jsonify({"error": "Empty filename"}), 400
+        
+        # Check extension
+        allowed_extensions = ['.pdf', '.docx', '.txt', '.md']
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in allowed_extensions:
+            return jsonify({"error": f"Unsupported format: {ext}. Allowed: {allowed_extensions}"}), 400
+        
+        # Save to temp location
+        temp_dir = os.path.join(current_dir, 'temp_uploads')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, f"{int(time.time())}_{file.filename}")
+        file.save(temp_path)
+        
+        # Extract text using DocumentReader
+        try:
+            from Backend.DocumentReader import document_reader
+            result = document_reader.read_document(temp_path)
+        except ImportError:
+            # Fallback: basic text reading
+            with open(temp_path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = f.read()
+            result = {
+                "status": "success",
+                "filename": file.filename,
+                "text": text,
+                "word_count": len(text.split()),
+                "preview": text[:500]
+            }
+        
+        # Cleanup temp file
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        if result.get('status') == 'success':
+            return jsonify({
+                "success": True,
+                "filename": result['filename'],
+                "word_count": result['word_count'],
+                "preview": result.get('preview', ''),
+                "text": result['text'],
+                "type": "document_upload"
+            }), 200
+        else:
+            return jsonify({"error": result.get('message', 'Failed to extract text')}), 400
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+
 # ==================== USER MANAGEMENT ENDPOINTS ====================
 
 @app.route('/api/v1/users/me', methods=['GET'])
@@ -1385,6 +1454,22 @@ def chat():
         trigger_type = None
         command = None
         
+        # === @MENTION PRIORITY DETECTION ===
+        # Highest priority - explicit tool invocation via @mention
+        mention_map = {
+            "@figma": "figma", "@notion": "notion", "@slack": "slack", 
+            "@trello": "trello", "@calendar": "calendar", "@weather": "weather",
+            "@news": "news", "@crypto": "crypto", "@github": "github",
+            "@system": "system_stats", "@nasa": "nasa_apod", "@pdf": "document",
+            "@image": "image", "@spotify": "spotify"
+        }
+        for mention, ttype in mention_map.items():
+            if mention in query_lower:
+                trigger_type = ttype
+                command = query.replace(mention, "").strip()
+                print(f"[PRE-CHECK] @Mention detected: {mention} → {ttype}")
+                break
+        
         # Check for explicit app commands
         if any(query_lower.startswith(p) for p in ["open ", "launch ", "start ", "close ", "quit ", "exit "]):
             for app in app_names:
@@ -1407,6 +1492,26 @@ def chat():
             trigger_type = "file"
             command = query
             print(f"[PRE-CHECK] Detected file command: {query}")
+        
+        # === FLEXIBLE GENERATION TRIGGERS ===
+        # Supports: generate/create/make/build/write + pdf/image/document/picture
+        generation_verbs = ["generate", "create", "make", "build", "write", "produce", "design"]
+        pdf_nouns = ["pdf", "document", "report", "paper", "doc"]
+        image_nouns = ["image", "picture", "photo", "illustration", "art", "drawing", "graphic"]
+        
+        has_gen_verb = any(v in query_lower for v in generation_verbs)
+        has_pdf_noun = any(n in query_lower for n in pdf_nouns)
+        has_image_noun = any(n in query_lower for n in image_nouns)
+        
+        if not trigger_type and has_gen_verb:
+            if has_pdf_noun and not has_image_noun:
+                trigger_type = "document"
+                command = query
+                print(f"[PRE-CHECK] Flexible detect: DOCUMENT generation")
+            elif has_image_noun and not has_pdf_noun:
+                trigger_type = "image"
+                command = query
+                print(f"[PRE-CHECK] Flexible detect: IMAGE generation")
         
         # Check for code commands
         code_keywords = ["generate code", "write code", "create code", "code for", "python code", 

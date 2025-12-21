@@ -1085,6 +1085,103 @@ if (toggleAuthModeBtn) {
 }
 
 
+
+
+// === 📄 DOCUMENT UPLOAD (Drag & Drop) ===
+let uploadedDocumentContext: string | null = null;
+
+(window as any).uploadDocument = async (file: File) => {
+    const allowedExts = ['.pdf', '.docx', '.txt', '.md'];
+    const ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+
+    if (!allowedExts.includes(ext)) {
+        notify(`Invalid format: ${ext}. Use PDF, DOCX, or TXT.`, 'error');
+        return;
+    }
+
+    addMessage('user', `📤 Uploading: ${file.name}...`);
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const resp = await fetch(`${API_URL}/upload-document`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await resp.json();
+
+        if (data.success) {
+            uploadedDocumentContext = data.text;
+
+            // Render document preview card
+            const previewHtml = `
+            <div class="mt-4 rounded-xl border border-white/10 bg-gradient-to-br from-indigo-900/30 to-purple-900/30 p-4 animate-in fade-in">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-500/30 flex items-center justify-center">
+                        <i data-lucide="file-text" class="w-5 h-5 text-indigo-300"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-white">${data.filename}</div>
+                        <div class="text-xs text-white/50">${data.word_count} words extracted</div>
+                    </div>
+                </div>
+                <div class="text-xs text-white/70 bg-black/30 rounded-lg p-3 max-h-32 overflow-hidden">
+                    ${data.preview?.substring(0, 300)}...
+                </div>
+                <div class="mt-3 text-[10px] text-emerald-400 flex items-center gap-1">
+                    <i data-lucide="check-circle" class="w-3 h-3"></i>
+                    Document added to context. Ask KAI to summarize!
+                </div>
+            </div>`;
+
+            addMessage('assistant', `✅ Loaded **${data.filename}** (${data.word_count} words). Ask me to summarize or analyze it!`, null, { type: 'document_upload', html: previewHtml });
+            notify('Document loaded into context!');
+        } else {
+            addMessage('assistant', `❌ Upload failed: ${data.error}`);
+        }
+    } catch (e) {
+        LOG.error('UPLOAD', 'Document upload failed', e);
+        addMessage('assistant', '❌ Upload error. Please try again.');
+    }
+};
+
+// Drag & Drop listeners
+const mainInterface = document.getElementById('main-interface');
+if (mainInterface) {
+    mainInterface.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        mainInterface.classList.add('ring-2', 'ring-indigo-500/50');
+    });
+
+    mainInterface.addEventListener('dragleave', () => {
+        mainInterface.classList.remove('ring-2', 'ring-indigo-500/50');
+    });
+
+    mainInterface.addEventListener('drop', (e) => {
+        e.preventDefault();
+        mainInterface.classList.remove('ring-2', 'ring-indigo-500/50');
+
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+            (window as any).uploadDocument(files[0]);
+        }
+    });
+}
+
+// Inject document context into chat query
+const originalSendMessage = (window as any).sendMessage;
+(window as any).sendMessage = async () => {
+    if (uploadedDocumentContext && messageInput.value.toLowerCase().includes('summarize')) {
+        // Prepend context to query
+        const originalQuery = messageInput.value;
+        messageInput.value = `[DOCUMENT CONTEXT: ${uploadedDocumentContext.substring(0, 3000)}...]\n\nUser request: ${originalQuery}`;
+    }
+    await originalSendMessage();
+};
+
+
 // === 🎤 VOICE MODE (BETA) ===
 (window as any).isVoiceMode = false;
 let recognition: any;
@@ -1170,4 +1267,108 @@ function stopListening() {
 };
 
 
+
+// === 🏷️ @MENTION AUTOCOMPLETE ===
+const mentionOptions = [
+    { id: 'figma', label: '@figma', icon: '🎨', desc: 'Design files' },
+    { id: 'notion', label: '@notion', icon: '📝', desc: 'Workspace pages' },
+    { id: 'slack', label: '@slack', icon: '💬', desc: 'Send messages' },
+    { id: 'trello', label: '@trello', icon: '📋', desc: 'Boards & cards' },
+    { id: 'calendar', label: '@calendar', icon: '📅', desc: 'Events' },
+    { id: 'weather', label: '@weather', icon: '🌤️', desc: 'Forecast' },
+    { id: 'news', label: '@news', icon: '📰', desc: 'Headlines' },
+    { id: 'crypto', label: '@crypto', icon: '₿', desc: 'Prices' },
+    { id: 'github', label: '@github', icon: '🐙', desc: 'Repos' },
+    { id: 'pdf', label: '@pdf', icon: '📄', desc: 'Generate document' },
+    { id: 'image', label: '@image', icon: '🖼️', desc: 'Generate image' },
+    { id: 'spotify', label: '@spotify', icon: '🎵', desc: 'Play music' },
+];
+
+// Create dropdown
+const mentionDropdown = document.createElement('div');
+mentionDropdown.id = 'mention-dropdown';
+mentionDropdown.className = 'hidden absolute bottom-full left-0 mb-2 w-64 max-h-64 overflow-y-auto bg-[#1a1a2e]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl z-50';
+document.querySelector('.relative')?.appendChild(mentionDropdown);
+
+function showMentionDropdown(filter: string = '') {
+    const filtered = mentionOptions.filter(o => o.label.toLowerCase().includes(filter.toLowerCase()));
+    if (filtered.length === 0) { mentionDropdown.classList.add('hidden'); return; }
+
+    mentionDropdown.innerHTML = filtered.map((opt, i) => `
+        <div class="mention-option flex items-center gap-3 px-4 py-2.5 hover:bg-white/10 cursor-pointer transition-colors ${i === 0 ? 'bg-white/5' : ''}" data-mention="${opt.label}">
+            <span class="text-lg">${opt.icon}</span>
+            <div class="flex-1">
+                <div class="text-sm font-semibold text-white">${opt.label}</div>
+                <div class="text-[10px] text-white/40">${opt.desc}</div>
+            </div>
+        </div>
+    `).join('');
+
+    mentionDropdown.classList.remove('hidden');
+
+    // Add click handlers
+    mentionDropdown.querySelectorAll('.mention-option').forEach(el => {
+        el.addEventListener('click', () => {
+            const mention = el.getAttribute('data-mention');
+            if (mention && messageInput) {
+                const currentValue = messageInput.value;
+                const atIndex = currentValue.lastIndexOf('@');
+                messageInput.value = currentValue.substring(0, atIndex) + mention + ' ';
+                messageInput.focus();
+                mentionDropdown.classList.add('hidden');
+            }
+        });
+    });
+}
+
+// Input listener for @ detection
+messageInput?.addEventListener('input', (e) => {
+    const value = (e.target as HTMLTextAreaElement).value;
+    const atIndex = value.lastIndexOf('@');
+
+    if (atIndex !== -1 && (atIndex === 0 || value[atIndex - 1] === ' ')) {
+        const partial = value.substring(atIndex);
+        if (!partial.includes(' ')) {
+            showMentionDropdown(partial);
+            return;
+        }
+    }
+    mentionDropdown.classList.add('hidden');
+});
+
+// Close dropdown on blur
+messageInput?.addEventListener('blur', () => {
+    setTimeout(() => mentionDropdown.classList.add('hidden'), 150);
+});
+
+// Keyboard navigation for dropdown
+messageInput?.addEventListener('keydown', (e) => {
+    if (mentionDropdown.classList.contains('hidden')) return;
+
+    const options = mentionDropdown.querySelectorAll('.mention-option');
+    const currentActive = mentionDropdown.querySelector('.bg-white\\/5');
+    let currentIndex = Array.from(options).indexOf(currentActive as Element);
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        currentActive?.classList.remove('bg-white/5');
+        const nextIndex = (currentIndex + 1) % options.length;
+        options[nextIndex]?.classList.add('bg-white/5');
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        currentActive?.classList.remove('bg-white/5');
+        const prevIndex = (currentIndex - 1 + options.length) % options.length;
+        options[prevIndex]?.classList.add('bg-white/5');
+    } else if (e.key === 'Tab' || e.key === 'Enter') {
+        if (currentActive) {
+            e.preventDefault();
+            (currentActive as HTMLElement).click();
+        }
+    } else if (e.key === 'Escape') {
+        mentionDropdown.classList.add('hidden');
+    }
+});
+
+
 LOG.info('SYSTEM', 'KAI OS Tactical Interface Initialized.');
+
