@@ -1288,9 +1288,20 @@ const mentionOptions = [
 const mentionDropdown = document.createElement('div');
 mentionDropdown.id = 'mention-dropdown';
 mentionDropdown.className = 'hidden absolute bottom-full left-0 mb-2 w-64 max-h-64 overflow-y-auto bg-[#1a1a2e]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl z-50';
-document.querySelector('.relative')?.appendChild(mentionDropdown);
+
+// Append to input's parent (make it relative first)
+const inputParent = messageInput?.parentElement;
+if (inputParent) {
+    inputParent.style.position = 'relative';
+    inputParent.appendChild(mentionDropdown);
+    console.log('[MENTION] Dropdown appended to input parent');
+} else {
+    document.body.appendChild(mentionDropdown);
+    console.log('[MENTION] Fallback: Dropdown appended to body');
+}
 
 function showMentionDropdown(filter: string = '') {
+    console.log('[MENTION] showMentionDropdown called with:', filter);
     const filtered = mentionOptions.filter(o => o.label.toLowerCase().includes(filter.toLowerCase()));
     if (filtered.length === 0) { mentionDropdown.classList.add('hidden'); return; }
 
