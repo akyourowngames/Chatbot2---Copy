@@ -411,7 +411,208 @@ function scrollToBottom() {
     if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
 }
 
+
+// ==================== WIDGET RENDERERS ====================
+
+function renderWeatherCard(container: HTMLElement, data: any) {
+    if (!data) return;
+    const html = `
+    <div class="mt-4 p-6 rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 border border-white/10 backdrop-blur-xl animate-in fade-in zoom-in duration-500 shadow-2xl overflow-hidden relative group">
+        <div class="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+            <i data-lucide="cloud-sun" class="w-32 h-32 text-white"></i>
+        </div>
+        <div class="relative z-10 flex justify-between items-start">
+            <div>
+                 <div class="text-[10px] font-mono uppercase tracking-widest text-blue-200/60 mb-1">ATMOSPHERIC DATA</div>
+                 <h3 class="text-3xl font-bold text-white flex items-center gap-3">
+                    ${data.city} 
+                 </h3>
+                 <div class="flex items-baseline gap-2 mt-2">
+                    <span class="text-5xl font-thin text-white tracking-tighter">${data.temperature}</span>
+                    <span class="text-lg text-indigo-300 capitalize">${data.condition}</span>
+                 </div>
+            </div>
+            <div class="text-right space-y-1 mt-2">
+                 <div class="flex items-center justify-end gap-2 text-xs text-white/60 font-mono">
+                    <i data-lucide="droplets" class="w-3 h-3"></i> <span>HUM: ${data.humidity}</span>
+                 </div>
+                 <div class="flex items-center justify-end gap-2 text-xs text-white/60 font-mono">
+                    <i data-lucide="wind" class="w-3 h-3"></i> <span>WIND: ${data.wind}</span>
+                 </div>
+                 <div class="flex items-center justify-end gap-2 text-xs text-white/60 font-mono">
+                    <i data-lucide="thermometer" class="w-3 h-3"></i> <span>FEELS: ${data.feels_like}</span>
+                 </div>
+            </div>
+        </div>
+    </div>`;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderNewsList(container: HTMLElement, data: any) {
+    if (!data || !data.articles) return;
+
+    let articlesHtml = data.articles.map((article: any) => `
+        <a href="${article.url}" target="_blank" class="block p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all group/item mb-2">
+            <div class="flex justify-between items-start gap-3">
+                <div class="flex-1">
+                    <h4 class="text-sm font-semibold text-gray-200 group-hover/item:text-indigo-400 transition-colors line-clamp-2">${article.title}</h4>
+                    ${article.score ? `<div class="text-[10px] text-orange-400 mt-1 font-mono">▲ ${article.score} points by ${article.by}</div>` :
+            article.source ? `<div class="text-[10px] text-gray-400 mt-1 font-mono uppercase">${article.source}</div>` : ''}
+                </div>
+                <i data-lucide="external-link" class="w-4 h-4 text-white/20 group-hover/item:text-white/60 shrink-0 mt-1"></i>
+            </div>
+        </a>
+    `).join('');
+
+    const html = `
+    <div class="mt-4 rounded-xl border border-white/10 bg-black/40 backdrop-blur-md overflow-hidden animate-in slide-in-from-bottom-2 duration-500">
+        <div class="px-4 py-3 bg-white/5 border-b border-white/5 flex items-center justify-between">
+            <span class="text-[10px] font-mono uppercase tracking-widest text-white/50">LATEST_HEADLINES</span>
+            <span class="text-[10px] text-white/30">${data.articles.length} RESULTS</span>
+        </div>
+        <div class="p-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+            ${articlesHtml}
+        </div>
+    </div>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderCryptoStock(container: HTMLElement, data: any) {
+    if (!data || data.error) return;
+
+    const isCrypto = !!data.change_24h;
+    const change = data.change_24h || data.change_percent;
+    const isPositive = change && !change.startsWith('-');
+    const colorClass = isPositive ? 'text-green-400' : 'text-red-400';
+    const bgClass = isPositive ? 'bg-green-500/10' : 'bg-red-500/10';
+    const borderClass = isPositive ? 'border-green-500/20' : 'border-red-500/20';
+
+    const html = `
+    <div class="mt-4 inline-flex flex-col p-4 rounded-xl ${bgClass} border ${borderClass} backdrop-blur-md min-w-[200px] animate-in zoom-in duration-300">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-mono uppercase tracking-widest text-white/60">${isCrypto ? 'CRYPTO_ASSET' : 'STOCK_EQUITY'}</span>
+            <i data-lucide="${isPositive ? 'trending-up' : 'trending-down'}" class="w-4 h-4 ${colorClass}"></i>
+        </div>
+        <div class="text-3xl font-bold text-white tracking-tight">${data.price}</div>
+        <div class="text-sm font-mono ${colorClass} mt-1 flex items-center gap-1">
+            <span>${change}</span>
+            <span class="opacity-50 text-[10px] uppercase">24H CHANGE</span>
+        </div>
+        <div class="mt-3 pt-3 border-t border-white/5 text-[10px] text-white/40 uppercase font-bold tracking-widest">
+            ${data.symbol}
+        </div>
+    </div>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderSystemStats(container: HTMLElement, data: any) {
+    if (!data) return;
+
+    const html = `
+    <div class="mt-4 p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl animate-in fade-in duration-500">
+        <div class="text-[10px] font-mono uppercase tracking-widest text-white/40 mb-3 text-center">SYSTEM_TELEMETRY</div>
+        <div class="grid grid-cols-3 gap-3">
+             <div class="flex flex-col items-center p-3 rounded-lg bg-white/5 border border-white/5">
+                <i data-lucide="cpu" class="w-5 h-5 text-indigo-400 mb-2"></i>
+                <div class="text-lg font-bold text-white">${data.cpu}</div>
+                <div class="text-[9px] text-white/40">CPU LOAD</div>
+             </div>
+             <div class="flex flex-col items-center p-3 rounded-lg bg-white/5 border border-white/5">
+                <i data-lucide="memory-stick" class="w-5 h-5 text-purple-400 mb-2"></i>
+                <div class="text-lg font-bold text-white">${data.ram}</div>
+                <div class="text-[9px] text-white/40">RAM USAGE</div>
+             </div>
+             <div class="flex flex-col items-center p-3 rounded-lg bg-white/5 border border-white/5">
+                <i data-lucide="hard-drive" class="w-5 h-5 text-emerald-400 mb-2"></i>
+                <div class="text-lg font-bold text-white">${data.disk}</div>
+                <div class="text-[9px] text-white/40">DISK I/O</div>
+             </div>
+        </div>
+        <div class="mt-3 text-center">
+             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 text-[10px] font-mono text-white/60">
+                <div class="w-2 h-2 rounded-full ${data.battery.plugged ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}"></div>
+                BATTERY: ${data.battery.percent}%
+             </div>
+        </div>
+    </div>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderNasaCard(container: HTMLElement, data: any) {
+    if (!data || data.error) return;
+
+    const html = `
+    <div class="mt-4 rounded-2xl overflow-hidden border border-white/10 bg-black/60 shadow-2xl animate-in fade-in zoom-in duration-700 group">
+        <div class="relative aspect-video overflow-hidden">
+            <img src="${data.url}" alt="${data.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
+            <div class="absolute bottom-0 left-0 p-4">
+                <div class="text-[9px] font-mono text-indigo-300 uppercase tracking-widest mb-1">NASA APOD • ${data.date}</div>
+                <h3 class="text-lg font-bold text-white leading-tight">${data.title}</h3>
+            </div>
+        </div>
+        <div class="p-4 text-xs text-gray-400 leading-relaxed bg-black/40 backdrop-blur-sm">
+            ${data.explanation.substring(0, 300)}...
+        </div>
+        <div class="px-4 py-2 bg-white/5 border-t border-white/5 flex justify-end">
+            <a href="${data.hdurl}" target="_blank" class="text-[10px] text-indigo-400 hover:text-white transition-colors uppercase font-bold tracking-widest flex items-center gap-1">
+                View Full Rez <i data-lucide="arrow-up-right" class="w-3 h-3"></i>
+            </a>
+        </div>
+    </div>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderGithubList(container: HTMLElement, data: any) {
+    if (!data || !data.repos) return;
+
+    const html = `
+    <div class="mt-4 rounded-xl border border-white/10 bg-[#0d1117] text-white animate-in slide-in-from-bottom-2 duration-500">
+         <div class="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+             <i data-lucide="github" class="w-4 h-4"></i>
+             <span class="text-sm font-bold">Repositories</span>
+         </div>
+         <div class="divide-y divide-white/5 max-h-[250px] overflow-y-auto custom-scrollbar">
+             ${data.repos.map((repo: any) => `
+             <div class="p-3 hover:bg-white/5 transition-colors">
+                 <div class="flex justify-between items-start">
+                     <a href="${repo.url}" target="_blank" class="text-sm font-bold text-blue-400 hover:underline">${repo.name}</a>
+                     <div class="flex items-center gap-1 text-xs text-gray-400">
+                        <i data-lucide="star" class="w-3 h-3"></i> ${repo.stars}
+                     </div>
+                 </div>
+                 <p class="text-xs text-gray-400 mt-1 line-clamp-1">${repo.description || 'No description'}</p>
+                 <div class="mt-2 text-[10px] flex items-center gap-2">
+                    ${repo.language ? `<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-yellow-400"></span> ${repo.language}</span>` : ''}
+                 </div>
+             </div>
+             `).join('')}
+         </div>
+    </div>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+addMessage.renderers = { renderWeatherCard, renderNewsList, renderCryptoStock, renderSystemStats, renderNasaCard, renderGithubList };
+
 function notify(text: string, type: 'info' | 'error' = 'info') {
+
     const area = document.getElementById('notification-area');
     if (!area) return;
     const notif = document.createElement('div');
@@ -478,6 +679,17 @@ function addMessage(role: string, content: string, attachedFile: string | null =
     if (metadata && (metadata.type === 'pdf' || metadata.type === 'document') && metadata.url) {
         renderPDFPreview(body, metadata.url, metadata.title);
     }
+
+    // 🔌 NEW INTEGRATIONS HANDLERS
+    if (metadata && metadata.type && metadata.data) {
+        if (metadata.type === 'weather') renderWeatherCard(body, metadata.data);
+        if (metadata.type === 'news') renderNewsList(body, metadata.data);
+        if (metadata.type === 'crypto' || metadata.type === 'stock') renderCryptoStock(body, metadata.data);
+        if (metadata.type === 'system_stats') renderSystemStats(body, metadata.data);
+        if (metadata.type === 'nasa_apod') renderNasaCard(body, metadata.data);
+        if (metadata.type === 'github') renderGithubList(body, metadata.data);
+    }
+
 
     messagesList.appendChild(block);
     scrollToBottom();

@@ -1482,6 +1482,30 @@ def chat():
                 trigger_type = "spotify"
                 command = query
                 print(f"[PRE-CHECK] Smart detect: SPOTIFY")
+            
+            # 1a. NEW INTEGRATIONS DETECTION
+            elif "weather" in query_lower or "forecast" in query_lower or "temperature" in query_lower:
+                trigger_type = "weather"
+                command = query
+            elif "news" in query_lower or "headline" in query_lower:
+                trigger_type = "news" if "hacker" not in query_lower else "hacker_news"
+                command = query
+            elif "system" in query_lower and ("stat" in query_lower or "info" in query_lower or "usage" in query_lower):
+                trigger_type = "system_stats"
+            elif ("cpu" in query_lower or "ram" in query_lower or "battery" in query_lower) and ("usage" in query_lower or "level" in query_lower):
+                 trigger_type = "system_stats"
+            elif "crypto" in query_lower or "bitcoin" in query_lower or "btc" in query_lower or "eth" in query_lower:
+                trigger_type = "crypto"
+                command = query
+            elif "stock" in query_lower or "share price" in query_lower:
+                trigger_type = "stock"
+                command = query
+            elif "github" in query_lower and ("repo" in query_lower or "code" in query_lower):
+                trigger_type = "github"
+                command = query
+            elif "apod" in query_lower or "astronomy picture" in query_lower or "space image" in query_lower:
+                trigger_type = "nasa_apod"
+
             else:
                 music_words = ["music", "song", "audio", "track", "playlist", "album"]
                 video_words = ["video", "movie", "youtube video", "clip", "show me"]  # Removed "watch" to avoid false positives
@@ -1616,6 +1640,99 @@ def chat():
                  import traceback
                  traceback.print_exc()
                  response_text = f"Anime streaming error: {str(e)}"
+
+
+        # 1f. ADVANCED INTEGRATIONS HANDLERS
+        elif trigger_type in ["weather", "news", "hacker_news", "crypto", "stock", "github", "system_stats", "nasa_apod"]:
+             print(f"[SMART-TRIGGER] Integration command detected: {trigger_type}")
+             try:
+                 from Backend.AdvancedIntegrations import integrations
+                 
+                 data = {}
+                 ui_type = trigger_type
+                 response_msg = "Here is the information you requested."
+                 
+                 if trigger_type == "weather":
+                     # Extract city or default
+                     city = "London" # Default
+                     words = command.split()
+                     if "in" in words:
+                         try:
+                             city = words[words.index("in") + 1]
+                             # simple cleanup for "New York" etc
+                             if len(words) > words.index("in") + 2:
+                                  next_word = words[words.index("in") + 2]
+                                  if next_word[0].isupper():
+                                      city += " " + next_word
+                         except: pass
+                     
+                     data = integrations.get_weather(city)
+                     if "error" not in data:
+                         response_msg = f"Current weather in {data['city']}: {data['temperature']}, {data['condition']}."
+                     else:
+                         response_msg = "Could not fetch weather data."
+                         
+                 elif trigger_type == "news":
+                     topic = "technology"
+                     if "about" in command:
+                         try: topic = command.split("about")[1].strip()
+                         except: pass
+                     data = {"articles": integrations.get_news(topic)}
+                     response_msg = f"Here are the latest headlines about {topic}."
+                     
+                 elif trigger_type == "hacker_news":
+                     data = {"articles": integrations.get_hacker_news()}
+                     response_msg = "Here are the top stories from Hacker News."
+                     ui_type = "news" # Use same UI as news
+                     
+                 elif trigger_type == "crypto":
+                     symbol = "bitcoin"
+                     for coin in ["bitcoin", "ethereum", "dogecoin", "solana"]:
+                         if coin in command.lower():
+                             symbol = coin
+                             break
+                     data = integrations.get_crypto_price(symbol)
+                     if "error" not in data:
+                         response_msg = f"The price of {data['symbol']} is {data['price']} ({data['change_24h']})."
+                     
+                 elif trigger_type == "stock":
+                     symbol = "AAPL"
+                     # Very basic symbol extraction (assumes uppercase word)
+                     for word in command.split():
+                         if word.isupper() and len(word) <= 5 and word not in ["STOCK", "PRICE", "SHOW", "ME", "THE", "IS", "WHAT"]:
+                             symbol = word
+                             break
+                     data = integrations.get_stock_price(symbol)
+                     if "error" not in data:
+                         response_msg = f"{data['symbol']} stock is at {data['price']}."
+                         
+                 elif trigger_type == "github":
+                     username = "torvalds" # Default demo
+                     if "user" in command or "for" in command:
+                         # Try to grab last word
+                         username = command.split()[-1]
+                     data = {"repos": integrations.get_github_repos(username)}
+                     response_msg = f"Found public repositories for {username}."
+                     
+                 elif trigger_type == "system_stats":
+                     data = integrations.get_system_stats()
+                     response_msg = f"System Status: CPU {data.get('cpu')}, RAM {data.get('ram')}."
+                     
+                 elif trigger_type == "nasa_apod":
+                     data = integrations.get_nasa_apod()
+                     response_msg = f"NASA Astronomy Picture of the Day: {data.get('title')}."
+                 
+                 return jsonify({
+                     "response": response_msg,
+                     "data": data,
+                     "type": ui_type
+                 }), 200
+                 
+             except Exception as e:
+                 print(f"[ERROR] Integration error: {e}")
+                 import traceback
+                 traceback.print_exc()
+                 response_text = f"Integration unavailable: {str(e)}"
 
         # 1d. WEB SCRAPING
         elif trigger_type == "scrape":

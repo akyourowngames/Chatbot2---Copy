@@ -268,7 +268,99 @@ class AdvancedIntegrations:
         except:
             pass
         
-        return {"error": "Could not fetch IP info"}
+    
+    # ==================== SYSTEM STATS ====================
+    
+    def get_system_stats(self) -> Dict:
+        """Get real-time system statistics"""
+        try:
+            import psutil
+            
+            cpu_percent = psutil.cpu_percent(interval=None)
+            ram = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            battery_info = {"percent": 100, "plugged": True}
+            try:
+                battery = psutil.sensors_battery()
+                if battery:
+                    battery_info = {
+                        "percent": battery.percent,
+                        "plugged": battery.power_plugged,
+                        "secsleft": battery.secsleft
+                    }
+            except:
+                pass
+            
+            return {
+                "cpu": f"{cpu_percent}%",
+                "ram": f"{ram.percent}%",
+                "ram_used": f"{ram.used / (1024**3):.1f}GB",
+                "ram_total": f"{ram.total / (1024**3):.1f}GB",
+                "disk": f"{disk.percent}%",
+                "battery": battery_info
+            }
+        except ImportError:
+            return {"error": "psutil not installed"}
+        except Exception as e:
+            return {"error": f"Failed to get stats: {str(e)}"}
+
+    # ==================== NASA APOD ====================
+    
+    def get_nasa_apod(self) -> Dict:
+        """Get NASA Astronomy Picture of the Day"""
+        try:
+            # Using specific demo key for NASA
+            url = "https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY"
+            response = requests.get(url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "title": data.get('title'),
+                    "url": data.get('url'),
+                    "hdurl": data.get('hdurl'),
+                    "explanation": data.get('explanation'),
+                    "date": data.get('date'),
+                    "copyright": data.get('copyright', 'NASA')
+                }
+        except:
+            pass
+        
+        return {"error": "Could not fetch APOD"}
+
+    # ==================== HACKER NEWS ====================
+    
+    def get_hacker_news(self, limit: int = 5) -> List[Dict]:
+        """Get top stories from Hacker News"""
+        try:
+            # Get top stories IDs
+            top_stories_url = "https://hacker-news.firebaseio.com/v0/topstories.json"
+            response = requests.get(top_stories_url, timeout=5)
+            
+            if response.status_code == 200:
+                story_ids = response.json()[:limit]
+                stories = []
+                
+                for sid in story_ids:
+                    story_url = f"https://hacker-news.firebaseio.com/v0/item/{sid}.json"
+                    story_resp = requests.get(story_url, timeout=2)
+                    if story_resp.status_code == 200:
+                        story = story_resp.json()
+                        stories.append({
+                            "title": story.get('title'),
+                            "url": story.get('url', f"https://news.ycombinator.com/item?id={sid}"),
+                            "score": story.get('score'),
+                            "by": story.get('by'),
+                            "time": story.get('time')
+                        })
+                
+                return stories
+        except:
+            pass
+        
+        return []
+
 
 # Global instance
 integrations = AdvancedIntegrations()
