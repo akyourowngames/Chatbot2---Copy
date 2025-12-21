@@ -1470,18 +1470,28 @@ def chat():
                 command = query
                 print(f"[PRE-CHECK] Ambiguous search → defaulting to FILE search")
         
-        # === SMART MUSIC vs VIDEO vs SPOTIFY DETECTION ===
+        # === SMART MUSIC vs VIDEO vs SPOTIFY vs ANIME DETECTION ===
         if not trigger_type and ("play" in query_lower or "watch" in query_lower or "stream" in query_lower or "listen" in query_lower):
             
+            # 0. ANIME Priority - Check for anime-specific keywords FIRST
+            anime_keywords = ["anime", "episode", "ep ", "episodes", "manga", "demon slayer", "naruto", 
+                              "attack on titan", "one piece", "jujutsu", "my hero", "dragon ball",
+                              "bleach", "death note", "fullmetal", "spy x family", "chainsaw man",
+                              "trending anime", "popular anime", "top anime", "anime info"]
+            is_anime = any(kw in query_lower for kw in anime_keywords)
+            
+            if is_anime:
+                trigger_type = "anime"
+                command = query
+                print(f"[PRE-CHECK] Smart detect: ANIME")
             # 1. Spotify Priority - Check for explicit Spotify request
-            spotify_patterns = ["spotify", "on spotify", "using spotify", "from spotify", "in spotify"]
-            if any(sp in query_lower for sp in spotify_patterns):
+            elif any(sp in query_lower for sp in ["spotify", "on spotify", "using spotify", "from spotify", "in spotify"]):
                 trigger_type = "spotify"
                 command = query
                 print(f"[PRE-CHECK] Smart detect: SPOTIFY")
             else:
                 music_words = ["music", "song", "audio", "track", "playlist", "album"]
-                video_words = ["video", "watch", "movie", "youtube video", "clip", "show me"]
+                video_words = ["video", "movie", "youtube video", "clip", "show me"]  # Removed "watch" to avoid false positives
                 stream_words = ["radio", "stream", "live", "news", "tv", "channel", "broadcast"]
                 
                 is_music = any(w in query_lower for w in music_words)
@@ -1505,8 +1515,14 @@ def chat():
                     trigger_type = "music"
                     command = query
                     print(f"[PRE-CHECK] 'play' without context → MUSIC")
+                elif "watch" in query_lower:
+                    # "watch" without video keywords could be anime
+                    trigger_type = "anime"
+                    command = query
+                    print(f"[PRE-CHECK] 'watch' without specific context → ANIME")
 
         # === LEGACY RESTORATION (FASTER) ===
+
         # Using SmartTrigger for instant, low-latency command detection.
         # This replaces the heavy "Agent" dispatcher.
         
@@ -2084,9 +2100,193 @@ def chat():
              except Exception as e:
                  print(f"[ERROR] Scrape error: {e}")
                  response_text = f"Scrape error: {str(e)}"
+        # 6a. ANIME STREAMING (Watch, Search, Trending, Info)
+        elif trigger_type in ["anime", "video"]:
+             print(f"[SMART-TRIGGER] Anime/Video command detected: {command}")
+             try:
+                 from Backend.AnimeStreaming import anime_system
+                 import re
+                 
+                 q = query.lower()
+                 
+                 # === TRENDING ANIME ===
+                 if any(w in q for w in ["trending", "popular", "top anime", "best anime", "what anime"]):
+                     result = anime_system.get_trending()
+                     
+                     if result.get("status") == "success":
+                         trending_list = result.get("trending", [])[:8]
+                         
+                         # Format for display
+                         anime_items = []
+                         for anime in trending_list:
+                             title = anime.get("title", "Unknown")
+                             score = anime.get("score", "N/A")
+                             episodes = anime.get("episodes", "?")
+                             genres = ", ".join(anime.get("genres", [])[:3])
+                             anime_items.append(f"• **{title}** ⭐{score} | {episodes} eps | {genres}")
+                         
+                         return jsonify({
+                             "response": f"🔥 **Trending Anime:**\n\n" + "\n".join(anime_items),
+                             "type": "anime_list",
+                             "anime_list": trending_list
+                         }), 200
+                     else:
+                         response_text = f"❌ Could not fetch trending: {result.get('error', 'Unknown error')}"
+                 
+                 # === SEARCH ANIME ===
+                 elif any(w in q for w in ["search anime", "find anime", "anime search", "look for anime"]):
+                     # Extract search query
+                     search_query = command
+                     for remove in ["search", "find", "anime", "for", "look"]:
+                         search_query = search_query.lower().replace(remove, "").strip()
+                     search_query = " ".join(search_query.split())
+                     
+                     if not search_query:
+                         search_query = "naruto"  # Default
+                     
+                     result = anime_system.search_anime(search_query)
+                     
+                     if result.get("status") == "success":
+                         results_list = result.get("results", [])[:6]
+                         
+                         anime_items = []
+                         for anime in results_list:
+                             title = anime.get("title", "Unknown")
+                             anime_id = anime.get("id", "")
+                             anime_items.append(f"• **{title}** (ID: {anime_id})")
+                         
+                         return jsonify({
+                             "response": f"🔍 **Search Results for '{search_query}':**\n\n" + "\n".join(anime_items) + "\n\nSay 'Watch [anime name]' to start streaming!",
+                             "type": "anime_search",
+                             "search_results": results_list,
+                             "search_query": search_query
+                         }), 200
+                     else:
+                         response_text = f"❌ Search failed: {result.get('error', 'Unknown error')}"
+                 
+                 # === ANIME INFO ===
+                 elif any(w in q for w in ["anime info", "info about", "details about", "about anime"]):
+                     # Extract anime name
+                     anime_name = command
+                     for remove in ["anime", "info", "about", "details", "tell me"]:
+                         anime_name = anime_name.lower().replace(remove, "").strip()
+                     anime_name = " ".join(anime_name.split())
+                     
+                     if anime_name:
+                         result = anime_system.get_anime_info(anime_name)
+                         
+                         if result.get("status") == "success":
+                             info = result.get("info", {})
+                             title = info.get("title", anime_name)
+                             synopsis = info.get("synopsis", "No synopsis available")[:400]
+                             score = info.get("score", "N/A")
+                             episodes = info.get("episodes", "?")
+                             status = info.get("status", "Unknown")
+                             genres = ", ".join(info.get("genres", [])[:4])
+                             image = info.get("image", "")
+                             
+                             response_md = f"""🎬 **{title}**
+⭐ Score: {score} | 📺 {episodes} episodes | 📡 {status}
+🏷️ Genres: {genres}
 
-        # 6. GENERIC AUTOMATION (Fallback for others)
-        elif trigger_type in ["chrome", "system", "app", "workflow", "whatsapp", "video", "switch"]:
+📝 **Synopsis:**
+{synopsis}...
+
+Say 'Watch {title}' to start streaming!"""
+                             
+                             return jsonify({
+                                 "response": response_md,
+                                 "type": "anime_info",
+                                 "anime_info": info,
+                                 "image_url": image
+                             }), 200
+                         else:
+                             response_text = f"❌ Could not find info: {result.get('error', 'Unknown')}"
+                     else:
+                         response_text = "Please specify an anime name. Example: 'Anime info Demon Slayer'"
+                 
+                 # === WATCH ANIME (Default - Most common action) ===
+                 else:
+                     # Extract anime name and episode
+                     anime_name = command if command else query
+                     episode = 1
+                     
+                     # Remove trigger words
+                     for remove in ["watch", "play", "stream", "anime", "video", "show", "episode"]:
+                         anime_name = anime_name.lower().replace(remove, "").strip()
+                     
+                     # Extract episode number if present
+                     ep_match = re.search(r'(?:ep|episode|eps?)\s*(\d+)', query.lower())
+                     if ep_match:
+                         episode = int(ep_match.group(1))
+                         # Remove episode part from name
+                         anime_name = re.sub(r'(?:ep|episode|eps?)\s*\d+', '', anime_name).strip()
+                     
+                     # Also check for just a number at the end
+                     trailing_num = re.search(r'\s+(\d+)\s*$', anime_name)
+                     if trailing_num and not ep_match:
+                         episode = int(trailing_num.group(1))
+                         anime_name = anime_name[:trailing_num.start()].strip()
+                     
+                     anime_name = " ".join(anime_name.split())  # Clean up spaces
+                     
+                     if not anime_name:
+                         anime_name = "demon slayer"  # Default
+                     
+                     print(f"[ANIME] Watching: {anime_name}, Episode: {episode}")
+                     
+                     result = anime_system.watch_anime(anime_name, episode)
+                     
+                     if result.get("status") == "success":
+                         stream_data = result.get("stream", {})
+                         anime_title = result.get("anime_title", anime_name)
+                         episode_title = result.get("episode_title", f"Episode {episode}")
+                         streaming_url = stream_data.get("url", "")
+                         quality = stream_data.get("quality", "default")
+                         thumbnail = result.get("thumbnail", "")
+                         total_episodes = result.get("total_episodes", "?")
+                         
+                         return jsonify({
+                             "response": f"🎬 **Now Streaming:** {anime_title}\n📺 {episode_title}\n⚙️ Quality: {quality}",
+                             "type": "anime",
+                             "anime": {
+                                 "title": anime_title,
+                                 "episode": episode,
+                                 "episode_title": episode_title,
+                                 "streaming_url": streaming_url,
+                                 "quality": quality,
+                                 "thumbnail": thumbnail,
+                                 "total_episodes": total_episodes,
+                                 "sources": stream_data.get("sources", [])
+                             }
+                         }), 200
+                     else:
+                         error_msg = result.get("error", "Could not find streaming source")
+                         
+                         # Provide helpful suggestions
+                         response_text = f"""❌ **Could not stream '{anime_name}'**
+
+{error_msg}
+
+💡 **Try these instead:**
+• "Watch [anime name]" - Stream anime
+• "Trending anime" - Popular shows
+• "Search anime [name]" - Find anime
+• "Anime info [name]" - Get details"""
+             
+             except ImportError as ie:
+                 print(f"[ERROR] AnimeStreaming import failed: {ie}")
+                 response_text = "❌ Anime streaming module not available. Please check installation."
+             except Exception as e:
+                 print(f"[ERROR] Anime streaming error: {e}")
+                 import traceback
+                 traceback.print_exc()
+                 response_text = f"Anime streaming error: {str(e)}"
+
+        # 6b. GENERIC AUTOMATION (Fallback for others)
+        elif trigger_type in ["chrome", "system", "app", "workflow", "whatsapp", "switch"]:
+
+
              print(f"[SMART-TRIGGER] Detected {trigger_type} command: {command}")
              
              try:
