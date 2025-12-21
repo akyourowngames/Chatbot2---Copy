@@ -1545,31 +1545,31 @@ def chat():
         response_text = ""
         
         # 1. MUSIC/MEDIA COMMANDS
-        # 1. MUSIC COMMANDS (YouTube/SoundCloud)
+        # 1. MUSIC COMMANDS - SPOTIFY ONLY (as per user request)
         if trigger_type == "music":
-             print(f"[SMART-TRIGGER] Music command detected: {command}")
+             print(f"[SMART-TRIGGER] Music command detected: {command} -> Using Spotify")
              try:
-                 from Backend.MultiMusicPlayer import multi_music_player
+                 from Backend.SpotifyPlayer import spotify_player
                  
-                 search_query = command if command and command.lower() not in ['music', 'song', 'track', 'audio'] else "lofi music"
+                 search_query = command if command and command.lower() not in ['music', 'song', 'track', 'audio'] else "top hits"
                  
-                 # Play using auto source (YouTube/SoundCloud)
-                 result = multi_music_player.play(search_query, source="auto")
+                 # Play using Spotify ONLY
+                 result = spotify_player.play(search_query)
                  
                  if result.get("status") == "success":
                      return jsonify({
                          "response": result["message"],
-                         "music": result["music"],
-                         "type": "music"
+                         "spotify": result.get("spotify"),  # Changed from 'music' to 'spotify'
+                         "type": "spotify"  # Changed from 'music' to 'spotify'
                      }), 200
                  else:
-                     response_text = result.get("error", "Could not play music.")
+                     response_text = result.get("message", "Could not play on Spotify.")
                      
              except Exception as e:
-                 print(f"[ERROR] Music player error: {e}")
+                 print(f"[ERROR] Spotify player error: {e}")
                  import traceback
                  traceback.print_exc()
-                 response_text = f"Music player error: {str(e)}"
+                 response_text = f"Spotify error: {str(e)}"
                  
         # 1c. STREAM/RADIO COMMANDS (YouTube Live)
         elif trigger_type == "stream":
