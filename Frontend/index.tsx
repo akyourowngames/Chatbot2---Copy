@@ -611,21 +611,37 @@ function renderGithubList(container: HTMLElement, data: any) {
 
 
 function renderFigmaCard(container: HTMLElement, data: any) {
-    if (!data || !data.files) return;
+    // Handle both: data = {files: [...]} or data = [...]
+    const files = Array.isArray(data) ? data : (data?.files || []);
+
+    if (!files || files.length === 0) {
+        // Show empty state instead of breaking
+        const emptyHtml = `
+        <div class="mt-4 rounded-xl border border-white/10 bg-[#1e1e1e] p-6 text-center animate-in fade-in">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Figma-logo.svg" class="w-10 h-10 mx-auto opacity-50 mb-3">
+            <div class="text-sm text-white/60">No Figma files found</div>
+            <div class="text-xs text-white/30 mt-1">Connect your Figma account or check API key</div>
+        </div>`;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = emptyHtml;
+        container.appendChild(wrapper);
+        return;
+    }
 
     const html = `
     <div class="mt-4 rounded-xl border border-white/10 bg-[#1e1e1e] overflow-hidden animate-in fade-in duration-500">
          <div class="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-[#2c2c2c]">
              <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Figma-logo.svg" class="w-4 h-4">
              <span class="text-sm font-bold text-white">Recent Files</span>
+             <span class="text-xs text-white/40 ml-auto">${files.length} files</span>
          </div>
          <div class="grid grid-cols-2 gap-3 p-3">
-             ${data.files.map((f: any) => `
-             <a href="${f.url}" target="_blank" class="group block relative aspect-[4/3] rounded-lg overflow-hidden border border-white/10 bg-black/50 hover:border-indigo-500/50 transition-all">
-                 <img src="${f.thumbnail}" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity">
+             ${files.map((f: any) => `
+             <a href="${f.url || '#'}" target="_blank" class="group block relative aspect-[4/3] rounded-lg overflow-hidden border border-white/10 bg-black/50 hover:border-indigo-500/50 transition-all">
+                 ${f.thumbnail ? `<img src="${f.thumbnail}" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">` : '<div class="w-full h-full flex items-center justify-center"><span class="text-2xl">🎨</span></div>'}
                  <div class="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex flex-col justify-end p-2">
-                     <div class="text-xs font-bold text-white truncate">${f.name}</div>
-                     <div class="text-[9px] text-white/50">${f.last_modified}</div>
+                     <div class="text-xs font-bold text-white truncate">${f.name || 'Untitled'}</div>
+                     <div class="text-[9px] text-white/50">${f.last_modified || 'Recently updated'}</div>
                  </div>
              </a>
              `).join('')}
@@ -635,6 +651,7 @@ function renderFigmaCard(container: HTMLElement, data: any) {
     wrapper.innerHTML = html;
     container.appendChild(wrapper);
 }
+
 
 function renderNotionList(container: HTMLElement, data: any) {
     if (!data || !data.pages) return;
