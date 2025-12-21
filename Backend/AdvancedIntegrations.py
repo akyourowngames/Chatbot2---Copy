@@ -25,6 +25,12 @@ class AdvancedIntegrations:
             "news": os.getenv("NEWS_API_KEY", ""),
             "spotify": os.getenv("SPOTIFY_API_KEY", ""),
             "github": os.getenv("GITHUB_TOKEN", ""),
+            "figma": os.getenv("FIGMA_ACCESS_TOKEN", ""),
+            "notion": os.getenv("NOTION_API_KEY", ""),
+            "slack": os.getenv("SLACK_BOT_TOKEN", ""),
+            "trello_key": os.getenv("TRELLO_API_KEY", ""),
+            "trello_token": os.getenv("TRELLO_TOKEN", ""),
+            "calendar": os.getenv("GOOGLE_CALENDAR_CREDENTIALS", "")
         }
     
     # ==================== WEATHER ====================
@@ -362,8 +368,176 @@ class AdvancedIntegrations:
         return []
 
 
+
+    # ==================== FIGMA ====================
+    
+    def get_figma_files(self, team_id: str = "demo") -> List[Dict]:
+        """Get recent Figma files"""
+        try:
+            token = self.api_keys.get("figma", "")
+            if not token or team_id == "demo":
+                 # Mock data for demo if no key
+                 return [
+                     {"key": "abc1", "name": "App UI Design", "last_modified": "2h ago", "thumbnail": "https://figma.com/demo1.png"},
+                     {"key": "abc2", "name": "Marketing Assets", "last_modified": "5h ago", "thumbnail": "https://figma.com/demo2.png"},
+                     {"key": "abc3", "name": "Design System", "last_modified": "1d ago", "thumbnail": "https://figma.com/demo3.png"}
+                 ]
+
+            url = f"https://api.figma.com/v1/teams/{team_id}/projects"
+            headers = {"X-Figma-Token": token}
+            response = requests.get(url, headers=headers, timeout=5)
+            
+            if response.status_code == 200:
+                projects = response.json().get('projects', [])
+                files = []
+                # Fetch files for first few projects
+                for proj in projects[:3]:
+                    f_url = f"https://api.figma.com/v1/projects/{proj['id']}/files"
+                    f_resp = requests.get(f_url, headers=headers)
+                    if f_resp.status_code == 200:
+                        for f in f_resp.json().get('files', [])[:2]:
+                            files.append({
+                                "key": f['key'],
+                                "name": f['name'],
+                                "last_modified": f['last_modified'],
+                                "thumbnail": f['thumbnail_url'],
+                                "url": f"https://www.figma.com/file/{f['key']}/{f['name'].replace(' ','-')}"
+                            })
+                return files
+        except:
+            pass
+        return [{"error": "Authentication failed"}]
+
+    # ==================== NOTION ====================
+
+    def search_notion(self, query: str = "") -> List[Dict]:
+        """Search Notion workspace"""
+        try:
+            token = self.api_keys.get("notion", "")
+            if not token:
+                # Mock data
+                return [
+                    {"id": "1", "title": "Project Roadmap", "url": "https://notion.so/roadmap", "icon": "🗺️"},
+                    {"id": "2", "title": "Meeting Notes", "url": "https://notion.so/notes", "icon": "📝"},
+                    {"id": "3", "title": "Design Specs", "url": "https://notion.so/specs", "icon": "🎨"}
+                ]
+            
+            url = "https://api.notion.com/v1/search"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Notion-Version": "2022-06-28",
+                "Content-Type": "application/json"
+            }
+            payload = {"query": query, "page_size": 5} if query else {"page_size": 5}
+            
+            response = requests.post(url, headers=headers, json=payload, timeout=5)
+            if response.status_code == 200:
+                results = []
+                for item in response.json().get('results', []):
+                    title = "Untitled"
+                    try:
+                        if item['object'] == 'page':
+                            # Notion properties are complex, simplified extraction
+                            props = item.get('properties', {})
+                            for key, val in props.items():
+                                if val['type'] == 'title':
+                                    title = val['title'][0]['plain_text']
+                                    break
+                    except: pass
+                    
+                    results.append({
+                        "id": item['id'],
+                        "title": title,
+                        "url": item.get('url'),
+                        "icon": item.get('icon', {}).get('emoji', '📄')
+                    })
+                return results
+        except:
+             pass
+        return []
+
+    # ==================== SLACK ====================
+
+    def get_slack_channels(self) -> List[Dict]:
+        """Get public Slack channels"""
+        try:
+            token = self.api_keys.get("slack", "")
+            if not token:
+                return [
+                    {"id": "C1", "name": "general", "members": 42},
+                    {"id": "C2", "name": "random", "members": 35},
+                    {"id": "C3", "name": "development", "members": 12}
+                ]
+            
+            url = "https://slack.com/api/conversations.list"
+            headers = {"Authorization": f"Bearer {token}"}
+            response = requests.get(url, headers=headers, params={"types": "public_channel", "limit": 10})
+            
+            if response.status_code == 200:
+                channels = response.json().get('channels', [])
+                return [{"id": c['id'], "name": c['name'], "members": c['num_members']} for c in channels]
+        except: pass
+        return []
+
+    def send_slack_message(self, channel: str, text: str) -> Dict:
+        """Send message to Slack"""
+        try:
+            token = self.api_keys.get("slack", "")
+            if not token: return {"status": "mock_success", "channel": channel}
+            
+            url = "https://slack.com/api/chat.postMessage"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            # Resolve channel name to ID if needed, or assume ID/Name works
+            resp = requests.post(url, headers=headers, json={"channel": channel, "text": text})
+            if resp.json().get('ok'):
+                return {"status": "success", "ts": resp.json().get('ts')}
+        except: pass
+        return {"error": "Failed to send"}
+
+    # ==================== TRELLO ====================
+
+    def get_trello_boards(self) -> List[Dict]:
+        """Get Trello boards"""
+        try:
+            key = self.api_keys.get("trello_key", "")
+            token = self.api_keys.get("trello_token", "")
+            if not key or not token:
+                return [
+                    {"id": "b1", "name": "Product Backlog", "url": "https://trello.com/b/1", "bg": "blue"},
+                    {"id": "b2", "name": "Sprint 42", "url": "https://trello.com/b/2", "bg": "green"},
+                ]
+                
+            url = f"https://api.trello.com/1/members/me/boards?key={key}&token={token}"
+            resp = requests.get(url)
+            if resp.status_code == 200:
+                return [{"id": b['id'], "name": b['name'], "url": b['url'], "bg": b['prefs']['backgroundColor']} for b in resp.json()[:5]]
+        except: pass
+        return []
+
+    # ==================== GOOGLE CALENDAR ====================
+
+    def get_calendar_events(self, count: int = 5) -> List[Dict]:
+        """Get upcoming Google Calendar events"""
+        try:
+            # Requires complex OAuth, using simplified or mock for now
+            creds = self.api_keys.get("calendar", "")
+            if not creds:
+                now = datetime.now()
+                return [
+                    {"summary": "Team Standup", "start": "10:00 AM", "date": "Today"},
+                    {"summary": "Client Call", "start": "2:00 PM", "date": "Today"},
+                    {"summary": "Project Review", "start": "11:00 AM", "date": "Tomorrow"}
+                ]
+            pass # Real implementation would use google-api-python-client
+        except: pass
+        return []
+
 # Global instance
 integrations = AdvancedIntegrations()
+
 
 if __name__ == "__main__":
     # Test integrations

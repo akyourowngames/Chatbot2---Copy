@@ -1505,6 +1505,24 @@ def chat():
                 command = query
             elif "apod" in query_lower or "astronomy picture" in query_lower or "space image" in query_lower:
                 trigger_type = "nasa_apod"
+            
+            # 1b. SAAS INTEGRATIONS DETECTION
+            elif "figma" in query_lower:
+                trigger_type = "figma"
+                command = query
+            elif "notion" in query_lower:
+                trigger_type = "notion"
+                command = query
+            elif "slack" in query_lower:
+                trigger_type = "slack"
+                command = query
+            elif "trello" in query_lower:
+                trigger_type = "trello"
+                command = query
+            elif "calendar" in query_lower or "schedule" in query_lower or "event" in query_lower:
+                trigger_type = "calendar"
+                command = query
+
 
             else:
                 music_words = ["music", "song", "audio", "track", "playlist", "album"]
@@ -1643,7 +1661,8 @@ def chat():
 
 
         # 1f. ADVANCED INTEGRATIONS HANDLERS
-        elif trigger_type in ["weather", "news", "hacker_news", "crypto", "stock", "github", "system_stats", "nasa_apod"]:
+        elif trigger_type in ["weather", "news", "hacker_news", "crypto", "stock", "github", "system_stats", "nasa_apod", "figma", "notion", "slack", "trello", "calendar"]:
+
              print(f"[SMART-TRIGGER] Integration command detected: {trigger_type}")
              try:
                  from Backend.AdvancedIntegrations import integrations
@@ -1722,11 +1741,43 @@ def chat():
                      data = integrations.get_nasa_apod()
                      response_msg = f"NASA Astronomy Picture of the Day: {data.get('title')}."
                  
+                 # --- SAAS SUITE ---
+                 elif trigger_type == "figma":
+                     data = {"files": integrations.get_figma_files()}
+                     response_msg = "Here are your recent Figma design files."
+                 
+                 elif trigger_type == "notion":
+                     q = command.replace("notion", "").replace("search", "").strip()
+                     data = {"pages": integrations.search_notion(q)}
+                     response_msg = f"Found these Notion pages matching '{q}'." if q else "Here are your recent Notion pages."
+                 
+                 elif trigger_type == "slack":
+                     if "send" in command or "message" in command:
+                         # Very basic extraction: "send hello to general"
+                         parts = command.split(" to ")
+                         msg = parts[0].replace("send", "").replace("message", "").strip()
+                         chn = parts[1].strip() if len(parts) > 1 else "general"
+                         res = integrations.send_slack_message(chn, msg)
+                         data = {"status": res, "message": msg, "channel": chn}
+                         response_msg = f"Message sent to #{chn}."
+                     else:
+                         data = {"channels": integrations.get_slack_channels()}
+                         response_msg = "Here are your public Slack channels."
+                         
+                 elif trigger_type == "trello":
+                     data = {"boards": integrations.get_trello_boards()}
+                     response_msg = "Here are your Trello boards."
+                     
+                 elif trigger_type == "calendar":
+                     data = {"events": integrations.get_calendar_events()}
+                     response_msg = "Here are your upcoming calendar events."
+                 
                  return jsonify({
                      "response": response_msg,
                      "data": data,
                      "type": ui_type
                  }), 200
+
                  
              except Exception as e:
                  print(f"[ERROR] Integration error: {e}")

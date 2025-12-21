@@ -609,7 +609,149 @@ function renderGithubList(container: HTMLElement, data: any) {
     container.appendChild(wrapper);
 }
 
-addMessage.renderers = { renderWeatherCard, renderNewsList, renderCryptoStock, renderSystemStats, renderNasaCard, renderGithubList };
+
+function renderFigmaCard(container: HTMLElement, data: any) {
+    if (!data || !data.files) return;
+
+    const html = `
+    <div class="mt-4 rounded-xl border border-white/10 bg-[#1e1e1e] overflow-hidden animate-in fade-in duration-500">
+         <div class="px-4 py-3 border-b border-white/5 flex items-center gap-2 bg-[#2c2c2c]">
+             <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/Figma-logo.svg" class="w-4 h-4">
+             <span class="text-sm font-bold text-white">Recent Files</span>
+         </div>
+         <div class="grid grid-cols-2 gap-3 p-3">
+             ${data.files.map((f: any) => `
+             <a href="${f.url}" target="_blank" class="group block relative aspect-[4/3] rounded-lg overflow-hidden border border-white/10 bg-black/50 hover:border-indigo-500/50 transition-all">
+                 <img src="${f.thumbnail}" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity">
+                 <div class="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex flex-col justify-end p-2">
+                     <div class="text-xs font-bold text-white truncate">${f.name}</div>
+                     <div class="text-[9px] text-white/50">${f.last_modified}</div>
+                 </div>
+             </a>
+             `).join('')}
+         </div>
+    </div>`;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderNotionList(container: HTMLElement, data: any) {
+    if (!data || !data.pages) return;
+
+    const html = `
+    <div class="mt-4 rounded-xl border border-white/10 bg-[#191919] animate-in slide-in-from-bottom-2 duration-500">
+         <div class="px-4 py-2 border-b border-white/5 flex items-center gap-2">
+             <span class="text-lg">📝</span>
+             <span class="text-xs font-mono uppercase tracking-widest text-white/50">Notion Workspace</span>
+         </div>
+         <div class="divide-y divide-white/5">
+             ${data.pages.map((p: any) => `
+             <a href="${p.url}" target="_blank" class="flex items-center gap-3 p-3 hover:bg-white/5 transition-colors group">
+                 <span class="text-lg opacity-80 group-hover:scale-110 transition-transform">${p.icon}</span>
+                 <div class="flex-1 min-w-0">
+                     <div class="text-sm text-gray-300 group-hover:text-white truncate">${p.title}</div>
+                 </div>
+                 <i data-lucide="arrow-right" class="w-3 h-3 text-white/20 group-hover:text-white/60"></i>
+             </a>
+             `).join('')}
+         </div>
+    </div>`;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderSlackCard(container: HTMLElement, data: any) {
+    if (!data) return;
+
+    if (data.status) {
+        // Message sent confirmation
+        const html = `
+       <div class="mt-4 inline-flex items-center gap-3 px-4 py-3 rounded-lg bg-[#4A154B]/20 border border-[#4A154B]/50 text-white">
+           <div class="p-2 rounded-full bg-[#4A154B]"><i data-lucide="check" class="w-4 h-4"></i></div>
+           <div>
+               <div class="text-xs font-bold">Message Sent</div>
+               <div class="text-[10px] opacity-70">To #${data.channel}</div>
+           </div>
+       </div>`;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        container.appendChild(wrapper);
+    } else if (data.channels) {
+        // Channel list
+        const html = `
+       <div class="mt-4 rounded-xl border border-white/10 bg-[#1a1d21] overflow-hidden">
+            <div class="px-4 py-2 border-b border-white/5 bg-[#4A154B] flex items-center gap-2">
+                <i data-lucide="hash" class="w-4 h-4 text-white"></i>
+                <span class="text-xs font-bold text-white">Slack Channels</span>
+            </div>
+            <div class="p-2 space-y-1">
+                ${data.channels.map((c: any) => `
+                <div class="flex items-center justify-between p-2 rounded hover:bg-white/5 cursor-default">
+                    <span class="text-sm text-gray-300"># ${c.name}</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/40">${c.members}</span>
+                </div>
+                `).join('')}
+            </div>
+       </div>`;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        container.appendChild(wrapper);
+    }
+}
+
+function renderTrelloBoard(container: HTMLElement, data: any) {
+    if (!data || !data.boards) return;
+
+    const html = `
+    <div class="mt-4 space-y-2">
+        ${data.boards.map((b: any) => `
+        <a href="${b.url}" target="_blank" class="block p-4 rounded-lg bg-gradient-to-r from-blue-600/20 to-blue-800/20 border border-blue-500/30 hover:border-blue-400/50 transition-all group">
+            <div class="flex justify-between items-center">
+                <div class="font-bold text-white group-hover:text-blue-200 transition-colors">${b.name}</div>
+                <i data-lucide="trello" class="w-4 h-4 text-white/40"></i>
+            </div>
+        </a>
+        `).join('')}
+    </div>`;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderCalendarWidget(container: HTMLElement, data: any) {
+    if (!data || !data.events) return;
+
+    const html = `
+    <div class="mt-4 rounded-xl border border-white/10 bg-[#202124] overflow-hidden animate-in fade-in duration-500">
+         <div class="px-4 py-3 border-b border-white/5 flex items-center gap-2">
+             <i data-lucide="calendar" class="w-4 h-4 text-blue-400"></i>
+             <span class="text-xs font-bold text-white uppercase tracking-widest">Upcoming</span>
+         </div>
+         <div class="p-4 relative">
+             <div class="absolute left-6 top-4 bottom-4 w-px bg-white/10"></div>
+             <div class="space-y-4">
+                 ${data.events.map((e: any) => `
+                 <div class="relative pl-6">
+                     <div class="absolute left-[-5px] top-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-[#202124]"></div>
+                     <div class="text-xs text-blue-400 font-mono mb-0.5">${e.start} • ${e.date}</div>
+                     <div class="text-sm font-semibold text-gray-200">${e.summary}</div>
+                 </div>
+                 `).join('')}
+             </div>
+         </div>
+    </div>`;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+addMessage.renderers = {
+    renderWeatherCard, renderNewsList, renderCryptoStock, renderSystemStats, renderNasaCard, renderGithubList,
+    renderFigmaCard, renderNotionList, renderSlackCard, renderTrelloBoard, renderCalendarWidget
+};
+
 
 function notify(text: string, type: 'info' | 'error' = 'info') {
 
@@ -688,7 +830,15 @@ function addMessage(role: string, content: string, attachedFile: string | null =
         if (metadata.type === 'system_stats') renderSystemStats(body, metadata.data);
         if (metadata.type === 'nasa_apod') renderNasaCard(body, metadata.data);
         if (metadata.type === 'github') renderGithubList(body, metadata.data);
+
+        // SaaS
+        if (metadata.type === 'figma') renderFigmaCard(body, metadata.data);
+        if (metadata.type === 'notion') renderNotionList(body, metadata.data);
+        if (metadata.type === 'slack') renderSlackCard(body, metadata.data);
+        if (metadata.type === 'trello') renderTrelloBoard(body, metadata.data);
+        if (metadata.type === 'calendar') renderCalendarWidget(body, metadata.data);
     }
+
 
 
     messagesList.appendChild(block);
