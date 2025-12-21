@@ -1,0 +1,531 @@
+
+// @ts-nocheck
+import { createClient } from "@supabase/supabase-js";
+import { initializeApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, writeBatch } from "firebase/firestore";
+
+declare var lucide: any;
+declare var Prism: any;
+declare var marked: any;
+declare var marked: any;
+declare var window: any;
+declare var Hls: any;
+declare var webkitSpeechRecognition: any;
+
+// 🟢 DEBUG LOGGER
+const LOG = {
+    info: (mod: string, msg: string, data?: any) => console.log(`%c[${mod}]%c ${msg}`, 'color: #6366f1; font-weight: bold; background: #1e1e2e; padding: 2px 5px;', 'color: #f1f5f9;', data || ''),
+    warn: (mod: string, msg: string, data?: any) => console.warn(`%c[${mod}]%c ${msg}`, 'color: #fbbf24; font-weight: bold; background: #1e1e2e; padding: 2px 5px;', 'color: #f1f5f9;', data || ''),
+    error: (mod: string, msg: string, data?: any) => console.error(`%c[${mod}]%c ${msg}`, 'color: #ef4444; font-weight: bold; background: #1e1e2e; padding: 2px 5px;', 'color: #fca5a5;', data || ''),
+    network: (url: string, status: number, data?: any) => console.log(`%c[NETWORK] %c${status} %c${url}`, 'color: #00f0ff; font-weight: bold;', status < 300 ? 'color: #10b981;' : 'color: #ef4444;', 'color: #94a3b8;', data || '')
+};
+
+// 🔥 Firebase Configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyAVv4EhUiVZSf54iZlB-ud05pxIlO8zBWk",
+    authDomain: "kai-g-80f9c.firebaseapp.com",
+    projectId: "kai-g-80f9c",
+    storageBucket: "kai-g-80f9c.appspot.com",
+    messagingSenderId: "125633190886",
+    appId: "1:125633190886:web:65e1a7b4f59048a1768853"
+};
+
+// Initialize Firebase
+let firebaseApp, auth, db;
+try {
+    LOG.info('SYSTEM', 'Initializing Firebase modules...');
+    firebaseApp = initializeApp(firebaseConfig);
+    auth = getAuth(firebaseApp);
+    db = getFirestore(firebaseApp);
+} catch (e) {
+    LOG.error('SYSTEM', 'Firebase Init Failed', e);
+}
+
+// 📡 API Configuration
+const USE_CLOUD_API = true;
+const BASE_URL = USE_CLOUD_API ? 'https://kai-api-nxxv.onrender.com' : 'http://localhost:5000';
+const API_URL = `${BASE_URL}/api/v1`;
+
+// 📦 Supabase Configuration
+const SUPABASE_URL = 'https://skbfmcwrshxnmaxfqyaw.supabase.co';
+const SUPABASE_KEY = 'sb_secret_kT3r_lTsBYBLwpv313A0qQ_przZ-Q8v';
+const SUPABASE_BUCKET = 'kai-images';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// State
+let isProcessing = false;
+let chatHistory: any[] = JSON.parse(localStorage.getItem('kai_chat_history') || '[]');
+let currentChatId = Date.now().toString();
+let isLoginMode = true;
+let pendingAssetUrl: string | null = null;
+let pendingAssetName: string | null = null;
+
+// DOM Elements
+const messagesList = document.getElementById('messages-list');
+const messageInput = document.getElementById('messageInput') as HTMLTextAreaElement;
+const welcomeScreen = document.getElementById('welcome-screen');
+const sidebar = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+const chatHistoryList = document.getElementById('chat-history-list');
+const sessionIdDisplay = document.getElementById('session-id-display');
+const attachmentArea = document.getElementById('attachment-area');
+const authForm = document.getElementById('auth-form') as HTMLFormElement;
+const authEmail = document.getElementById('auth-email') as HTMLInputElement;
+const authPassword = document.getElementById('auth-password') as HTMLInputElement;
+const authSubmitBtn = document.getElementById('auth-submit-btn') as HTMLButtonElement;
+const toggleAuthModeBtn = document.getElementById('toggle-auth-mode') as HTMLButtonElement;
+const authError = document.getElementById('auth-error') as HTMLElement;
+const authProgress = document.getElementById('auth-progress') as HTMLElement;
+const authBar = document.getElementById('auth-bar') as HTMLElement;
+const authPercent = document.getElementById('auth-percent') as HTMLElement;
+
+// Formatting
+function formatMessage(text: string) {
+    if (typeof marked === 'undefined') return text;
+    const renderer = new marked.Renderer();
+    renderer.code = (code: string, language: string) => {
+        return `<div class="code-container my-4 border border-white/10 group relative">
+            <div class="px-4 py-2 bg-white/5 border-b border-white/10 flex justify-between items-center">
+                <span class="text-[9px] font-mono text-indigo-300/70 uppercase tracking-widest">${language || 'RAW_BUFFER'}</span>
+            </div>
+            <pre class="p-4 custom-scrollbar overflow-x-auto"><code class="language-${language}">${code}</code></pre>
+        </div>`;
+    };
+    marked.setOptions({
+        renderer: renderer,
+        highlight: (code, lang) => {
+            if (typeof Prism !== 'undefined' && Prism.languages[lang]) {
+                return Prism.highlight(code, Prism.languages[lang], lang);
+            }
+            return code;
+        }
+    });
+    return marked.parse(text);
+}
+
+// UI Rendering
+function renderHistory() {
+    if (!chatHistoryList) return;
+    const uniqueChats = chatHistory.reduce((acc: any[], current: any) => {
+        const x = acc.find(item => item.id === current.id);
+        return x ? acc : acc.concat([current]);
+    }, []).reverse();
+
+    chatHistoryList.innerHTML = uniqueChats.length ? '' : `<div class="px-3 py-2 text-[10px] text-white/20 font-mono italic text-center">EMPTY_LOGS</div>`;
+
+    uniqueChats.slice(0, 15).forEach(chat => {
+        const container = document.createElement('div');
+        container.className = 'group flex items-center justify-between hover:bg-white/5 border-l-2 border-transparent hover:border-indigo-500 transition-all px-3 py-1';
+
+        const btn = document.createElement('button');
+        btn.className = 'flex-1 text-left py-2 text-[10px] text-white/40 group-hover:text-white truncate font-mono uppercase tracking-widest';
+        btn.innerText = chat.user.substring(0, 24) + (chat.user.length > 24 ? '...' : '');
+        btn.onclick = () => { loadChat(chat.id); if (window.innerWidth < 1024) (window as any).toggleSidebar(); };
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'opacity-0 group-hover:opacity-100 p-2 text-white/20 hover:text-red-400 transition-all';
+        deleteBtn.innerHTML = `<i data-lucide="trash-2" class="w-3 h-3"></i>`;
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm('PURGE INDIVIDUAL LOG ENTRY?')) (window as any).deleteChat(chat.id);
+        };
+
+        container.appendChild(btn);
+        container.appendChild(deleteBtn);
+        chatHistoryList.appendChild(container);
+    });
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+
+function renderAnimePlayer(container: HTMLElement, anime: any) {
+    if (!anime || !anime.streaming_url) return;
+
+    const playerId = `anime-player-${Date.now()}`;
+    const html = `
+    <div class="mt-4 rounded-lg overflow-hidden border border-indigo-500/30 bg-black shadow-lg shadow-indigo-500/10 animate-in fade-in duration-500">
+        <div class="relative aspect-video group">
+            <video id="${playerId}" class="w-full h-full object-contain bg-black" controls crossorigin="anonymous" poster="${anime.thumbnail || ''}"></video>
+            <div class="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-[10px] font-mono text-white/80 border border-white/10">
+                ${anime.quality || 'HD'}
+            </div>
+            <div class="absolute bottom-4 left-4 right-4 hidden group-hover:block transition-all">
+                <div class="text-white font-bold text-shadow text-sm">${anime.episode_title}</div>
+            </div>
+        </div>
+        <div class="p-3 bg-indigo-900/10 border-t border-white/5 flex justify-between items-center">
+             <div class="flex items-center gap-2">
+                <i data-lucide="play-circle" class="w-4 h-4 text-indigo-400"></i>
+                <span class="text-xs font-mono text-indigo-200">${anime.title} - Ep ${anime.episode}</span>
+             </div>
+             <button onclick="window.open('${anime.streaming_url}', '_blank')" class="text-[10px] uppercase hover:text-white text-white/50 transition-colors">Open ext</button>
+        </div>
+    </div>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+
+    setTimeout(() => {
+        const video = document.getElementById(playerId) as HTMLVideoElement;
+        if (!video) return;
+
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(anime.streaming_url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                // video.play(); // Auto-play might be blocked
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = anime.streaming_url;
+        }
+    }, 100);
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('chat-container');
+    if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+}
+
+function notify(text: string, type: 'info' | 'error' = 'info') {
+    const area = document.getElementById('notification-area');
+    if (!area) return;
+    const notif = document.createElement('div');
+    notif.className = `p-3 bg-black/90 backdrop-blur-md border-l-2 ${type === 'error' ? 'border-red-500' : 'border-indigo-500'} shadow-2xl animate-in slide-in-from-right duration-300 relative pointer-events-auto`;
+    notif.innerHTML = `<div class="flex items-center justify-between gap-6 px-2">
+            <span class="text-[9px] font-bold font-mono text-white/80 uppercase tracking-widest">${text}</span>
+            <i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle'}" class="w-3 h-3 ${type === 'error' ? 'text-red-500' : 'text-indigo-500'}"></i>
+        </div>`;
+    area.appendChild(notif);
+    setTimeout(() => { notif.style.opacity = '0'; setTimeout(() => notif.remove(), 400); }, 4000);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function addMessage(role: string, content: string, attachedFile: string | null = null, metadata: any = null) {
+    if (!messagesList) return;
+    const block = document.createElement('div');
+    block.className = `msg-block ${role} group`;
+
+    const header = document.createElement('div');
+    header.className = 'flex items-center gap-2 mb-3 opacity-60 font-mono text-[10px] uppercase tracking-[0.2em]';
+    header.innerHTML = role === 'assistant'
+        ? `<div class="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div> <span class="text-indigo-400 font-bold">KAI_SYS_INTEL</span> <span>${new Date().toLocaleTimeString()}</span>`
+        : `<span class="text-white/60 font-bold">OPERATOR_TRANS</span> <span>${new Date().toLocaleTimeString()}</span>`;
+
+    const body = document.createElement('div');
+    body.className = `markdown-body text-sm leading-relaxed ${role === 'assistant' ? 'text-gray-200' : 'text-gray-400'}`;
+
+    let displayContent = content;
+    if (role === 'user' && attachedFile) {
+        displayContent = `<div class="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-indigo-500/30 rounded-sm text-[9px] font-mono text-indigo-400 mb-3 uppercase tracking-widest shadow-lg shadow-indigo-500/5">
+            <i data-lucide="file-check" class="w-3 h-3"></i> ATTACHED_ASSET: ${attachedFile}
+        </div><br>` + (displayContent || 'Awaiting file analysis...');
+    }
+
+    body.innerHTML = formatMessage(displayContent);
+    block.appendChild(header);
+    block.appendChild(body);
+
+    // 🎬 RICH MEDIA RENDERING
+    if (metadata && metadata.type === 'anime' && metadata.anime) {
+        renderAnimePlayer(body, metadata.anime);
+    }
+
+    messagesList.appendChild(block);
+    scrollToBottom();
+    try {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        if (typeof Prism !== 'undefined') Prism.highlightAllUnder(block);
+    } catch (e) { }
+}
+
+async function loadChat(id: string) {
+    currentChatId = id;
+    if (sessionIdDisplay) sessionIdDisplay.innerText = `SID-${id.substring(0, 6)}`;
+    if (messagesList) {
+        messagesList.innerHTML = '';
+        if (welcomeScreen) welcomeScreen.style.display = 'none';
+        messagesList.classList.remove('hidden');
+        messagesList.classList.add('flex');
+    }
+    chatHistory.filter(h => h.id === id).forEach(h => {
+        addMessage('user', h.user);
+        addMessage('assistant', h.assistant);
+    });
+}
+
+async function loadHistoryFromCloud(uid: string) {
+    if (!db) return;
+    try {
+        const q = query(collection(db, "chat_history"), where("uid", "==", uid));
+        const querySnapshot = await getDocs(q);
+        const cloudHistory: any[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            data.docId = doc.id;
+            cloudHistory.push(data);
+        });
+        cloudHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        if (cloudHistory.length > 0) {
+            chatHistory = cloudHistory;
+            localStorage.setItem('kai_chat_history', JSON.stringify(chatHistory));
+            renderHistory();
+        }
+    } catch (e) { LOG.error('DATABASE', 'Sync failure', e); }
+}
+
+async function checkConnection() {
+    try {
+        const res = await fetch(BASE_URL + '/health', { method: 'GET', signal: AbortSignal.timeout(5000) });
+        const dots = document.querySelectorAll('.status-dot');
+        if (res.ok) dots.forEach(d => { d.classList.remove('busy'); d.classList.add('active'); });
+    } catch (e) { LOG.error('NETWORK', 'Probing failed', e); }
+}
+
+async function initApp() {
+    renderHistory();
+    checkConnection();
+    if (sessionIdDisplay) sessionIdDisplay.innerText = `SID-${currentChatId.substring(0, 6)}`;
+    setInterval(checkConnection, 30000);
+}
+
+// Auth State Observer
+if (auth) {
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            LOG.info('AUTH', 'Uplink active', { email: user.email });
+            document.getElementById('auth-container')!.style.display = 'none';
+            document.getElementById('main-interface')!.style.opacity = '1';
+            document.getElementById('main-interface')!.style.pointerEvents = 'auto';
+            initApp();
+            loadHistoryFromCloud(user.uid);
+        } else {
+            document.getElementById('auth-container')!.style.display = 'flex';
+            document.getElementById('main-interface')!.style.opacity = '0';
+        }
+    });
+}
+
+// Interface Actions
+(window as any).sendMessage = async () => {
+    const queryStr = messageInput.value.trim();
+    if (!queryStr || isProcessing) return;
+
+    if (welcomeScreen) welcomeScreen.style.display = 'none';
+    messagesList?.classList.remove('hidden');
+    messagesList?.classList.add('flex');
+
+    addMessage('user', queryStr);
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
+
+    isProcessing = true;
+    try {
+        const response = await fetch(`${API_URL}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: queryStr, session_id: currentChatId, uid: auth?.currentUser?.uid })
+        });
+        const data = await response.json();
+        addMessage('assistant', data.response || "NO_DATA", null, data);
+
+        // 🗣️ AUTO-SPEAK Logic (Voice Mode)
+        if ((window as any).isVoiceMode) {
+            (window as any).speak(data.response);
+        }
+
+        const historyItem = { timestamp: Date.now(), user: queryStr, assistant: data.response, id: currentChatId, uid: auth?.currentUser?.uid };
+        chatHistory.push(historyItem);
+        localStorage.setItem('kai_chat_history', JSON.stringify(chatHistory));
+        renderHistory();
+        if (db && auth?.currentUser) addDoc(collection(db, "chat_history"), historyItem);
+    } catch (e) {
+        addMessage('assistant', "[!] CRITICAL UPLINK ERROR");
+    } finally {
+        isProcessing = false;
+    }
+};
+
+(window as any).newChat = () => {
+    currentChatId = Date.now().toString();
+    if (messagesList) messagesList.innerHTML = '';
+    if (welcomeScreen) welcomeScreen.style.display = 'flex';
+    if (sessionIdDisplay) sessionIdDisplay.innerText = `SID-${currentChatId.substring(0, 6)}`;
+};
+
+(window as any).toggleSidebar = () => {
+    sidebar?.classList.toggle('open');
+    sidebarBackdrop?.classList.toggle('opacity-0');
+    sidebarBackdrop?.classList.toggle('pointer-events-none');
+};
+
+(window as any).signOut = () => auth && signOut(auth).then(() => window.location.reload());
+
+(window as any).clearAllHistory = async () => {
+    if (!confirm('CRITICAL: PURGE ALL LOGGED TELEMETRY?')) return;
+    const uid = auth?.currentUser?.uid;
+
+    LOG.warn('SYSTEM', 'Executing global purge protocol...');
+
+    try {
+        if (db && uid) {
+            const q = query(collection(db, "chat_history"), where("uid", "==", uid));
+            const snap = await getDocs(q);
+            const batch = writeBatch(db);
+            snap.forEach(d => batch.delete(doc(db, "chat_history", d.id)));
+            await batch.commit();
+        }
+
+        chatHistory = [];
+        localStorage.removeItem('kai_chat_history');
+        renderHistory();
+        (window as any).newChat();
+        notify('SYSTEM_PURGED');
+    } catch (e) {
+        LOG.error('SYSTEM', 'Purge operation failed', e);
+        notify('PURGE_FAILED', 'error');
+    }
+};
+
+(window as any).exportHistory = () => {
+    LOG.info('SYSTEM', 'Packaging intel for export...');
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(chatHistory, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `KAI_INTEL_EXPORT_${Date.now()}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    notify('INTEL_EXPORTED');
+};
+
+(window as any).deleteChat = async (id) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+        const q = query(collection(db, "chat_history"), where("uid", "==", uid), where("id", "==", id));
+        const snap = await getDocs(q);
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(doc(db, "chat_history", d.id)));
+        await batch.commit();
+        chatHistory = chatHistory.filter(h => h.id !== id);
+        localStorage.setItem('kai_chat_history', JSON.stringify(chatHistory));
+        renderHistory();
+        if (currentChatId === id) (window as any).newChat();
+        notify('PURGED');
+    } catch (e) { LOG.error('DB', 'Delete error', e); }
+};
+
+if (authForm) {
+    authForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            authError.classList.add('hidden');
+            authProgress.classList.remove('hidden');
+            if (isLoginMode) await signInWithEmailAndPassword(auth, authEmail.value, authPassword.value);
+            else await createUserWithEmailAndPassword(auth, authEmail.value, authPassword.value);
+        } catch (error: any) {
+            authError.innerText = `ACCESS DENIED: ${error.code}`;
+            authError.classList.remove('hidden');
+            authProgress.classList.add('hidden');
+        }
+    });
+}
+
+if (toggleAuthModeBtn) {
+    toggleAuthModeBtn.onclick = () => {
+        isLoginMode = !isLoginMode;
+        authSubmitBtn.innerText = isLoginMode ? "Authenticate" : "Register ID";
+        toggleAuthModeBtn.innerText = isLoginMode ? "[ Request Credentials ]" : "[ Return to Login ]";
+    };
+}
+
+
+// === 🎤 VOICE MODE (BETA) ===
+(window as any).isVoiceMode = false;
+let recognition: any;
+
+(window as any).toggleVoice = () => {
+    (window as any).isVoiceMode = !(window as any).isVoiceMode;
+    const btn = document.getElementById('voice-btn');
+
+    if ((window as any).isVoiceMode) {
+        btn?.classList.add('text-red-500', 'animate-pulse', 'bg-red-500/10');
+        notify('VOICE UPLINK ESTABLISHED');
+        startListening();
+    } else {
+        btn?.classList.remove('text-red-500', 'animate-pulse', 'bg-red-500/10');
+        notify('VOICE UPLINK SEVERED');
+        stopListening();
+    }
+};
+
+function startListening() {
+    if (!('webkitSpeechRecognition' in window)) {
+        notify('VOICE MODULE MISSING', 'error');
+        return;
+    }
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false; // We restart manually for control
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+        // Visual feedback could go here
+    };
+
+    recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        messageInput.value = transcript;
+        (window as any).sendMessage();
+    };
+
+    recognition.onend = () => {
+        // Only restart if still in voice mode and NOT speaking
+        if ((window as any).isVoiceMode && !window.speechSynthesis.speaking) {
+            try { recognition.start(); } catch (e) { }
+        }
+    };
+
+    recognition.start();
+}
+
+function stopListening() {
+    if (recognition) recognition.stop();
+}
+
+(window as any).speak = (text: string) => {
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/[*#`_]/g, '');
+    const utter = new SpeechSynthesisUtterance(cleanText);
+    utter.rate = 1.1;
+    utter.pitch = 1.0;
+
+    utter.onend = () => {
+        if ((window as any).isVoiceMode) startListening(); // Resume listening
+    };
+
+    window.speechSynthesis.speak(utter);
+};
+
+
+// === 🖼️ OVERLAY MODE ===
+(window as any).toggleOverlayMode = () => {
+    document.body.classList.toggle('overlay-mode');
+    // Add CSS via JS for the overlay mode
+    if (document.body.classList.contains('overlay-mode')) {
+        sidebar!.style.display = 'none';
+        document.body.style.background = 'transparent';
+        // More styles would be needed in CSS, but this is a start
+        notify('MINI_MODE ACTIVE');
+    } else {
+        sidebar!.style.display = 'flex';
+        document.body.style.background = 'var(--surface-dark)';
+        notify('FULL_MODE ACTIVE');
+    }
+};
+
+
+LOG.info('SYSTEM', 'KAI OS Tactical Interface Initialized.');

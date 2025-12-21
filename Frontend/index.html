@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>KAI OS | Tactical Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- HLS.js for Anime Streaming -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dim: rgba(99, 102, 241, 0.1);
+            --primary-glow: rgba(99, 102, 241, 0.5);
+            --accent: #00f0ff;
+            --danger: #ff003c;
+            --surface-dark: #050505;
+            --surface-panel: #0a0a0c;
+            --border: rgba(255, 255, 255, 0.1);
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) transparent;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--surface-dark);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100dvh;
+            width: 100vw;
+            position: fixed;
+        }
+
+        .scan-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.3) 51%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 60;
+            opacity: 0.1;
+        }
+
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 55;
+            opacity: 0.3;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .cyber-grid {
+            position: fixed;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background-image: linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg);
+            animation: gridMove 40s linear infinite;
+            z-index: 0;
+            pointer-events: none;
+            mask-image: radial-gradient(circle at 50% 50%, black 0%, transparent 80%);
+        }
+
+        @keyframes gridMove {
+            0% {
+                transform: perspective(500px) rotateX(60deg) translateY(0);
+            }
+
+            100% {
+                transform: perspective(500px) rotateX(60deg) translateY(50px);
+            }
+        }
+
+        .cut-corner {
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+
+        .cut-corner-br {
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+        }
+
+        .cut-corner-top {
+            clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px);
+        }
+
+        .glitch-text {
+            position: relative;
+            font-family: var(--font-mono);
+        }
+
+        .sidebar-bg {
+            background: rgba(5, 5, 7, 0.98);
+            border-right: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+        }
+
+        .msg-block {
+            animation: slideIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+            padding: 20px;
+            margin-bottom: 24px;
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .msg-block.assistant {
+            border-left: 2px solid var(--primary);
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.03) 0%, transparent 100%);
+        }
+
+        .msg-block.user {
+            border-right: 2px solid rgba(255, 255, 255, 0.2);
+            background: linear-gradient(-90deg, rgba(255, 255, 255, 0.01) 0%, transparent 100%);
+        }
+
+        .tactical-console {
+            background: rgba(8, 8, 10, 0.95);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(25px);
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .console-input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-family: var(--font-mono);
+            width: 100%;
+            resize: none;
+            outline: none;
+        }
+
+        .auth-panel {
+            background: rgba(10, 10, 12, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.active {
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+
+        .status-dot.busy {
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .hud-border-tl {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 12px;
+            height: 12px;
+            border-top: 1px solid var(--primary);
+            border-left: 1px solid var(--primary);
+            opacity: 0.6;
+        }
+
+        .hud-border-tr {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            border-top: 1px solid var(--primary);
+            border-right: 1px solid var(--primary);
+            opacity: 0.6;
+        }
+
+        .hud-border-bl {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 12px;
+            height: 12px;
+            border-bottom: 1px solid var(--primary);
+            border-left: 1px solid var(--primary);
+            opacity: 0.6;
+        }
+
+        .hud-border-br {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            border-bottom: 1px solid var(--primary);
+            border-right: 1px solid var(--primary);
+            opacity: 0.6;
+        }
+
+        /* Overlay Mode Styles */
+        body.overlay-mode {
+            background: transparent !important;
+        }
+
+        body.overlay-mode .cyber-grid,
+        body.overlay-mode .noise-overlay,
+        body.overlay-mode .ambient-glow,
+        body.overlay-mode .scan-line {
+            display: none !important;
+        }
+
+        body.overlay-mode #main-interface header {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            height: 48px;
+        }
+
+        body.overlay-mode #chat-container {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            margin: 0;
+        }
+
+        body.overlay-mode .tactical-console {
+            background: rgba(5, 5, 7, 0.9);
+            backdrop-filter: blur(20px);
+        }
+
+        @media (max-width: 1024px) {
+            #sidebar {
+                transform: translateX(-100%);
+            }
+
+            #sidebar.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js",
+    "firebase/": "https://esm.sh/firebase@^12.7.0/"
+  }
+}
+</script>
+    <link rel="stylesheet" href="/index.css">
+</head>
+
+<body class="flex flex-col lg:flex-row overflow-hidden">
+    <div class="cyber-grid"></div>
+    <div class="noise-overlay"></div>
+    <div class="ambient-glow"></div>
+    <div class="scan-line"></div>
+
+    <div id="auth-container" class="fixed inset-0 z-[100] flex items-center justify-center bg-black">
+        <div class="w-full max-w-sm p-8 auth-panel cut-corner relative">
+            <div class="hud-border-tl"></div>
+            <div class="hud-border-tr"></div>
+            <div class="hud-border-bl"></div>
+            <div class="hud-border-br"></div>
+            <div class="text-center mb-8">
+                <div
+                    class="w-16 h-16 bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto mb-4 cut-corner">
+                    <i data-lucide="shield-check" class="text-indigo-400 w-8 h-8"></i>
+                </div>
+                <h1 class="text-2xl font-black text-white tracking-[0.2em] uppercase">Operator Access</h1>
+                <p class="text-indigo-400/50 font-mono text-[9px] tracking-[0.3em] mt-2">SECURE_LINK_V2.5.0</p>
+            </div>
+            <form id="auth-form" class="space-y-6">
+                <div class="space-y-6">
+                    <div class="relative">
+                        <input type="email" id="auth-email"
+                            class="w-full bg-transparent border-b border-white/10 py-3 text-sm font-mono text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                            placeholder="OPERATOR_EMAIL" required>
+                    </div>
+                    <div class="relative">
+                        <input type="password" id="auth-password"
+                            class="w-full bg-transparent border-b border-white/10 py-3 text-sm font-mono text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                            placeholder="ACCESS_KEY" required>
+                    </div>
+                </div>
+                <div id="auth-error"
+                    class="hidden p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-mono text-center">
+                </div>
+                <div id="auth-progress" class="hidden space-y-2">
+                    <div class="flex justify-between text-[9px] font-mono text-indigo-400">
+                        <span>VERIFYING...</span>
+                        <span id="auth-percent">0%</span>
+                    </div>
+                    <div class="h-1 w-full bg-indigo-950 overflow-hidden">
+                        <div id="auth-bar" class="h-full bg-indigo-500 transition-all duration-300"></div>
+                    </div>
+                </div>
+                <button type="submit" id="auth-submit-btn"
+                    class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-black uppercase tracking-[0.2em] cut-corner-br transition-all hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]">
+                    Establish Uplink
+                </button>
+                <button type="button" id="toggle-auth-mode"
+                    class="w-full text-[9px] font-mono text-white/30 hover:text-indigo-400 transition-colors uppercase tracking-widest text-center">
+                    [ Request Credentials ]
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="sidebar-backdrop"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300 lg:hidden"
+        onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar"
+        class="sidebar-bg h-full flex flex-col w-72 shrink-0 z-50 fixed lg:relative transition-transform duration-300 left-0 top-0 bottom-0">
+        <div class="p-6 border-b border-white/5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 bg-indigo-600 flex items-center justify-center cut-corner shadow-lg shadow-indigo-500/20">
+                    <i data-lucide="cpu" class="text-white w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="font-black text-sm tracking-widest text-white leading-none">KAI OS</h1>
+                    <span
+                        class="text-[9px] font-mono text-emerald-500/60 uppercase tracking-widest mt-1 block">Operational</span>
+                </div>
+            </div>
+            <button onclick="toggleSidebar()" class="lg:hidden text-white/40 hover:text-white"><i data-lucide="x"
+                    class="w-5 h-5"></i></button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-8">
+            <button onclick="newChat()"
+                class="w-full flex items-center justify-between px-4 py-4 bg-white/5 hover:bg-indigo-500/10 border border-white/10 hover:border-indigo-500/40 text-white transition-all group cut-corner-br">
+                <span class="text-[10px] font-black uppercase tracking-widest">New Operation</span>
+                <i data-lucide="plus" class="w-4 h-4 text-indigo-400"></i>
+            </button>
+
+            <div class="space-y-4">
+                <div
+                    class="px-2 flex items-center justify-between text-[9px] font-black text-white/30 uppercase tracking-[0.3em]">
+                    <span>Management</span>
+                    <i data-lucide="settings" class="w-3 h-3"></i>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="exportHistory()"
+                        class="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/5 text-[9px] font-mono text-indigo-300 uppercase tracking-widest transition-all">
+                        <i data-lucide="download" class="w-3 h-3"></i> Export
+                    </button>
+                    <button onclick="clearAllHistory()"
+                        class="flex items-center justify-center gap-2 py-3 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 text-[9px] font-mono text-red-400 uppercase tracking-widest transition-all">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i> Purge
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div
+                    class="px-2 flex items-center justify-between text-[9px] font-black text-white/30 uppercase tracking-[0.3em]">
+                    <span>Telemetry</span>
+                </div>
+                <div class="space-y-4 bg-black/40 p-4 border border-white/5 rounded-sm">
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[8px] font-mono text-indigo-400/70">
+                            <span>NEURAL_LOAD</span>
+                            <span id="stat-cpu">0%</span>
+                        </div>
+                        <div class="h-1 bg-white/5 w-full">
+                            <div id="bar-cpu"
+                                class="h-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)] w-0 transition-all duration-1000">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[8px] font-mono text-emerald-400/70">
+                            <span>MEM_STACK</span>
+                            <span id="stat-ram">0%</span>
+                        </div>
+                        <div class="h-1 bg-white/5 w-full">
+                            <div id="bar-ram"
+                                class="h-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] w-0 transition-all duration-1000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div class="px-2 text-[9px] font-black text-white/30 uppercase tracking-[0.3em]">Session Logs</div>
+                <div id="chat-history-list" class="space-y-1"></div>
+            </div>
+        </div>
+
+        <div class="p-5 border-t border-white/5 bg-black/60">
+            <button onclick="window.signOut()"
+                class="w-full flex items-center justify-center gap-2 py-3 text-[10px] text-red-500/50 hover:text-red-400 transition-colors uppercase tracking-widest font-mono">
+                <i data-lucide="power" class="w-3 h-3"></i> Disconnect
+            </button>
+        </div>
+    </aside>
+
+    <main id="main-interface"
+        class="flex-1 flex flex-col relative h-full min-w-0 opacity-0 transition-opacity duration-1000">
+        <header
+            class="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-black/80 backdrop-blur-xl z-30 sticky top-0 w-full">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar()" class="lg:hidden p-2 text-white/60 hover:text-white"><i
+                        data-lucide="menu" class="w-5 h-5"></i></button>
+                <div class="flex flex-col">
+                    <div class="flex items-center gap-3">
+                        <span class="status-dot active"></span>
+                        <span class="text-xs font-black text-white uppercase tracking-[0.2em]">Intel Core</span>
+                    </div>
+                    <span id="session-id-display"
+                        class="text-[9px] font-mono text-indigo-400/40 uppercase pl-5">IDLE</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-6">
+                <button onclick="window.toggleOverlayMode()"
+                    class="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all group cut-corner">
+                    <i data-lucide="minimize-2"
+                        class="w-3 h-3 text-white/50 group-hover:text-white transition-colors"></i>
+                    <span
+                        class="text-[8px] font-mono text-white/50 group-hover:text-white uppercase tracking-widest hidden md:inline">Mini
+                        Mode</span>
+                </button>
+                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20">
+                    <i data-lucide="shield" class="w-3 h-3 text-indigo-400"></i>
+                    <span class="text-[8px] font-mono text-indigo-300 tracking-widest">TLS_ENCRYPTED</span>
+                </div>
+                <div class="w-10 h-10 cut-corner bg-indigo-500/10 border border-indigo-500/30 p-1">
+                    <img src="https://api.dicebear.com/7.x/bottts/svg?seed=KAI&backgroundColor=transparent"
+                        class="w-full h-full opacity-60" alt="Bot">
+                </div>
+            </div>
+        </header>
+
+        <div id="chat-container" class="flex-1 overflow-y-auto px-6 md:px-12 lg:px-32 py-8 custom-scrollbar">
+            <div id="welcome-screen" class="min-h-full flex flex-col items-center justify-center p-6">
+                <div class="max-w-4xl w-full text-center space-y-12">
+                    <div class="space-y-6 relative">
+                        <div
+                            class="inline-block px-4 py-1.5 bg-amber-500/10 border border-amber-500/30 cut-corner text-[9px] font-mono text-amber-500 font-black tracking-[0.4em] uppercase mb-4">
+                            System Version 2.5.0_PRO
+                        </div>
+                        <div
+                            class="w-24 h-24 bg-indigo-500/5 border border-indigo-500/20 mx-auto flex items-center justify-center cut-corner relative mb-8">
+                            <div
+                                class="absolute inset-0 border border-indigo-500/10 scale-125 rounded-full animate-pulse">
+                            </div>
+                            <i data-lucide="cpu" class="w-10 h-10 text-indigo-400"></i>
+                        </div>
+                        <h2
+                            class="text-4xl md:text-7xl font-black text-white tracking-tighter uppercase italic opacity-90 leading-none">
+                            KAI <span class="text-indigo-600">INTEL</span>
+                        </h2>
+                        <div
+                            class="flex justify-center gap-8 text-[9px] font-mono text-indigo-400/40 uppercase tracking-[0.3em]">
+                            <span>SYSLOG_CLEAR</span>
+                            <span>CPU_STABLE</span>
+                            <span>NEURAL_READY</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button onclick="setSuggested('Perform market volatility analysis')"
+                            class="group p-6 bg-white/5 hover:bg-indigo-500/10 border border-white/5 hover:border-indigo-500/30 transition-all cut-corner text-left backdrop-blur-sm">
+                            <i data-lucide="activity"
+                                class="w-6 h-6 text-indigo-400/50 group-hover:text-indigo-400 transition-colors mb-4"></i>
+                            <p class="text-[10px] font-black text-white/70 uppercase leading-relaxed tracking-widest">
+                                Market Analysis</p>
+                        </button>
+                        <button onclick="setSuggested('Generate tactical UI mockup')"
+                            class="group p-6 bg-white/5 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/30 transition-all cut-corner text-left backdrop-blur-sm">
+                            <i data-lucide="layers"
+                                class="w-6 h-6 text-emerald-400/50 group-hover:text-emerald-400 transition-colors mb-4"></i>
+                            <p class="text-[10px] font-black text-white/70 uppercase leading-relaxed tracking-widest">
+                                Visual Synthesis</p>
+                        </button>
+                        <button onclick="setSuggested('Decrypt complex architectural concepts')"
+                            class="group p-6 bg-white/5 hover:bg-violet-500/10 border border-white/5 hover:border-violet-500/30 transition-all cut-corner text-left backdrop-blur-sm">
+                            <i data-lucide="database"
+                                class="w-6 h-6 text-violet-400/50 group-hover:text-violet-400 transition-colors mb-4"></i>
+                            <p class="text-[10px] font-black text-white/70 uppercase leading-relaxed tracking-widest">
+                                Data Mining</p>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="messages-list" class="space-y-8 pb-10 max-w-5xl mx-auto w-full hidden flex-col"></div>
+        </div>
+
+        <div class="p-6 md:p-10 bg-gradient-to-t from-black via-black/90 to-transparent sticky bottom-0 w-full z-40">
+            <div class="max-w-4xl mx-auto tactical-console cut-corner-top overflow-hidden">
+                <div id="attachment-area" class="px-5 pt-5 hidden flex-wrap gap-2"></div>
+                <div class="p-4 flex gap-4 items-end">
+                    <input type="file" id="fileInput" class="hidden" onchange="handleFileUpload(event)">
+                    <button onclick="document.getElementById('fileInput').click()"
+                        class="h-12 w-12 flex items-center justify-center text-white/30 hover:text-indigo-400 hover:bg-white/5 transition-colors rounded-sm shrink-0">
+                        <i data-lucide="paperclip" class="w-6 h-6"></i>
+                    </button>
+                    <div class="flex-1 py-2">
+                        <textarea id="messageInput" rows="1"
+                            class="console-input text-sm leading-relaxed max-h-48 custom-scrollbar"
+                            placeholder="Awaiting Input..."></textarea>
+                    </div>
+                    <div class="flex items-center gap-2 pb-1">
+                        <button id="voice-btn" onclick="toggleVoice()"
+                            class="h-12 w-12 flex items-center justify-center text-white/30 hover:text-red-500 transition-colors">
+                            <i data-lucide="mic" class="w-6 h-6"></i>
+                        </button>
+                        <button onclick="sendMessage()"
+                            class="h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-[10px] font-black uppercase tracking-[0.3em] transition-all hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] cut-corner-br">
+                            Execute
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="notification-area" class="fixed top-20 right-6 w-80 z-[200] space-y-3 pointer-events-none"></div>
+
+    <script src="index.tsx" type="module"></script>
+    <script>
+        lucide.createIcons();
+        const input = document.getElementById('messageInput');
+        if (input) {
+            input.addEventListener('input', () => {
+                input.style.height = 'auto';
+                input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    window.sendMessage();
+                }
+            });
+        }
+    </script>
+
+</body>
+
+</html>
