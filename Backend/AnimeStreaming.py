@@ -278,63 +278,70 @@ class AnimeStreamingSystem:
         # FALLBACK: Use direct embed players when API is down
         logger.info(f"[ANIME] Using fallback embed for: {slug} ep {episode}")
         
-        # Get anime info from Jikan (this always works)
+        # Get anime info from Jikan (this always works and gives us MAL ID)
         jikan_info = self._search_jikan(anime_name, limit=1)
         anime_title = anime_name.title()
         anime_image = None
         total_eps = "?"
+        mal_id = None
         
         if jikan_info:
             anime_title = jikan_info[0].get("title", anime_name)
             anime_image = jikan_info[0].get("image") or jikan_info[0].get("images", {}).get("jpg", {}).get("large_image_url")
             total_eps = jikan_info[0].get("episodes", "?")
+            mal_id = jikan_info[0].get("mal_id")
         
-        # Generate multiple embed sources - using sites that ALLOW iframe embedding
-        # These sites have X-Frame-Options: ALLOWALL or no restriction
-        embed_sources = [
-            {
-                "name": "Gogo-Stream",
-                "url": f"https://gogoanime3.co/{slug}-episode-{episode}",
-                "embed": f"https://embtaku.pro/streaming.php?id={slug}-episode-{episode}",
-                "quality": "auto",
-                "is_m3u8": False
-            },
-            {
-                "name": "Gogo-Alt",
-                "url": f"https://gogoanime.tel/{slug}-episode-{episode}",
-                "embed": f"https://gogoanime3.co/streaming.php?id={slug}-episode-{episode}",
-                "quality": "auto",
-                "is_m3u8": False
-            },
-            {
-                "name": "PlayTaku",
-                "url": f"https://playtaku.net/{slug}-episode-{episode}",
-                "embed": f"https://playtaku.net/streaming.php?id={slug}-episode-{episode}",
-                "quality": "auto",
-                "is_m3u8": False
-            }
-        ]
+        # Generate WORKING embed URLs - these sites ALLOW iframe embedding!
+        # vidsrc.xyz and 2embed.cc do not block X-Frame-Options
+        embed_sources = []
         
-        # Primary embed URL - using embtaku which allows iframe
-        primary_embed = f"https://embtaku.pro/streaming.php?id={slug}-episode-{episode}"
+        if mal_id:
+            # VidSrc supports anime by MAL ID - WORKS in iframes!
+            embed_sources.append({
+                "name": "VidSrc",
+                "url": f"https://vidsrc.xyz/embed/anime/{mal_id}/{episode}",
+                "embed": f"https://vidsrc.xyz/embed/anime/{mal_id}/{episode}",
+                "quality": "auto",
+                "is_m3u8": False
+            })
+            embed_sources.append({
+                "name": "2Embed",
+                "url": f"https://2embed.cc/embedanime/{mal_id}/{episode}",
+                "embed": f"https://2embed.cc/embedanime/{mal_id}/{episode}",
+                "quality": "auto", 
+                "is_m3u8": False
+            })
+            embed_sources.append({
+                "name": "AnimeAPI",
+                "url": f"https://vidsrc.in/embed/anime/{mal_id}/{episode}",
+                "embed": f"https://vidsrc.in/embed/anime/{mal_id}/{episode}",
+                "quality": "auto",
+                "is_m3u8": False
+            })
+        
+        # Primary embed - VidSrc is most reliable for anime
+        primary_embed = embed_sources[0]["embed"] if embed_sources else None
         
         return {
             "status": "success",
-            "fallback": True,  # Flag to tell frontend this is a fallback
+            "fallback": True if not mal_id else False,
             "anime": {
                 "title": anime_title,
                 "image": anime_image,
-                "total_episodes": total_eps
+                "total_episodes": total_eps,
+                "mal_id": mal_id
             },
             "episode": {"number": episode},
             "streams": embed_sources,
             "embed_url": primary_embed,
             "watch_links": [
                 {"name": "GogoAnime", "url": f"https://gogoanime3.co/{slug}-episode-{episode}"},
-                {"name": "9Anime", "url": f"https://9anime.to/watch/{slug}?ep={episode}"},
+                {"name": "Zoro", "url": f"https://zoro.to/search?keyword={slug.replace('-', '+')}"},
                 {"name": "AnimePahe", "url": f"https://animepahe.ru/anime/{slug}"}
             ],
-            "message": f"🎬 Now Streaming: {anime_title} Episode {episode}"
+            "message": f"🎬 Now Streaming: {anime_title} Episode {episode}" if primary_embed else f"🔍 Found: {anime_title} - Use watch links below",
+            "title": anime_title,
+            "thumbnail": anime_image
         }
     
     # ==================== INFO ====================
