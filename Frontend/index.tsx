@@ -163,26 +163,113 @@ function renderHistory() {
 
 
 function renderAnimePlayer(container: HTMLElement, anime: any) {
-    if (!anime || !anime.streaming_url) return;
+    if (!anime) return;
+
+    // Get the streaming URL - check multiple possible fields
+    const streamUrl = anime.streaming_url || anime.embed_url ||
+        (anime.streams && anime.streams[0]?.url) ||
+        (anime.streams && anime.streams[0]?.embed);
+    const watchLinks = anime.watch_links || [];
+    const thumbnail = anime.thumbnail || anime.image ||
+        (anime.anime && anime.anime.image) || '';
+    const title = anime.title || (anime.anime && anime.anime.title) || 'Anime';
+    const episode = anime.episode || (anime.episode && anime.episode.number) || 1;
+    const quality = anime.quality || 'HD';
+    const isFallback = anime.fallback === true;
+
+    // If we have an embed URL, use iframe embed player
+    if (anime.embed_url || (anime.streams && anime.streams[0]?.embed)) {
+        const embedUrl = anime.embed_url || anime.streams[0].embed;
+        const html = `
+        <div class="mt-4 rounded-lg overflow-hidden border border-indigo-500/30 bg-black shadow-lg shadow-indigo-500/10 animate-in fade-in duration-500">
+            <div class="relative aspect-video">
+                <iframe 
+                    src="${embedUrl}" 
+                    class="w-full h-full" 
+                    frameborder="0" 
+                    allowfullscreen 
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="p-3 bg-indigo-900/10 border-t border-white/5">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="tv" class="w-4 h-4 text-indigo-400"></i>
+                        <span class="text-xs font-mono text-indigo-200">${title} - Episode ${episode}</span>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 bg-indigo-500/20 rounded text-indigo-300">${quality}</span>
+                </div>
+                ${watchLinks.length > 0 ? `
+                    <div class="flex gap-2 flex-wrap mt-2">
+                        ${watchLinks.map((link: any) => `
+                            <a href="${link.url}" target="_blank" 
+                               class="text-[10px] px-2 py-1 bg-white/5 hover:bg-white/10 rounded border border-white/10 text-white/70 hover:text-white transition-all">
+                                ${link.name}
+                            </a>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        </div>`;
+
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        container.appendChild(wrapper);
+        // @ts-ignore
+        if (window.lucide) window.lucide.createIcons();
+        return;
+    }
+
+    // If we have watch links but no embed (fallback mode)
+    if (watchLinks.length > 0) {
+        const html = `
+        <div class="mt-4 rounded-lg overflow-hidden border border-indigo-500/30 bg-gradient-to-br from-indigo-900/20 to-black shadow-lg shadow-indigo-500/10 animate-in fade-in duration-500">
+            <div class="relative aspect-video flex items-center justify-center" style="background-image: url('${thumbnail}'); background-size: cover; background-position: center;">
+                <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+                <div class="relative z-10 text-center p-6">
+                    <i data-lucide="play-circle" class="w-16 h-16 text-indigo-400 mx-auto mb-4"></i>
+                    <div class="text-white font-bold text-lg mb-2">${title}</div>
+                    <div class="text-white/60 text-sm mb-4">Episode ${episode}</div>
+                    <div class="flex gap-3 justify-center flex-wrap">
+                        ${watchLinks.map((link: any) => `
+                            <a href="${link.url}" target="_blank" 
+                               class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-sm font-medium transition-all flex items-center gap-2">
+                                <i data-lucide="external-link" class="w-4 h-4"></i>
+                                ${link.name}
+                            </a>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        container.appendChild(wrapper);
+        // @ts-ignore
+        if (window.lucide) window.lucide.createIcons();
+        return;
+    }
+
+    // Original HLS player for direct streaming URLs
+    if (!streamUrl) return;
 
     const playerId = `anime-player-${Date.now()}`;
     const html = `
     <div class="mt-4 rounded-lg overflow-hidden border border-indigo-500/30 bg-black shadow-lg shadow-indigo-500/10 animate-in fade-in duration-500">
         <div class="relative aspect-video group">
-            <video id="${playerId}" class="w-full h-full object-contain bg-black" controls crossorigin="anonymous" poster="${anime.thumbnail || ''}"></video>
+            <video id="${playerId}" class="w-full h-full object-contain bg-black" controls crossorigin="anonymous" poster="${thumbnail}"></video>
             <div class="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-[10px] font-mono text-white/80 border border-white/10">
-                ${anime.quality || 'HD'}
-            </div>
-            <div class="absolute bottom-4 left-4 right-4 hidden group-hover:block transition-all">
-                <div class="text-white font-bold text-shadow text-sm">${anime.episode_title}</div>
+                ${quality}
             </div>
         </div>
         <div class="p-3 bg-indigo-900/10 border-t border-white/5 flex justify-between items-center">
              <div class="flex items-center gap-2">
                 <i data-lucide="play-circle" class="w-4 h-4 text-indigo-400"></i>
-                <span class="text-xs font-mono text-indigo-200">${anime.title} - Ep ${anime.episode}</span>
+                <span class="text-xs font-mono text-indigo-200">${title} - Ep ${episode}</span>
              </div>
-             <button onclick="window.open('${anime.streaming_url}', '_blank')" class="text-[10px] uppercase hover:text-white text-white/50 transition-colors">Open ext</button>
+             <button onclick="window.open('${streamUrl}', '_blank')" class="text-[10px] uppercase hover:text-white text-white/50 transition-colors">Open ext</button>
         </div>
     </div>`;
 
@@ -194,15 +281,14 @@ function renderAnimePlayer(container: HTMLElement, anime: any) {
         const video = document.getElementById(playerId) as HTMLVideoElement;
         if (!video) return;
 
-        if (Hls.isSupported()) {
+        // @ts-ignore
+        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+            // @ts-ignore
             const hls = new Hls();
-            hls.loadSource(anime.streaming_url);
+            hls.loadSource(streamUrl);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                // video.play(); // Auto-play might be blocked
-            });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = anime.streaming_url;
+            video.src = streamUrl;
         }
     }, 100);
 }
