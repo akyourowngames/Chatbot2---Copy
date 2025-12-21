@@ -1503,11 +1503,9 @@ def chat():
                     trigger_type = "video"
                     command = query
                     print(f"[PRE-CHECK] Smart detect: VIDEO")
-                elif "play" in query_lower and not is_video:
-                    # Default "play X" to music
-                    trigger_type = "music"
-                    command = query
-                    print(f"[PRE-CHECK] 'play' without context → MUSIC")
+                # NOTE: Removed "play defaults to music" - too many false positives
+                # "play game", "play chess", etc. would wrongly trigger music
+                # Only trigger music when explicit music words are present
                 elif "watch" in query_lower:
                     # "watch" without video keywords could be anime
                     trigger_type = "anime"
