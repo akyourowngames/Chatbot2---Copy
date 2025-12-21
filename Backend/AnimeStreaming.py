@@ -62,10 +62,10 @@ class AnimeStreamingSystem:
             logger.error(f"[ANIME] Request error: {e}")
             return None
     
-    def _scrape_hianime(self, anime_name: str, episode: int = 1) -> Optional[Dict[str, Any]]:
+    def _scrape_aniwatchtv(self, anime_name: str, episode: int = 1) -> Optional[Dict[str, Any]]:
         """
-        Scrape embed URL from hianime.to (formerly zoro.to).
-        Returns the actual embed URL that can be used in an iframe.
+        Scrape streaming URL from aniwatchtv.by.
+        This site exposes googlevideo/M3U8 stream URLs directly in page source.
         """
         import requests
         from bs4 import BeautifulSoup
@@ -73,95 +73,102 @@ class AnimeStreamingSystem:
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://hianime.to/',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            'Referer': 'https://aniwatchtv.by/',
+            'Accept': '*/*'
         }
         
         slug = anime_name.lower().strip().replace(" ", "-").replace(":", "").replace("'", "")
         
         try:
-            # Step 1: Search for anime on hianime.to
-            search_url = f"https://hianime.to/search?keyword={anime_name.replace(' ', '+')}"
-            logger.info(f"[ANIME] Scraping HiAnime search: {search_url}")
+            # Step 1: Search for anime on aniwatchtv.by
+            search_url = f"https://aniwatchtv.by/search?keyword={anime_name.replace(' ', '+')}"
+            logger.info(f"[ANIME] Scraping AniWatchTV search: {search_url}")
             
             r = requests.get(search_url, headers=headers, timeout=20)
             if not r.ok:
-                logger.warning(f"[ANIME] HiAnime search failed: {r.status_code}")
+                logger.warning(f"[ANIME] AniWatchTV search failed: {r.status_code}")
                 return None
             
             soup = BeautifulSoup(r.text, 'html.parser')
             
-            # Find first anime result
-            result = soup.find('a', {'class': 'dynamic-name'})
-            if not result:
-                result = soup.select_one('.film-poster a') or soup.select_one('.flw-item a')
+            # Find first anime result - look for film-poster or flw-item links
+            result = soup.select_one('.film-poster a') or soup.select_one('.flw-item a') or soup.select_one('.dynamic-name')
             
             if not result:
-                logger.warning("[ANIME] No HiAnime search results found")
+                logger.warning("[ANIME] No AniWatchTV search results found")
                 return None
             
             anime_url = result.get('href', '')
             if not anime_url.startswith('http'):
-                anime_url = f"https://hianime.to{anime_url}"
+                anime_url = f"https://aniwatchtv.by{anime_url}"
             
             logger.info(f"[ANIME] Found anime URL: {anime_url}")
             
-            # Step 2: Get watch page with episode
-            # HiAnime URLs are like: /watch/anime-name-123?ep=456
-            # We need to find the episode ID
-            anime_page = requests.get(anime_url, headers=headers, timeout=20)
-            if not anime_page.ok:
-                return None
+            # Step 2: Construct episode URL
+            # AniWatchTV URLs are like: /anime-name-episode-1
+            # Extract the base name from the anime URL
+            ep_url = f"https://aniwatchtv.by/{slug}-episode-{episode}"
+            logger.info(f"[ANIME] Episode URL: {ep_url}")
             
-            anime_soup = BeautifulSoup(anime_page.text, 'html.parser')
+            # Step 3: Get episode page and extract stream URL
+            ep_page = requests.get(ep_url, headers=headers, timeout=20)
+            if not ep_page.ok:
+                # Try with anime ID format
+                logger.warning(f"[ANIME] Episode page failed, trying anime page format")
+                ep_page = requests.get(anime_url, headers=headers, timeout=20)
             
-            # Find episode link
-            ep_links = anime_soup.find_all('a', {'class': 'ep-item'}) or anime_soup.select('.ssl-item.ep-item a')
-            
-            target_ep = None
-            for ep in ep_links:
-                ep_num = ep.get('data-number') or ep.get('data-id') or ep.get_text(strip=True)
-                try:
-                    if str(episode) == str(ep_num) or int(ep_num) == episode:
-                        target_ep = ep
-                        break
-                except:
-                    continue
-            
-            if not target_ep and ep_links:
-                target_ep = ep_links[min(episode-1, len(ep_links)-1)]
-            
-            if target_ep:
-                ep_url = target_ep.get('href', '')
-                if not ep_url.startswith('http'):
-                    ep_url = f"https://hianime.to{ep_url}"
+            if ep_page.ok:
+                # Look for googlevideo URL (direct stream)
+                googlevideo_match = re.search(r'https://[^"\']+googlevideo\.com[^"\'\s]+', ep_page.text)
+                if googlevideo_match:
+                    stream_url = googlevideo_match.group(0)
+                    logger.info(f"[ANIME] Found googlevideo stream: {stream_url[:80]}...")
+                    return {
+                        "status": "success",
+                        "streaming_url": stream_url,
+                        "watch_url": ep_url,
+                        "source": "aniwatchtv",
+                        "type": "direct"
+                    }
                 
-                # HiAnime uses megacloud.tv or similar for embeds
-                # Generate embed URL pattern
-                anime_id = re.search(r'-(\d+)\?', ep_url)
-                ep_id = re.search(r'ep=(\d+)', ep_url)
+                # Look for M3U8 URL
+                m3u8_match = re.search(r'https://[^"\']+\.m3u8[^"\'\s]*', ep_page.text)
+                if m3u8_match:
+                    stream_url = m3u8_match.group(0)
+                    logger.info(f"[ANIME] Found M3U8 stream: {stream_url[:80]}...")
+                    return {
+                        "status": "success",
+                        "streaming_url": stream_url,
+                        "watch_url": ep_url,
+                        "source": "aniwatchtv",
+                        "type": "m3u8"
+                    }
                 
-                if anime_id and ep_id:
-                    # HiAnime's embed pattern
-                    embed_url = f"https://megacloud.tv/embed-2/e-1/{anime_id.group(1)}?ep={ep_id.group(1)}"
-                    
+                # Look for iframe embed
+                ep_soup = BeautifulSoup(ep_page.text, 'html.parser')
+                iframe = ep_soup.find('iframe')
+                if iframe and iframe.get('src'):
+                    embed_url = iframe.get('src')
+                    if not embed_url.startswith('http'):
+                        embed_url = f"https:{embed_url}" if embed_url.startswith('//') else f"https://aniwatchtv.by{embed_url}"
+                    logger.info(f"[ANIME] Found iframe embed: {embed_url[:80]}...")
                     return {
                         "status": "success",
                         "embed_url": embed_url,
                         "watch_url": ep_url,
-                        "anime_url": anime_url,
-                        "source": "hianime"
+                        "source": "aniwatchtv",
+                        "type": "embed"
                     }
             
             # Fallback: Return watch link only
             return {
                 "status": "partial",
                 "watch_url": anime_url,
-                "source": "hianime"
+                "source": "aniwatchtv"
             }
             
         except Exception as e:
-            logger.error(f"[ANIME] HiAnime scrape error: {e}")
+            logger.error(f"[ANIME] AniWatchTV scrape error: {e}")
             return None
     
     # ==================== SEARCH ====================
@@ -377,22 +384,22 @@ class AnimeStreamingSystem:
         except Exception as e:
             logger.warning(f"[ANIME] API failed, using fallback: {e}")
         
-        # FALLBACK 1: Try scraping HiAnime.to for real embed URL
-        logger.info(f"[ANIME] Trying HiAnime scraper for: {anime_name} ep {episode}")
-        hianime_result = self._scrape_hianime(anime_name, episode)
+        # FALLBACK: Scrape AniWatchTV for streaming URL
+        logger.info(f"[ANIME] Trying AniWatchTV scraper for: {anime_name} ep {episode}")
+        aniwatchtv_result = self._scrape_aniwatchtv(anime_name, episode)
         
-        if hianime_result and hianime_result.get("status") == "success" and hianime_result.get("embed_url"):
-            logger.info(f"[ANIME] Got HiAnime embed: {hianime_result.get('embed_url')}")
+        # Get anime info from Jikan for thumbnail
+        jikan_info = self._search_jikan(anime_name, limit=1)
+        anime_title = anime_name.title()
+        anime_image = None
+        if jikan_info:
+            anime_title = jikan_info[0].get("title", anime_name)
+            anime_image = jikan_info[0].get("image") or jikan_info[0].get("images", {}).get("jpg", {}).get("large_image_url")
+        
+        if aniwatchtv_result and aniwatchtv_result.get("status") == "success":
+            logger.info(f"[ANIME] Got AniWatchTV result: {aniwatchtv_result.get('type', 'unknown')}")
             
-            # Get additional info from Jikan for thumbnail
-            jikan_info = self._search_jikan(anime_name, limit=1)
-            anime_title = anime_name.title()
-            anime_image = None
-            if jikan_info:
-                anime_title = jikan_info[0].get("title", anime_name)
-                anime_image = jikan_info[0].get("image") or jikan_info[0].get("images", {}).get("jpg", {}).get("large_image_url")
-            
-            return {
+            result = {
                 "status": "success",
                 "fallback": False,
                 "anime": {
@@ -400,85 +407,52 @@ class AnimeStreamingSystem:
                     "image": anime_image
                 },
                 "episode": {"number": episode},
-                "embed_url": hianime_result.get("embed_url"),
-                "streams": [{
-                    "name": "HiAnime",
-                    "embed": hianime_result.get("embed_url"),
-                    "quality": "HD"
-                }],
                 "watch_links": [
-                    {"name": "HiAnime", "url": hianime_result.get("watch_url", f"https://hianime.to/search?keyword={anime_name}")},
+                    {"name": "AniWatchTV", "url": aniwatchtv_result.get("watch_url", f"https://aniwatchtv.by/search?keyword={anime_name}")},
                     {"name": "AnimeKai", "url": f"https://animekai.to/search?q={anime_name.replace(' ', '+')}"}
                 ],
                 "message": f"🎬 Now Streaming: {anime_title} Episode {episode}",
                 "title": anime_title,
                 "thumbnail": anime_image
             }
+            
+            # Handle different result types
+            if aniwatchtv_result.get("streaming_url"):
+                # Direct streaming URL (googlevideo or M3U8)
+                result["streaming_url"] = aniwatchtv_result.get("streaming_url")
+                result["stream_type"] = aniwatchtv_result.get("type", "direct")
+                result["streams"] = [{
+                    "name": "AniWatchTV",
+                    "url": aniwatchtv_result.get("streaming_url"),
+                    "quality": "HD",
+                    "is_m3u8": aniwatchtv_result.get("type") == "m3u8"
+                }]
+            elif aniwatchtv_result.get("embed_url"):
+                # Iframe embed URL
+                result["embed_url"] = aniwatchtv_result.get("embed_url")
+                result["streams"] = [{
+                    "name": "AniWatchTV",
+                    "embed": aniwatchtv_result.get("embed_url"),
+                    "quality": "HD"
+                }]
+            
+            return result
         
-        # FALLBACK 2: Use VidSrc/other embeds
-        logger.info(f"[ANIME] HiAnime failed, trying VidSrc fallback for: {slug} ep {episode}")
-        
-        # Get anime info from Jikan (this always works and gives us MAL ID)
-        jikan_info = self._search_jikan(anime_name, limit=1)
-        anime_title = anime_name.title()
-        anime_image = None
-        total_eps = "?"
-        mal_id = None
-        
-        if jikan_info:
-            anime_title = jikan_info[0].get("title", anime_name)
-            anime_image = jikan_info[0].get("image") or jikan_info[0].get("images", {}).get("jpg", {}).get("large_image_url")
-            total_eps = jikan_info[0].get("episodes", "?")
-            mal_id = jikan_info[0].get("mal_id")
-        
-        # Generate embed URLs from various sources
-        embed_sources = []
-        
-        if mal_id:
-            # VidSrc supports anime by MAL ID - WORKS in iframes!
-            embed_sources.append({
-                "name": "VidSrc",
-                "url": f"https://vidsrc.xyz/embed/anime/{mal_id}/{episode}",
-                "embed": f"https://vidsrc.xyz/embed/anime/{mal_id}/{episode}",
-                "quality": "auto",
-                "is_m3u8": False
-            })
-            embed_sources.append({
-                "name": "2Embed",
-                "url": f"https://2embed.cc/embedanime/{mal_id}/{episode}",
-                "embed": f"https://2embed.cc/embedanime/{mal_id}/{episode}",
-                "quality": "auto", 
-                "is_m3u8": False
-            })
-            embed_sources.append({
-                "name": "AnimeAPI",
-                "url": f"https://vidsrc.in/embed/anime/{mal_id}/{episode}",
-                "embed": f"https://vidsrc.in/embed/anime/{mal_id}/{episode}",
-                "quality": "auto",
-                "is_m3u8": False
-            })
-        
-        # Primary embed - VidSrc is most reliable for anime
-        primary_embed = embed_sources[0]["embed"] if embed_sources else None
-        
+        # Final fallback: Return watch links only
         return {
             "status": "success",
-            "fallback": True if not mal_id else False,
+            "fallback": True,
             "anime": {
                 "title": anime_title,
-                "image": anime_image,
-                "total_episodes": total_eps,
-                "mal_id": mal_id
+                "image": anime_image
             },
             "episode": {"number": episode},
-            "streams": embed_sources,
-            "embed_url": primary_embed,
             "watch_links": [
-                {"name": "GogoAnime", "url": f"https://gogoanime3.co/{slug}-episode-{episode}"},
-                {"name": "Zoro", "url": f"https://zoro.to/search?keyword={slug.replace('-', '+')}"},
-                {"name": "AnimePahe", "url": f"https://animepahe.ru/anime/{slug}"}
+                {"name": "AniWatchTV", "url": f"https://aniwatchtv.by/search?keyword={anime_name.replace(' ', '+')}"},
+                {"name": "AnimeKai", "url": f"https://animekai.to/search?q={anime_name.replace(' ', '+')}"},
+                {"name": "Zoro", "url": f"https://zoro.to/search?keyword={anime_name.replace(' ', '+')}"}
             ],
-            "message": f"🎬 Now Streaming: {anime_title} Episode {episode}" if primary_embed else f"🔍 Found: {anime_title} - Use watch links below",
+            "message": f"🔍 Found: {anime_title} - Use watch links below",
             "title": anime_title,
             "thumbnail": anime_image
         }

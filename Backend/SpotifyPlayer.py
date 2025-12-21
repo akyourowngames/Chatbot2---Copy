@@ -54,9 +54,9 @@ class SpotifyPlayer:
             print(f"[Spotify] Auth error: {e}")
             return None
     
-    def search(self, query: str, search_type: str = "track", limit: int = 5, artist: str = None):
+    def search(self, query: str, search_type: str = "track", limit: int = 10, artist: str = None):
         """
-        Search Spotify catalog
+        Search Spotify catalog with improved matching
         
         Args:
             query: Search query (song/album name)
@@ -75,20 +75,29 @@ class SpotifyPlayer:
             url = f"{self.base_url}/search"
             headers = {"Authorization": f"Bearer {token}"}
             
+            # Clean query - remove "on spotify", "play", etc.
+            clean_query = query.lower()
+            for phrase in ["on spotify", "play ", "spotify", "song ", "music "]:
+                clean_query = clean_query.replace(phrase, "")
+            clean_query = clean_query.strip()
+            
             # Build smart search query
-            search_query = query
-            if artist and search_type == "track":
-                # Use Spotify's field filters for exact matching
-                search_query = f'track:"{query}" artist:"{artist}"'
-            elif search_type == "track" and " by " in query.lower():
+            search_query = clean_query
+            parsed_artist = artist
+            
+            if search_type == "track":
                 # Parse "song by artist" format
-                parts = query.lower().split(" by ", 1)
-                track_name = parts[0].strip()
-                artist_name = parts[1].strip() if len(parts) > 1 else ""
-                if artist_name:
-                    search_query = f'track:"{track_name}" artist:"{artist_name}"'
-                    print(f"[Spotify] Parsed query: track='{track_name}' artist='{artist_name}'")
-                    
+                if " by " in clean_query:
+                    parts = clean_query.split(" by ", 1)
+                    track_name = parts[0].strip()
+                    parsed_artist = parts[1].strip() if len(parts) > 1 else ""
+                    if parsed_artist:
+                        # Use both formats for better matching
+                        search_query = f'{track_name} {parsed_artist}'
+                        print(f"[Spotify] Parsed: track='{track_name}' artist='{parsed_artist}'")
+                elif artist:
+                    search_query = f'{clean_query} {artist}'
+            
             params = {
                 "q": search_query,
                 "type": search_type,
@@ -96,6 +105,7 @@ class SpotifyPlayer:
                 "market": "IN"  # Use India market for Hindi songs
             }
             
+            print(f"[Spotify] Search query: '{search_query}'")
             response = requests.get(url, headers=headers, params=params, timeout=10)
             
             if response.status_code == 200:
