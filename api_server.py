@@ -2711,6 +2711,30 @@ Say 'Watch {title}' to start streaming!"""
                          traceback.print_exc()
                          response_text = f"❌ Anime error: {e}"
 
+                 # Handle SPOTIFY & MUSIC commands
+                 elif trigger_type in ["spotify", "music"]:
+                     try:
+                          from Backend.SpotifyPlayer import spotify_player
+                          
+                          # Determine what to play
+                          search_query = command
+                          
+                          # Execute play
+                          result = spotify_player.play(search_query)
+                          
+                          if result.get("status") == "success":
+                              return jsonify({
+                                  "response": result.get("message"),
+                                  "type": "spotify",
+                                  "spotify": result.get("spotify")
+                              }), 200
+                          else:
+                              response_text = result.get("message", "Could not play music")
+                              
+                     except Exception as me:
+                         print(f"[ERROR] Music error: {me}")
+                         response_text = f"Music module error: {me}"
+
                  # Handle AGENTS commands - NEW  
                  elif trigger_type == "agents":
                      try:

@@ -92,6 +92,29 @@ function formatMessage(text: string) {
             <pre class="p-4 custom-scrollbar overflow-x-auto"><code class="language-${language}">${code}</code></pre>
         </div>`;
     };
+    renderer.image = (href: string, title: string, text: string) => {
+        if (href && !href.startsWith('http') && !href.startsWith('data:') && !href.startsWith('//')) {
+            href = BASE_URL + href;
+        }
+        return `<div class="my-3 rounded-lg overflow-hidden border border-white/10 bg-black/20 inline-block">
+            <img src="${href}" alt="${text}" title="${title || ''}" class="max-w-full h-auto max-h-[400px] object-contain block" loading="lazy" />
+        </div>`;
+    };
+
+    renderer.link = (href: string, title: string, text: string) => {
+        if (href && (href.endsWith('.pdf') || href.includes('.pdf'))) {
+            // We can inject a preview button or just return the link
+            // Better: if it's a PDF link, maybe we can auto-embed?
+            // For now, standard link behavior but styled
+            if (!href.startsWith('http') && !href.startsWith('//')) {
+                href = BASE_URL + href;
+            }
+            return `<span class="inline-flex flex-col gap-2 w-full"><a href="${href}" target="_blank" class="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 underline decoration-indigo-500/30">${text}</a>
+             <iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(href)}&embedded=true" class="w-full h-[300px] border border-white/10 rounded bg-black/50"></iframe></span>`;
+        }
+        return `<a href="${href}" target="_blank" title="${title || ''}" class="text-indigo-400 hover:text-indigo-300 underline decoration-indigo-500/30">${text}</a>`;
+    };
+
     marked.setOptions({
         renderer: renderer,
         highlight: (code, lang) => {
@@ -184,6 +207,43 @@ function renderAnimePlayer(container: HTMLElement, anime: any) {
     }, 100);
 }
 
+function renderSpotifyPlayer(container: HTMLElement, spotify: any) {
+    if (!spotify || !spotify.embed_url) return;
+
+    const playerId = `spotify-player-${Date.now()}`;
+    const html = `
+    <div class="mt-4 rounded-lg overflow-hidden border border-green-500/30 bg-black shadow-lg shadow-green-500/10 animate-in fade-in duration-500 max-w-md">
+        <iframe style="border-radius:12px" src="${spotify.embed_url}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    </div>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
+function renderPDFPreview(container: HTMLElement, pdfUrl: string, title: string = "Document") {
+    // Correct URL if relative
+    if (pdfUrl && !pdfUrl.startsWith('http')) {
+        pdfUrl = BASE_URL + pdfUrl;
+    }
+
+    const html = `
+    <div class="mt-4 rounded-lg overflow-hidden border border-white/20 bg-black/50 backdrop-blur-sm w-full h-[400px]">
+        <div class="flex items-center justify-between px-3 py-2 bg-white/10 border-b border-white/10">
+             <div class="flex items-center gap-2">
+                 <i data-lucide="file-text" class="w-4 h-4 text-white/70"></i>
+                 <span class="text-xs font-mono text-white/80">${title}</span>
+             </div>
+             <a href="${pdfUrl}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300">Download</a>
+        </div>
+        <iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true" class="w-full h-full border-0"></iframe>
+    </div>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
+}
+
 function scrollToBottom() {
     const container = document.getElementById('chat-container');
     if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
@@ -231,6 +291,24 @@ function addMessage(role: string, content: string, attachedFile: string | null =
     // 🎬 RICH MEDIA RENDERING
     if (metadata && metadata.type === 'anime' && metadata.anime) {
         renderAnimePlayer(body, metadata.anime);
+    }
+
+    // 🎵 SPOTIFY PLAYER
+    if (metadata && metadata.type === 'spotify' && metadata.spotify) {
+        renderSpotifyPlayer(body, metadata.spotify);
+    }
+
+    // 📄 PDF PREVIEW (if explicit file in metadata or detected in content)
+    // Check if content mentions "Generated PDF:" and has a file link?
+    // Actually, backend might send metadata for generated files in future, 
+    // but for now let's check for "Generated PDF" text pattern if no metadata
+    if (content.includes('Generated PDF:') || content.includes('.pdf')) {
+        // Naive extraction or rely on markdown links
+    }
+
+    // If metadata has specific type for document
+    if (metadata && (metadata.type === 'pdf' || metadata.type === 'document') && metadata.url) {
+        renderPDFPreview(body, metadata.url, metadata.title);
     }
 
     messagesList.appendChild(block);
