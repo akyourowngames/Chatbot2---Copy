@@ -62,6 +62,108 @@ class AnimeStreamingSystem:
             logger.error(f"[ANIME] Request error: {e}")
             return None
     
+    def _scrape_hianime(self, anime_name: str, episode: int = 1) -> Optional[Dict[str, Any]]:
+        """
+        Scrape embed URL from hianime.to (formerly zoro.to).
+        Returns the actual embed URL that can be used in an iframe.
+        """
+        import requests
+        from bs4 import BeautifulSoup
+        import re
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://hianime.to/',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+        
+        slug = anime_name.lower().strip().replace(" ", "-").replace(":", "").replace("'", "")
+        
+        try:
+            # Step 1: Search for anime on hianime.to
+            search_url = f"https://hianime.to/search?keyword={anime_name.replace(' ', '+')}"
+            logger.info(f"[ANIME] Scraping HiAnime search: {search_url}")
+            
+            r = requests.get(search_url, headers=headers, timeout=20)
+            if not r.ok:
+                logger.warning(f"[ANIME] HiAnime search failed: {r.status_code}")
+                return None
+            
+            soup = BeautifulSoup(r.text, 'html.parser')
+            
+            # Find first anime result
+            result = soup.find('a', {'class': 'dynamic-name'})
+            if not result:
+                result = soup.select_one('.film-poster a') or soup.select_one('.flw-item a')
+            
+            if not result:
+                logger.warning("[ANIME] No HiAnime search results found")
+                return None
+            
+            anime_url = result.get('href', '')
+            if not anime_url.startswith('http'):
+                anime_url = f"https://hianime.to{anime_url}"
+            
+            logger.info(f"[ANIME] Found anime URL: {anime_url}")
+            
+            # Step 2: Get watch page with episode
+            # HiAnime URLs are like: /watch/anime-name-123?ep=456
+            # We need to find the episode ID
+            anime_page = requests.get(anime_url, headers=headers, timeout=20)
+            if not anime_page.ok:
+                return None
+            
+            anime_soup = BeautifulSoup(anime_page.text, 'html.parser')
+            
+            # Find episode link
+            ep_links = anime_soup.find_all('a', {'class': 'ep-item'}) or anime_soup.select('.ssl-item.ep-item a')
+            
+            target_ep = None
+            for ep in ep_links:
+                ep_num = ep.get('data-number') or ep.get('data-id') or ep.get_text(strip=True)
+                try:
+                    if str(episode) == str(ep_num) or int(ep_num) == episode:
+                        target_ep = ep
+                        break
+                except:
+                    continue
+            
+            if not target_ep and ep_links:
+                target_ep = ep_links[min(episode-1, len(ep_links)-1)]
+            
+            if target_ep:
+                ep_url = target_ep.get('href', '')
+                if not ep_url.startswith('http'):
+                    ep_url = f"https://hianime.to{ep_url}"
+                
+                # HiAnime uses megacloud.tv or similar for embeds
+                # Generate embed URL pattern
+                anime_id = re.search(r'-(\d+)\?', ep_url)
+                ep_id = re.search(r'ep=(\d+)', ep_url)
+                
+                if anime_id and ep_id:
+                    # HiAnime's embed pattern
+                    embed_url = f"https://megacloud.tv/embed-2/e-1/{anime_id.group(1)}?ep={ep_id.group(1)}"
+                    
+                    return {
+                        "status": "success",
+                        "embed_url": embed_url,
+                        "watch_url": ep_url,
+                        "anime_url": anime_url,
+                        "source": "hianime"
+                    }
+            
+            # Fallback: Return watch link only
+            return {
+                "status": "partial",
+                "watch_url": anime_url,
+                "source": "hianime"
+            }
+            
+        except Exception as e:
+            logger.error(f"[ANIME] HiAnime scrape error: {e}")
+            return None
+    
     # ==================== SEARCH ====================
     
     def search_anime(self, query: str, limit: int = 10) -> Dict[str, Any]:
@@ -275,8 +377,46 @@ class AnimeStreamingSystem:
         except Exception as e:
             logger.warning(f"[ANIME] API failed, using fallback: {e}")
         
-        # FALLBACK: Use direct embed players when API is down
-        logger.info(f"[ANIME] Using fallback embed for: {slug} ep {episode}")
+        # FALLBACK 1: Try scraping HiAnime.to for real embed URL
+        logger.info(f"[ANIME] Trying HiAnime scraper for: {anime_name} ep {episode}")
+        hianime_result = self._scrape_hianime(anime_name, episode)
+        
+        if hianime_result and hianime_result.get("status") == "success" and hianime_result.get("embed_url"):
+            logger.info(f"[ANIME] Got HiAnime embed: {hianime_result.get('embed_url')}")
+            
+            # Get additional info from Jikan for thumbnail
+            jikan_info = self._search_jikan(anime_name, limit=1)
+            anime_title = anime_name.title()
+            anime_image = None
+            if jikan_info:
+                anime_title = jikan_info[0].get("title", anime_name)
+                anime_image = jikan_info[0].get("image") or jikan_info[0].get("images", {}).get("jpg", {}).get("large_image_url")
+            
+            return {
+                "status": "success",
+                "fallback": False,
+                "anime": {
+                    "title": anime_title,
+                    "image": anime_image
+                },
+                "episode": {"number": episode},
+                "embed_url": hianime_result.get("embed_url"),
+                "streams": [{
+                    "name": "HiAnime",
+                    "embed": hianime_result.get("embed_url"),
+                    "quality": "HD"
+                }],
+                "watch_links": [
+                    {"name": "HiAnime", "url": hianime_result.get("watch_url", f"https://hianime.to/search?keyword={anime_name}")},
+                    {"name": "AnimeKai", "url": f"https://animekai.to/search?q={anime_name.replace(' ', '+')}"}
+                ],
+                "message": f"🎬 Now Streaming: {anime_title} Episode {episode}",
+                "title": anime_title,
+                "thumbnail": anime_image
+            }
+        
+        # FALLBACK 2: Use VidSrc/other embeds
+        logger.info(f"[ANIME] HiAnime failed, trying VidSrc fallback for: {slug} ep {episode}")
         
         # Get anime info from Jikan (this always works and gives us MAL ID)
         jikan_info = self._search_jikan(anime_name, limit=1)
@@ -291,8 +431,7 @@ class AnimeStreamingSystem:
             total_eps = jikan_info[0].get("episodes", "?")
             mal_id = jikan_info[0].get("mal_id")
         
-        # Generate WORKING embed URLs - these sites ALLOW iframe embedding!
-        # vidsrc.xyz and 2embed.cc do not block X-Frame-Options
+        # Generate embed URLs from various sources
         embed_sources = []
         
         if mal_id:
