@@ -65,87 +65,91 @@ class AnimeStreamingSystem:
     def _scrape_aniwatchtv(self, anime_name: str, episode: int = 1) -> Optional[Dict[str, Any]]:
         """
         Scrape streaming URL from aniwatchtv.by.
-        This site exposes googlevideo/M3U8 stream URLs directly in page source.
+        This site exposes googlevideo/M3U8 stream URLs in Base64 encoded server buttons.
         """
         import requests
         from bs4 import BeautifulSoup
         import re
+        import base64
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://aniwatchtv.by/',
-            'Accept': '*/*'
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         }
         
         slug = anime_name.lower().strip().replace(" ", "-").replace(":", "").replace("'", "")
         
         try:
-            # Step 1: Search for anime on aniwatchtv.by
-            search_url = f"https://aniwatchtv.by/search?keyword={anime_name.replace(' ', '+')}"
+            # Step 1: Search using correct URL format: /?s=keyword
+            search_url = f"https://aniwatchtv.by/?s={anime_name.replace(' ', '+')}"
             logger.info(f"[ANIME] Scraping AniWatchTV search: {search_url}")
             
-            r = requests.get(search_url, headers=headers, timeout=20)
+            r = requests.get(search_url, headers=headers, timeout=25)
             if not r.ok:
                 logger.warning(f"[ANIME] AniWatchTV search failed: {r.status_code}")
                 return None
             
             soup = BeautifulSoup(r.text, 'html.parser')
             
-            # Find first anime result - look for film-poster or flw-item links
-            result = soup.select_one('.film-poster a') or soup.select_one('.flw-item a') or soup.select_one('.dynamic-name')
+            # Find anime results with correct selector: .bsx a.tip
+            result = soup.select_one('.bsx a.tip') or soup.select_one('.bsx a') or soup.select_one('a.tip')
             
             if not result:
                 logger.warning("[ANIME] No AniWatchTV search results found")
                 return None
             
             anime_url = result.get('href', '')
+            anime_title = result.get('title', '') or anime_name
             if not anime_url.startswith('http'):
                 anime_url = f"https://aniwatchtv.by{anime_url}"
             
             logger.info(f"[ANIME] Found anime URL: {anime_url}")
             
             # Step 2: Construct episode URL
-            # AniWatchTV URLs are like: /anime-name-episode-1
-            # Extract the base name from the anime URL
-            ep_url = f"https://aniwatchtv.by/{slug}-episode-{episode}"
+            # Extract anime slug from URL and build episode URL
+            # Pattern: /anime-name/ -> /anime-name-episode-1-english-subbed/
+            anime_slug = anime_url.rstrip('/').split('/')[-1]
+            ep_url = f"https://aniwatchtv.by/{anime_slug}-episode-{episode}-english-subbed/"
             logger.info(f"[ANIME] Episode URL: {ep_url}")
             
-            # Step 3: Get episode page and extract stream URL
-            ep_page = requests.get(ep_url, headers=headers, timeout=20)
+            # Step 3: Get episode page
+            ep_page = requests.get(ep_url, headers=headers, timeout=25)
+            
+            # Try alternate URL pattern if first fails
             if not ep_page.ok:
-                # Try with anime ID format
-                logger.warning(f"[ANIME] Episode page failed, trying anime page format")
-                ep_page = requests.get(anime_url, headers=headers, timeout=20)
+                ep_url = f"https://aniwatchtv.by/{slug}-episode-{episode}/"
+                logger.info(f"[ANIME] Trying alternate URL: {ep_url}")
+                ep_page = requests.get(ep_url, headers=headers, timeout=25)
             
             if ep_page.ok:
-                # Look for googlevideo URL (direct stream)
-                googlevideo_match = re.search(r'https://[^"\']+googlevideo\.com[^"\'\s]+', ep_page.text)
-                if googlevideo_match:
-                    stream_url = googlevideo_match.group(0)
-                    logger.info(f"[ANIME] Found googlevideo stream: {stream_url[:80]}...")
-                    return {
-                        "status": "success",
-                        "streaming_url": stream_url,
-                        "watch_url": ep_url,
-                        "source": "aniwatchtv",
-                        "type": "direct"
-                    }
-                
-                # Look for M3U8 URL
-                m3u8_match = re.search(r'https://[^"\']+\.m3u8[^"\'\s]*', ep_page.text)
-                if m3u8_match:
-                    stream_url = m3u8_match.group(0)
-                    logger.info(f"[ANIME] Found M3U8 stream: {stream_url[:80]}...")
-                    return {
-                        "status": "success",
-                        "streaming_url": stream_url,
-                        "watch_url": ep_url,
-                        "source": "aniwatchtv",
-                        "type": "m3u8"
-                    }
-                
-                # Look for iframe embed
                 ep_soup = BeautifulSoup(ep_page.text, 'html.parser')
+                
+                # Look for server buttons with Base64 encoded URLs
+                server_buttons = ep_soup.select('.server-button')
+                for btn in server_buttons:
+                    onclick = btn.get('onclick', '')
+                    # Pattern: loadMi({ value: 'BASE64_STRING' })
+                    base64_match = re.search(r"value:\s*['\"]([^'\"]+)['\"]", onclick)
+                    if base64_match:
+                        try:
+                            decoded = base64.b64decode(base64_match.group(1)).decode('utf-8')
+                            # Look for streaming URL in decoded content
+                            stream_match = re.search(r'(https://[^"\']+(?:googlevideo\.com|\.m3u8)[^"\']*)', decoded)
+                            if stream_match:
+                                stream_url = stream_match.group(1)
+                                logger.info(f"[ANIME] Found decoded stream: {stream_url[:80]}...")
+                                return {
+                                    "status": "success",
+                                    "streaming_url": stream_url,
+                                    "watch_url": ep_url,
+                                    "source": "aniwatchtv",
+                                    "type": "m3u8" if ".m3u8" in stream_url else "direct"
+                                }
+                        except Exception as e:
+                            logger.debug(f"[ANIME] Base64 decode failed: {e}")
+                
+                # Fallback: Look for iframe embed
                 iframe = ep_soup.find('iframe')
                 if iframe and iframe.get('src'):
                     embed_url = iframe.get('src')
@@ -159,8 +163,29 @@ class AnimeStreamingSystem:
                         "source": "aniwatchtv",
                         "type": "embed"
                     }
+                
+                # Look for direct M3U8/googlevideo in page source
+                googlevideo_match = re.search(r'https://[^"\'\s]+googlevideo\.com[^"\'\s]+', ep_page.text)
+                if googlevideo_match:
+                    return {
+                        "status": "success",
+                        "streaming_url": googlevideo_match.group(0),
+                        "watch_url": ep_url,
+                        "source": "aniwatchtv",
+                        "type": "direct"
+                    }
+                
+                m3u8_match = re.search(r'https://[^"\'\s]+\.m3u8[^"\'\s]*', ep_page.text)
+                if m3u8_match:
+                    return {
+                        "status": "success",
+                        "streaming_url": m3u8_match.group(0),
+                        "watch_url": ep_url,
+                        "source": "aniwatchtv",
+                        "type": "m3u8"
+                    }
             
-            # Fallback: Return watch link only
+            # Fallback: Return anime page URL
             return {
                 "status": "partial",
                 "watch_url": anime_url,
