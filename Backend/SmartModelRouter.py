@@ -18,7 +18,7 @@ class SmartModelRouter:
     - gemini-2.0-flash-exp: Best for complex reasoning, coding, analysis (DEFAULT)
     - gemini-2.0-flash-thinking-exp: For deep thinking/multi-step problems
     - llama-3.3-70b-versatile: Good for creative, conversational
-    - llama-3.2-3b-preview: Fast for simple Q&A
+    - llama-3.1-8b-instant: Fast for simple Q&A
     """
     
     # Model configurations
@@ -42,7 +42,7 @@ class SmartModelRouter:
             "description": "Great for creative and conversational"
         },
         "fast": {
-            "name": "llama-3.2-3b-preview",
+            "name": "llama-3.1-8b-instant",  # Fast model (3.2-3b was decommissioned)
             "provider": "groq",
             "max_tokens": 1024,
             "description": "Ultra-fast for simple queries"
