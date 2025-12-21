@@ -1580,6 +1580,45 @@ def chat():
                  print(f"[ERROR] Stream player error: {e}")
                  response_text = f"Stream player error: {str(e)}"
 
+        # 1e. ANIME STREAMING
+        elif trigger_type == "anime":
+             print(f"[SMART-TRIGGER] Anime command detected: {command}")
+             try:
+                 from Backend.AnimeStreaming import anime_system
+                 import re
+                 
+                 # Extract anime name and episode from query
+                 anime_query = query.lower()
+                 for prefix in ["watch anime ", "play anime ", "stream anime ", "anime ", "watch ", "play ", "stream "]:
+                     if anime_query.startswith(prefix):
+                         anime_query = anime_query[len(prefix):]
+                         break
+                 
+                 # Check for episode number
+                 ep_match = re.search(r'\bepisode\s+(\d+)\b', anime_query)
+                 episode = int(ep_match.group(1)) if ep_match else 1
+                 anime_name = re.sub(r'\bepisode\s+\d+\b', '', anime_query).strip()
+                 
+                 print(f"[ANIME] Searching: {anime_name}, Episode: {episode}")
+                 
+                 # Get stream data
+                 result = anime_system.watch_anime(anime_name, episode)
+                 
+                 if result.get("status") == "success":
+                     return jsonify({
+                         "response": result.get("message", f"🎬 Now playing: {anime_name} Episode {episode}"),
+                         "anime": result,  # Pass all the stream data
+                         "type": "anime"
+                     }), 200
+                 else:
+                     response_text = f"Could not stream '{anime_name}': {result.get('message', 'Unknown error')}"
+                     
+             except Exception as e:
+                 print(f"[ERROR] Anime streaming error: {e}")
+                 import traceback
+                 traceback.print_exc()
+                 response_text = f"Anime streaming error: {str(e)}"
+
         # 1d. WEB SCRAPING
         elif trigger_type == "scrape":
              print(f"[SMART-TRIGGER] Scrape command detected: {command}")
