@@ -457,6 +457,344 @@
             border-color: rgba(99, 102, 241, 0.5);
             box-shadow: 0 0 30px rgba(99, 102, 241, 0.15);
         }
+
+        /* ========== RESPONSIVE: LARGE SCREENS (1440px+) ========== */
+        @media (min-width: 1440px) {
+            #chat-container {
+                padding-left: 15%;
+                padding-right: 15%;
+            }
+
+            #messages-list {
+                max-width: 900px;
+            }
+
+            .msg-block {
+                padding: 28px;
+                margin-bottom: 32px;
+            }
+
+            .tactical-console {
+                max-width: 900px;
+            }
+
+            #welcome-screen h2 {
+                font-size: 5rem;
+            }
+
+            #welcome-screen .grid {
+                gap: 1.5rem;
+            }
+        }
+
+        /* ========== RESPONSIVE: EXTRA LARGE (1920px+) ========== */
+        @media (min-width: 1920px) {
+            #chat-container {
+                padding-left: 20%;
+                padding-right: 20%;
+            }
+
+            #messages-list {
+                max-width: 1000px;
+            }
+
+            .tactical-console {
+                max-width: 1000px;
+            }
+
+            .msg-block {
+                font-size: 1.05rem;
+            }
+        }
+
+        /* ========== RESPONSIVE: TABLETS (768px - 1024px) ========== */
+        @media (max-width: 1024px) and (min-width: 768px) {
+            #chat-container {
+                padding-left: 2rem;
+                padding-right: 2rem;
+            }
+
+            .msg-block {
+                padding: 16px;
+                margin-bottom: 20px;
+            }
+
+            #welcome-screen h2 {
+                font-size: 3rem;
+            }
+
+            #welcome-screen .grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* ========== RESPONSIVE: MOBILE (max-width: 768px) ========== */
+        @media (max-width: 768px) {
+
+            /* Main Layout */
+            body {
+                font-size: 14px;
+            }
+
+            /* Header */
+            header {
+                height: 56px !important;
+                padding-left: 12px !important;
+                padding-right: 12px !important;
+            }
+
+            header .flex-col span:first-child {
+                font-size: 10px;
+            }
+
+            /* Hide some header elements on mobile */
+
+            /* Chat Container */
+            #chat-container {
+                padding: 12px !important;
+            }
+
+            /* Messages */
+            .msg-block {
+                padding: 14px;
+                margin-bottom: 16px;
+                border-radius: 8px;
+            }
+
+            .msg-block .mb-3 {
+                margin-bottom: 8px;
+            }
+
+            #messages-list {
+                max-width: 100%;
+                padding-bottom: 20px;
+            }
+
+            /* Welcome Screen */
+            #welcome-screen {
+                padding: 16px !important;
+            }
+
+            #welcome-screen h2 {
+                font-size: 2rem !important;
+                line-height: 1.1;
+            }
+
+            #welcome-screen .grid {
+                grid-template-columns: 1fr !important;
+                gap: 12px;
+            }
+
+            #welcome-screen .grid button {
+                padding: 16px !important;
+            }
+
+            #welcome-screen .w-24 {
+                width: 64px;
+                height: 64px;
+            }
+
+            #welcome-screen .w-24 i {
+                width: 28px;
+                height: 28px;
+            }
+
+            /* Input Console */
+            .tactical-console {
+                margin: 0 8px;
+                border-radius: 12px;
+            }
+
+            .tactical-console .p-4 {
+                padding: 12px !important;
+                gap: 8px !important;
+            }
+
+            .tactical-console textarea {
+                font-size: 14px;
+                min-height: 44px;
+            }
+
+            .tactical-console button {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            /* Execute Button */
+            .tactical-console button[onclick="sendMessage()"] {
+                padding: 0 16px !important;
+                font-size: 9px !important;
+            }
+
+            /* Bottom Padding Area */
+            main>.p-6 {
+                padding: 12px !important;
+            }
+
+            /* Spotify Player */
+            .spotify-player-card {
+                max-width: 100% !important;
+                margin-left: 0;
+                margin-right: 0;
+            }
+
+            .spotify-player-card iframe {
+                height: 80px !important;
+            }
+
+            /* PDF Preview */
+            .pdf-preview-card {
+                height: 300px !important;
+            }
+
+            /* Auth Panel */
+            .auth-panel {
+                margin: 16px;
+                padding: 24px !important;
+            }
+
+            /* Code blocks */
+            .code-container {
+                font-size: 12px;
+            }
+
+            pre code {
+                font-size: 11px !important;
+            }
+        }
+
+        /* ========== RESPONSIVE: SMALL MOBILE (max-width: 480px) ========== */
+        @media (max-width: 480px) {
+
+            /* Even smaller text */
+            body {
+                font-size: 13px;
+            }
+
+            header {
+                height: 52px !important;
+            }
+
+            #welcome-screen h2 {
+                font-size: 1.75rem !important;
+            }
+
+            /* Small text adjustments */
+
+            .msg-block {
+                padding: 12px;
+            }
+
+            /* Reduce icon sizes */
+            #welcome-screen .w-24 {
+                width: 56px;
+                height: 56px;
+            }
+
+            /* Make buttons more tappable */
+            button,
+            a.px-3 {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            /* Simplify welcome grid */
+            #welcome-screen .grid button p {
+                font-size: 9px;
+            }
+        }
+
+        /* ========== TOUCH OPTIMIZATIONS ========== */
+        @media (hover: none) and (pointer: coarse) {
+
+            /* Remove hover effects on touch devices */
+            .msg-block:hover,
+            .spotify-player-card:hover,
+            .pdf-preview-card:hover {
+                transform: none;
+            }
+
+            /* Larger touch targets */
+            button,
+            a,
+            input,
+            textarea {
+                min-height: 44px;
+            }
+
+            /* Remove animations that can cause jank */
+            .cyber-grid {
+                animation: none;
+            }
+
+            /* Disable scanlines on mobile for performance */
+            .scan-line {
+                display: none;
+            }
+        }
+
+        /* ========== SAFE AREA INSETS (Notched phones) ========== */
+        @supports (padding: max(0px)) {
+            .tactical-console {
+                padding-bottom: max(12px, env(safe-area-inset-bottom));
+            }
+
+            main>.p-6 {
+                padding-bottom: max(12px, env(safe-area-inset-bottom));
+            }
+
+            header {
+                padding-top: max(0px, env(safe-area-inset-top));
+            }
+        }
+
+        /* ========== LANDSCAPE MOBILE ========== */
+        @media (max-height: 500px) and (orientation: landscape) {
+            #welcome-screen {
+                padding: 8px !important;
+            }
+
+            #welcome-screen h2 {
+                font-size: 1.5rem !important;
+                margin-bottom: 8px;
+            }
+
+            #welcome-screen .grid {
+                grid-template-columns: repeat(3, 1fr) !important;
+            }
+
+            header {
+                height: 44px !important;
+            }
+
+            .tactical-console .p-4 {
+                padding: 8px !important;
+            }
+        }
+
+        /* ========== PRINT STYLES ========== */
+        @media print {
+
+            .cyber-grid,
+            .noise-overlay,
+            .ambient-glow,
+            .scan-line,
+            #sidebar,
+            .tactical-console,
+            header button {
+                display: none !important;
+            }
+
+            body {
+                background: white;
+                color: black;
+            }
+
+            .msg-block {
+                border: 1px solid #ccc;
+                page-break-inside: avoid;
+            }
+        }
     </style>
     <script type="importmap">
 {
