@@ -232,64 +232,106 @@ class AnimeStreamingSystem:
     def watch_anime(self, anime_name: str, episode: int = 1) -> Dict[str, Any]:
         """
         Complete flow: Search → Get Episode → Get Stream Link
-        
-        Args:
-            anime_name: Name of the anime
-            episode: Episode number to watch
-            
-        Returns:
-            Ready-to-play streaming info
+        Falls back to embed players if API is down.
         """
         logger.info(f"[ANIME] Watch request: {anime_name} Ep {episode}")
         
-        # Step 1: Search
-        search = self.search_anime(anime_name, limit=1)
-        if not search.get("results"):
-            return {"status": "error", "message": f"Anime '{anime_name}' not found"}
+        # Clean anime name for URL
+        slug = anime_name.lower().strip()
+        slug = slug.replace(" ", "-").replace(":", "").replace("'", "")
         
-        anime = search["results"][0]
-        anime_id = anime.get("id")
-        provider = anime.get("provider", "gogoanime") # Use found provider
+        # Try API first
+        try:
+            search = self.search_anime(anime_name, limit=1)
+            if search.get("results"):
+                anime = search["results"][0]
+                anime_id = anime.get("id")
+                provider = anime.get("provider", "animekai")
+                
+                if anime_id:
+                    # Get episodes
+                    episodes_data = self.get_episodes(anime_id, provider)
+                    if episodes_data.get("status") != "error":
+                        episodes = episodes_data.get("episodes", [])
+                        if episodes and 1 <= episode <= len(episodes):
+                            episode_info = episodes[episode - 1]
+                            episode_id = episode_info.get("id")
+                            
+                            # Get stream
+                            stream = self.get_streaming_links(episode_id, provider)
+                            if stream.get("status") == "success" and stream.get("sources"):
+                                return {
+                                    "status": "success",
+                                    "anime": {
+                                        "title": episodes_data.get("title", anime_name),
+                                        "image": episodes_data.get("image"),
+                                        "total_episodes": episodes_data.get("total_episodes", len(episodes))
+                                    },
+                                    "episode": {"number": episode, "id": episode_id},
+                                    "streams": stream.get("sources", []),
+                                    "download": stream.get("download"),
+                                    "message": f"🎬 Ready to watch: {episodes_data.get('title', anime_name)} - Episode {episode}"
+                                }
+        except Exception as e:
+            logger.warning(f"[ANIME] API failed, using fallback: {e}")
         
-        if not anime_id:
-            return {"status": "error", "message": "No streaming source found"}
+        # FALLBACK: Use direct embed players when API is down
+        logger.info(f"[ANIME] Using fallback embed for: {slug} ep {episode}")
         
-        # Step 2: Get episodes
-        episodes_data = self.get_episodes(anime_id, provider)
-        if episodes_data.get("status") == "error":
-            return episodes_data
+        # Get anime info from Jikan (this always works)
+        jikan_info = self._search_jikan(anime_name, limit=1)
+        anime_title = anime_name.title()
+        anime_image = None
+        total_eps = "?"
         
-        episodes = episodes_data.get("episodes", [])
-        if episode > len(episodes) or episode < 1:
-            return {
-                "status": "error", 
-                "message": f"Episode {episode} not found. Available: 1-{len(episodes)}"
+        if jikan_info:
+            anime_title = jikan_info[0].get("title", anime_name)
+            anime_image = jikan_info[0].get("image") or jikan_info[0].get("images", {}).get("jpg", {}).get("large_image_url")
+            total_eps = jikan_info[0].get("episodes", "?")
+        
+        # Generate multiple embed sources
+        embed_sources = [
+            {
+                "name": "Gogo-Stream",
+                "url": f"https://gogoanime.tel/{slug}-episode-{episode}",
+                "embed": f"https://s3taku.com/embedplus?id={slug}-episode-{episode}",
+                "quality": "auto",
+                "is_m3u8": False
+            },
+            {
+                "name": "AnimePahe",
+                "url": f"https://animepahe.ru/anime/{slug}",
+                "embed": f"https://animepahe.ru/play/{slug}/{episode}",  
+                "quality": "auto",
+                "is_m3u8": False
+            },
+            {
+                "name": "9Anime",
+                "url": f"https://9anime.to/watch/{slug}",
+                "embed": f"https://9anime.to/watch/{slug}?ep={episode}",
+                "quality": "auto",
+                "is_m3u8": False
             }
+        ]
         
-        episode_info = episodes[episode - 1]
-        episode_id = episode_info.get("id")
-        
-        # Step 3: Get streaming links
-        stream = self.get_streaming_links(episode_id, provider)
-        
-        if stream.get("status") == "success":
-            return {
-                "status": "success",
-                "anime": {
-                    "title": episodes_data.get("title"),
-                    "image": episodes_data.get("image"),
-                    "total_episodes": episodes_data.get("total_episodes")
-                },
-                "episode": {
-                    "number": episode,
-                    "id": episode_id
-                },
-                "streams": stream.get("sources", []),
-                "download": stream.get("download"),
-                "message": f"🎬 Ready to watch: {episodes_data.get('title')} - Episode {episode}"
-            }
-        
-        return stream
+        return {
+            "status": "success",
+            "fallback": True,  # Flag to tell frontend this is a fallback
+            "anime": {
+                "title": anime_title,
+                "image": anime_image,
+                "total_episodes": total_eps
+            },
+            "episode": {"number": episode},
+            "streams": embed_sources,
+            "embed_url": f"https://s3taku.com/embedplus?id={slug}-episode-{episode}",
+            "watch_links": [
+                {"name": "GogoAnime", "url": f"https://gogoanime.tel/{slug}-episode-{episode}"},
+                {"name": "9Anime", "url": f"https://9anime.to/watch/{slug}?ep={episode}"},
+                {"name": "AnimePahe", "url": f"https://animepahe.ru/anime/{slug}"}
+            ],
+            "message": f"🎬 Watch {anime_title} Episode {episode} (click link to stream)"
+        }
     
     # ==================== INFO ====================
     
