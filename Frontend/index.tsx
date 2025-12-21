@@ -407,6 +407,13 @@ if (auth) {
             body: JSON.stringify({ query: queryStr, session_id: currentChatId, uid: auth?.currentUser?.uid })
         });
         const data = await response.json();
+
+        // 🔍 DEBUG: Log API response to trace Spotify/media metadata
+        LOG.info('API', 'Response received', { type: data.type, hasSpotify: !!data.spotify, hasAnime: !!data.anime });
+        if (data.type === 'spotify') {
+            LOG.info('SPOTIFY', 'Embed URL', data.spotify?.embed_url);
+        }
+
         addMessage('assistant', data.response || "NO_DATA", null, data);
 
         // 🗣️ AUTO-SPEAK Logic (Voice Mode)

@@ -167,6 +167,40 @@ class SmartTrigger:
                 "keywords": ["open", "close", "launch", "start", "quit"]
             },
             
+            # 🎵 Music & Spotify - BEAST MODE
+            "spotify": {
+                "patterns": [
+                    # Direct play commands
+                    r"(?:jarvis\s+)?play\s+(.+?)(?:\s+on\s+spotify)?$",
+                    r"(?:jarvis\s+)?(?:play|put on|queue)\s+(?:the\s+)?(?:song\s+)?(.+?)(?:\s+by\s+.+)?",
+                    r"(?:jarvis\s+)?(?:play|listen to)\s+(.+?)\s+by\s+(.+)",
+                    # Spotify specific
+                    r"(?:jarvis\s+)?spotify\s+(?:play\s+)?(.+)?",
+                    r"(?:jarvis\s+)?(?:play|stream)\s+(?:some\s+)?music",
+                    r"(?:jarvis\s+)?(?:play|put on)\s+(?:my|some)\s+(?:liked\s+songs|favorites|playlist)",
+                    # Artist/album commands
+                    r"(?:jarvis\s+)?play\s+(?:songs?\s+)?(?:by|from)\s+(.+)",
+                    r"(?:jarvis\s+)?play\s+(?:the\s+)?album\s+(.+)",
+                    # Controls
+                    r"(?:jarvis\s+)?(?:pause|stop|resume|next|skip|previous)\s*(?:song|track|music)?",
+                ],
+                "keywords": [
+                    # Core keywords
+                    "play", "play music", "play song", "play spotify",
+                    "spotify", "spotify play", "on spotify",
+                    "listen to", "listen to music", "put on",
+                    # Playback
+                    "pause", "pause music", "stop music", "resume", "resume music",
+                    "next song", "skip", "skip song", "previous song", "previous",
+                    # Discovery
+                    "play something", "music", "song", "track", "album",
+                    "liked songs", "my playlist", "favorites",
+                    # Genres
+                    "play pop", "play rock", "play hip hop", "play jazz",
+                    "play classical", "play edm", "play country"
+                ]
+            },
+            
             # Web Scraping - Enhanced patterns
             "scrape": {
                 "patterns": [
