@@ -16,6 +16,7 @@ import datetime
 from dotenv import dotenv_values
 import os
 import sys
+import re  # For knowledge grounding patterns
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -180,69 +181,215 @@ def AnswerModifier(Answer):
     return modified_answer
 
 
-def ChatBot(Query: str, use_cache: bool = True) -> str:
+def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
+    """
+    Enhanced ChatBot with:
+    - Smart Model Routing (best model per query)
+    - Gemini 2.0 Flash as default
+    - Response Enhancement (quality post-processing)
+    - Auto Knowledge Grounding (web search for factual Qs)
+    """
     start_time = time.time()
     
     try:
-        # Load chat history
-        with open(chatlog_path, "r") as f:
-            messages = load(f)
+        # ===== 1. SMART MODEL ROUTING =====
+        try:
+            from Backend.SmartModelRouter import route_query, should_think
+            model_name, provider, routing_analysis = route_query(Query, force_model)
+            is_thinking_mode = should_think(Query)
+            print(f"[CHAT] Routing to {model_name} (thinking={is_thinking_mode})")
+        except ImportError:
+            model_name = "gemini-2.0-flash-exp"  # Default to best model
+            provider = "gemini"
+            is_thinking_mode = False
+            routing_analysis = {}
+        
+        # ===== 2. KNOWLEDGE GROUNDING (Auto-search for factual Qs) =====
+        grounding_context = ""
+        factual_patterns = [
+            r"\b(who is|who was|who are)\b",
+            r"\b(what is|what are|what was)\b",
+            r"\b(when did|when was|when is)\b",
+            r"\b(where is|where was|where are)\b",
+            r"\b(current|latest|recent|today's|today|now)\b",
+            r"\b(price|weather|news|score|result)\b",
+        ]
+        
+        query_lower = Query.lower()
+        needs_grounding = any(re.search(p, query_lower) for p in factual_patterns)
+        
+        if needs_grounding:
+            try:
+                from Backend.RealtimeSearchEngine import RealtimeSearchEngine
+                print("[CHAT] Grounding with web search...")
+                search_result = RealtimeSearchEngine(Query)
+                if search_result and len(search_result) > 50:
+                    grounding_context = f"\n\n[REAL-TIME DATA - Use this for accuracy]:\n{search_result[:2000]}"
+                    print(f"[CHAT] Grounded with {len(search_result)} chars of context")
+            except Exception as e:
+                print(f"[CHAT] Grounding skipped: {e}")
+        
+        # ===== 3. LOAD CHAT HISTORY =====
+        try:
+            with open(chatlog_path, "r") as f:
+                messages = load(f)
+        except:
+            messages = []
         
         # Keep only recent context (last 12 exchanges)
         if len(messages) > 12:
             messages = messages[-12:]
-            
-        # Get Long-Term Memory
-        from Backend.Memory import Recall
-        MemoryContext = Recall()
         
-        # Get Contextual Memory
-        from Backend.ContextualMemory import contextual_memory
-        ConversationContext = contextual_memory.get_context(Query)
+        # ===== 4. MEMORY INTEGRATION =====
+        MemoryContext = ""
+        ConversationContext = ""
+        try:
+            from Backend.Memory import Recall
+            MemoryContext = Recall()
+        except:
+            pass
         
-        # Build System Prompt
+        try:
+            from Backend.ContextualMemory import contextual_memory
+            ConversationContext = contextual_memory.get_context(Query)
+            if isinstance(ConversationContext, dict):
+                ConversationContext = str(ConversationContext.get("relevant_memories", ""))
+        except:
+            pass
+        
+        # ===== 5. BUILD FULL CONTEXT =====
         full_context = System + "\n" + RealTimeInformation() + "\n\n" + MemoryContext
         if ConversationContext:
-            full_context += "\n\nConversation Context:\n" + ConversationContext
-
-        # --- DIRECT LLM CALL (LEGACY RESTORED) ---
-        # Build messages for LLM
+            full_context += "\n\nConversation Memory:\n" + ConversationContext
+        if grounding_context:
+            full_context += grounding_context
+        
+        # ===== 6. CALL THE LLM =====
         conversation_messages = SystemChatBot.copy()
         conversation_messages.append({"role": "system", "content": full_context})
         conversation_messages.extend(messages)
         conversation_messages.append({"role": "user", "content": Query})
         
-        # Call unified LLM provider
-        Answer = ChatCompletion(
-            messages=conversation_messages,
-            model="llama-3.3-70b-versatile",
-            text_only=True
-        )
-        # ----------------------------
-
-        # Prepare message for history
+        # Use appropriate provider
+        if provider == "gemini":
+            Answer = _call_gemini(conversation_messages, model_name)
+        else:
+            Answer = ChatCompletion(
+                messages=conversation_messages,
+                model=model_name,
+                text_only=True
+            )
+        
+        # ===== 7. RESPONSE ENHANCEMENT =====
+        try:
+            from Backend.ResponseEnhancer import enhance_response
+            Answer = enhance_response(Answer, Query)
+        except ImportError:
+            pass  # Use raw response if enhancer not available
+        
+        # ===== 8. SAVE TO HISTORY =====
         messages.append({"role": "user", "content": Query})
         messages.append({"role": "assistant", "content": Answer})
         
-        # Save chat history
         with open(chatlog_path, "w") as f:
             dump(messages, f, indent=4)
         
         # Save to contextual memory
-        contextual_memory.add_conversation(Query, Answer)
+        try:
+            contextual_memory.add_conversation(Query, Answer)
+        except:
+            pass
         
         # Cache the response
         generation_time = time.time() - start_time
         if use_cache and CACHE_AVAILABLE:
             cache_response(Query, Answer, generation_time)
         
-        print(f"Response generated in {generation_time:.2f}s")
+        print(f"[CHAT] Response generated in {generation_time:.2f}s using {model_name}")
         
         return AnswerModifier(Answer=Answer)
     
     except Exception as e:
-        print(f"Error: {e}")
-        return "I encountered an error. Please try again."
+        import traceback
+        print(f"[CHAT] Error: {e}")
+        traceback.print_exc()
+        return "I encountered an error processing your request. Please try again."
+
+
+def _call_gemini(messages: list, model_name: str = "gemini-2.0-flash-exp") -> str:
+    """
+    Call Gemini API directly for best performance.
+    Handles thinking mode models specially.
+    """
+    import google.generativeai as genai
+    from dotenv import dotenv_values
+    
+    env_vars = dotenv_values(".env")
+    api_key = env_vars.get("GeminiAPIKey", "") or os.environ.get("GEMINI_API_KEY")
+    
+    if not api_key:
+        # Fallback to Groq
+        return ChatCompletion(messages, model="llama-3.3-70b-versatile", text_only=True)
+    
+    try:
+        genai.configure(api_key=api_key)
+        
+        # Extract system instruction and conversation
+        system_instruction = None
+        gemini_history = []
+        last_user_msg = ""
+        
+        for msg in messages:
+            role = msg['role']
+            content = msg['content']
+            
+            if role == 'system':
+                if system_instruction:
+                    system_instruction += "\n" + content
+                else:
+                    system_instruction = content
+            elif role == 'user':
+                last_user_msg = content
+                gemini_history.append({'role': 'user', 'parts': [content]})
+            elif role == 'assistant':
+                gemini_history.append({'role': 'model', 'parts': [content]})
+        
+        # Pop last user message to use as input
+        if gemini_history and gemini_history[-1]['role'] == 'user':
+            gemini_history.pop()
+        
+        # Handle thinking model specially
+        if "thinking" in model_name:
+            # Thinking models need specific config
+            model = genai.GenerativeModel(
+                model_name,
+                system_instruction=system_instruction,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.7,
+                    max_output_tokens=8192
+                )
+            )
+        else:
+            model = genai.GenerativeModel(
+                model_name,
+                system_instruction=system_instruction
+            )
+        
+        chat = model.start_chat(history=gemini_history)
+        response = chat.send_message(last_user_msg)
+        
+        # Extract text (handle thinking model's special output)
+        if hasattr(response, 'text'):
+            return response.text
+        elif hasattr(response, 'candidates') and response.candidates:
+            return response.candidates[0].content.parts[0].text
+        else:
+            return str(response)
+    
+    except Exception as e:
+        print(f"[GEMINI] Error: {e}")
+        # Fallback to Groq
+        return ChatCompletion(messages, model="llama-3.3-70b-versatile", text_only=True)
 
 def add_interaction_to_history(query: str, response: str, role: str = "assistant") -> bool:
     """
