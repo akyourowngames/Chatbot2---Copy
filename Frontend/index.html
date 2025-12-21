@@ -290,6 +290,178 @@
                 transform: translateX(0);
             }
         }
+
+        /* ========== KILLER UI ENHANCEMENTS ========== */
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.05) 0%, transparent 100%);
+            border: 1px solid var(--border);
+            border-left: 2px solid var(--primary);
+        }
+
+        .typing-indicator .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator .dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-indicator .dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        .typing-indicator .dot:nth-child(3) {
+            animation-delay: 0s;
+        }
+
+        @keyframes typingBounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0.6);
+                opacity: 0.4;
+            }
+
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Equalizer Animation for Spotify */
+        .equalizer-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 16px;
+        }
+
+        .equalizer-bars .bar {
+            width: 3px;
+            background: linear-gradient(to top, #1db954, #1ed760);
+            border-radius: 1px;
+            animation: equalize 0.8s infinite ease-in-out;
+        }
+
+        .equalizer-bars .bar:nth-child(1) {
+            animation-delay: -0.4s;
+            height: 60%;
+        }
+
+        .equalizer-bars .bar:nth-child(2) {
+            animation-delay: -0.2s;
+            height: 100%;
+        }
+
+        .equalizer-bars .bar:nth-child(3) {
+            animation-delay: -0.3s;
+            height: 40%;
+        }
+
+        .equalizer-bars .bar:nth-child(4) {
+            animation-delay: -0.1s;
+            height: 80%;
+        }
+
+        @keyframes equalize {
+
+            0%,
+            100% {
+                transform: scaleY(0.3);
+            }
+
+            50% {
+                transform: scaleY(1);
+            }
+        }
+
+        /* Enhanced Message Hover */
+        .msg-block {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .msg-block:hover {
+            background: rgba(255, 255, 255, 0.025);
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.05);
+        }
+
+        .msg-block.assistant:hover {
+            border-left-color: var(--primary);
+            box-shadow: -4px 0 20px rgba(99, 102, 241, 0.1), 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Glowing Input Focus */
+        .tactical-console:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.15), 0 -10px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Premium Execute Button */
+        #executeBtn {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        #executeBtn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        #executeBtn:hover::before {
+            left: 100%;
+        }
+
+        #executeBtn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Spotify Player Glow */
+        .spotify-player-card {
+            border: 1px solid rgba(29, 185, 84, 0.3);
+            box-shadow: 0 0 30px rgba(29, 185, 84, 0.1);
+            animation: spotifyGlow 2s infinite alternate;
+        }
+
+        @keyframes spotifyGlow {
+            from {
+                box-shadow: 0 0 20px rgba(29, 185, 84, 0.1);
+            }
+
+            to {
+                box-shadow: 0 0 40px rgba(29, 185, 84, 0.2);
+            }
+        }
+
+        /* PDF Preview Card Glow */
+        .pdf-preview-card {
+            transition: all 0.3s ease;
+        }
+
+        .pdf-preview-card:hover {
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.15);
+        }
     </style>
     <script type="importmap">
 {

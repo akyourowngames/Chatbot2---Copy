@@ -211,9 +211,39 @@ function renderSpotifyPlayer(container: HTMLElement, spotify: any) {
     if (!spotify || !spotify.embed_url) return;
 
     const playerId = `spotify-player-${Date.now()}`;
+    const trackName = spotify.name || 'Track';
+    const artistName = spotify.artists || '';
+
     const html = `
-    <div class="mt-4 rounded-lg overflow-hidden border border-green-500/30 bg-black shadow-lg shadow-green-500/10 animate-in fade-in duration-500 max-w-md">
-        <iframe style="border-radius:12px" src="${spotify.embed_url}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    <div class="mt-4 rounded-xl overflow-hidden spotify-player-card bg-gradient-to-br from-[#1a1a2e] to-black max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <!-- NOW PLAYING Header -->
+        <div class="flex items-center justify-between px-4 py-3 bg-black/50 border-b border-green-500/20">
+            <div class="flex items-center gap-3">
+                <div class="equalizer-bars">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </div>
+                <div>
+                    <span class="text-[10px] font-mono text-green-400 uppercase tracking-widest">Now Playing</span>
+                    <div class="text-xs text-white/80 font-medium truncate max-w-[200px]">${trackName}</div>
+                    ${artistName ? `<div class="text-[10px] text-white/50">${artistName}</div>` : ''}
+                </div>
+            </div>
+            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+        </div>
+        <!-- Spotify Embed -->
+        <iframe 
+            style="border-radius:0 0 12px 12px" 
+            src="${spotify.embed_url}" 
+            width="100%" 
+            height="152" 
+            frameBorder="0" 
+            allowfullscreen="" 
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+            loading="lazy">
+        </iframe>
     </div>`;
 
     const wrapper = document.createElement('div');
@@ -228,20 +258,28 @@ function renderPDFPreview(container: HTMLElement, pdfUrl: string, title: string 
     }
 
     const html = `
-    <div class="mt-4 rounded-lg overflow-hidden border border-white/20 bg-black/50 backdrop-blur-sm w-full h-[400px]">
-        <div class="flex items-center justify-between px-3 py-2 bg-white/10 border-b border-white/10">
-             <div class="flex items-center gap-2">
-                 <i data-lucide="file-text" class="w-4 h-4 text-white/70"></i>
-                 <span class="text-xs font-mono text-white/80">${title}</span>
-             </div>
-             <a href="${pdfUrl}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300">Download</a>
+    <div class="mt-4 rounded-xl overflow-hidden pdf-preview-card border border-indigo-500/30 bg-gradient-to-br from-[#1a1a2e] to-black w-full h-[400px] animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div class="flex items-center justify-between px-4 py-3 bg-black/50 border-b border-indigo-500/20">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600/30 flex items-center justify-center">
+                    <i data-lucide="file-text" class="w-4 h-4 text-indigo-400"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-mono text-indigo-400 uppercase tracking-widest">Document Ready</span>
+                    <div class="text-xs text-white/80 font-medium">${title}</div>
+                </div>
+            </div>
+            <a href="${pdfUrl}" target="_blank" class="px-3 py-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-xs text-indigo-300 hover:bg-indigo-600/30 transition-all">
+                <i data-lucide="download" class="w-3 h-3 inline mr-1"></i>Download
+            </a>
         </div>
-        <iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true" class="w-full h-full border-0"></iframe>
+        <iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true" class="w-full h-[calc(100%-52px)] border-0"></iframe>
     </div>`;
 
     const wrapper = document.createElement('div');
     wrapper.innerHTML = html;
     container.appendChild(wrapper);
+    try { if (typeof lucide !== 'undefined') lucide.createIcons(); } catch (e) { }
 }
 
 function scrollToBottom() {
@@ -400,6 +438,22 @@ if (auth) {
     messageInput.style.height = 'auto';
 
     isProcessing = true;
+
+    // 💬 Show typing indicator
+    let typingIndicator: HTMLElement | null = null;
+    if (messagesList) {
+        typingIndicator = document.createElement('div');
+        typingIndicator.className = 'typing-indicator';
+        typingIndicator.innerHTML = `
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <span class="ml-3 text-xs font-mono text-white/50 uppercase tracking-widest">KAI is processing...</span>
+        `;
+        messagesList.appendChild(typingIndicator);
+        scrollToBottom();
+    }
+
     try {
         const response = await fetch(`${API_URL}/chat`, {
             method: 'POST',
@@ -412,6 +466,11 @@ if (auth) {
         LOG.info('API', 'Response received', { type: data.type, hasSpotify: !!data.spotify, hasAnime: !!data.anime });
         if (data.type === 'spotify') {
             LOG.info('SPOTIFY', 'Embed URL', data.spotify?.embed_url);
+        }
+
+        // 💬 Remove typing indicator
+        if (typingIndicator && typingIndicator.parentNode) {
+            typingIndicator.remove();
         }
 
         addMessage('assistant', data.response || "NO_DATA", null, data);
@@ -427,6 +486,10 @@ if (auth) {
         renderHistory();
         if (db && auth?.currentUser) addDoc(collection(db, "chat_history"), historyItem);
     } catch (e) {
+        // Remove typing indicator on error too
+        if (typingIndicator && typingIndicator.parentNode) {
+            typingIndicator.remove();
+        }
         addMessage('assistant', "[!] CRITICAL UPLINK ERROR");
     } finally {
         isProcessing = false;
