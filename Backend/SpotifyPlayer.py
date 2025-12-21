@@ -54,14 +54,15 @@ class SpotifyPlayer:
             print(f"[Spotify] Auth error: {e}")
             return None
     
-    def search(self, query: str, search_type: str = "track", limit: int = 5):
+    def search(self, query: str, search_type: str = "track", limit: int = 5, artist: str = None):
         """
         Search Spotify catalog
         
         Args:
-            query: Search query
+            query: Search query (song/album name)
             search_type: track, album, artist, playlist
             limit: Number of results
+            artist: Optional artist name to filter results
             
         Returns:
             List of results with embed URLs
@@ -73,11 +74,26 @@ class SpotifyPlayer:
         try:
             url = f"{self.base_url}/search"
             headers = {"Authorization": f"Bearer {token}"}
+            
+            # Build smart search query
+            search_query = query
+            if artist and search_type == "track":
+                # Use Spotify's field filters for exact matching
+                search_query = f'track:"{query}" artist:"{artist}"'
+            elif search_type == "track" and " by " in query.lower():
+                # Parse "song by artist" format
+                parts = query.lower().split(" by ", 1)
+                track_name = parts[0].strip()
+                artist_name = parts[1].strip() if len(parts) > 1 else ""
+                if artist_name:
+                    search_query = f'track:"{track_name}" artist:"{artist_name}"'
+                    print(f"[Spotify] Parsed query: track='{track_name}' artist='{artist_name}'")
+                    
             params = {
-                "q": query,
+                "q": search_query,
                 "type": search_type,
                 "limit": limit,
-                "market": "US"
+                "market": "IN"  # Use India market for Hindi songs
             }
             
             response = requests.get(url, headers=headers, params=params, timeout=10)

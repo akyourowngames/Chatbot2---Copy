@@ -436,21 +436,16 @@
             box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
         }
 
-        /* Spotify Player Glow */
+        /* Spotify Player - Subtle styling */
         .spotify-player-card {
-            border: 1px solid rgba(29, 185, 84, 0.3);
-            box-shadow: 0 0 30px rgba(29, 185, 84, 0.1);
-            animation: spotifyGlow 2s infinite alternate;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
         }
 
-        @keyframes spotifyGlow {
-            from {
-                box-shadow: 0 0 20px rgba(29, 185, 84, 0.1);
-            }
-
-            to {
-                box-shadow: 0 0 40px rgba(29, 185, 84, 0.2);
-            }
+        .spotify-player-card:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
 
         /* PDF Preview Card Glow */

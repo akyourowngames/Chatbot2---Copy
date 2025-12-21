@@ -24,11 +24,11 @@ class AnimeStreamingSystem:
     
 
     def __init__(self):
-        # API Endpoints
+        # API Endpoints - Updated with working mirrors
         self.mirrors = [
-            "https://consumet-api-jade.vercel.app", # Primary (Vercel)
-            "https://api.consumet.org",             # Official (Rate limited)
-            "https://c.delusionz.xyz"               # Backup
+            "https://api.consumet.org",             # Official (most reliable)
+            "https://consumet-api-jade.vercel.app", # Vercel backup
+            "https://consumet-api.onrender.com",    # Render backup
         ]
         self.consumet_base = self.mirrors[0] 
         self.jikan_base = "https://api.jikan.moe/v4"      # MyAnimeList
