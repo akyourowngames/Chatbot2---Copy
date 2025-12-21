@@ -125,7 +125,16 @@ except ImportError as e:
 # ==================== HEALTH CHECK (CRITICAL) ====================
 @app.route("/health", methods=["GET"])
 def health():
-    return {"status": "ok"}, 200 
+    return {"status": "ok"}, 200
+
+# ==================== FILE SERVING ====================
+@app.route('/data/<path:filename>')
+def serve_files(filename):
+    """Serve generic files from Data directory"""
+    try:
+        return send_from_directory(DATA_DIR, filename)
+    except Exception as e:
+        return {"error": str(e)}, 404 
 
 # ==================== CONFIGURATION ====================
 
@@ -2636,7 +2645,7 @@ Say 'Watch {title}' to start streaming!"""
                              
                              # Clean anime name
                              anime_name = re.sub(r'(watch|play|stream|anime|episode\s*\d+)', '', query_lower).strip()
-                             anime_name = anime_name.replace('jarvis', '').strip()
+                             anime_name = anime_name.replace('jarvis', '').strip().strip('"\'')
                              
                              if anime_name:
                                  result = anime_system.watch_anime(anime_name, episode)
