@@ -522,6 +522,112 @@ let lastUserAttachment: string | null = null;
     }, 300);
 };
 
+// === 📁 FILE UPLOAD HANDLER ===
+let pendingFiles: { name: string; url: string; type: string }[] = [];
+
+(window as any).handleFileUpload = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    LOG.info('FILE', `Uploading: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+
+    // Show uploading indicator
+    notify('UPLOADING_FILE...');
+
+    // Create FormData
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(`${API_URL}/files/upload`, {
+            method: 'POST',
+            headers: {
+                'X-API-Key': 'kai_test_key_12345'
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+        LOG.network(`${API_URL}/files/upload`, response.status, data);
+
+        if (data.status === 'success') {
+            // Store file for context
+            pendingFiles.push({
+                name: data.filename || file.name,
+                url: data.url || '',
+                type: data.analysis?.file_type || 'unknown'
+            });
+
+            // Show in attachment area
+            showAttachmentPreview(file.name, data.analysis?.file_type || 'file', data.url);
+
+            // Show analysis summary if available
+            if (data.ai_summary) {
+                notify(`FILE_ANALYZED: ${data.ai_summary.substring(0, 50)}...`);
+            } else {
+                notify('FILE_UPLOADED');
+            }
+
+            LOG.info('FILE', 'Upload successful', data);
+        } else {
+            throw new Error(data.error || 'Upload failed');
+        }
+    } catch (error: any) {
+        LOG.error('FILE', 'Upload failed', error);
+        notify(`UPLOAD_FAILED: ${error.message}`, 'error');
+    }
+
+    // Reset input
+    input.value = '';
+};
+
+function showAttachmentPreview(filename: string, fileType: string, url?: string) {
+    if (!attachmentArea) return;
+
+    attachmentArea.classList.remove('hidden');
+    attachmentArea.classList.add('flex');
+
+    const iconMap: Record<string, string> = {
+        'image': 'image',
+        'video': 'film',
+        'document': 'file-text',
+        'code': 'code',
+        'data': 'database',
+        'archive': 'archive',
+        'unknown': 'file'
+    };
+
+    const icon = iconMap[fileType] || 'file';
+
+    const chip = document.createElement('div');
+    chip.className = 'flex items-center gap-2 px-3 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg text-sm text-indigo-300 group';
+    chip.innerHTML = `
+        <i data-lucide="${icon}" class="w-4 h-4"></i>
+        <span class="max-w-[150px] truncate">${filename}</span>
+        <button onclick="removeAttachment(this)" class="text-white/40 hover:text-red-400 ml-1">
+            <i data-lucide="x" class="w-3 h-3"></i>
+        </button>
+    `;
+
+    attachmentArea.appendChild(chip);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+(window as any).removeAttachment = (btn: HTMLElement) => {
+    const chip = btn.closest('.flex');
+    if (chip) {
+        chip.remove();
+        pendingFiles.pop(); // Remove last file (simple approach)
+    }
+
+    // Hide area if empty
+    if (attachmentArea && attachmentArea.children.length === 0) {
+        attachmentArea.classList.add('hidden');
+        attachmentArea.classList.remove('flex');
+    }
+};
+
 // === ⌨️ TYPEWRITER STREAMING EFFECT ===
 let isStreaming = false;
 let streamAbortController: AbortController | null = null;

@@ -5388,42 +5388,44 @@ def capture_url_as_screenshot():
 # ==================== END BEAST-LEVEL FEATURES ====================
 
 # --- FILE UPLOAD & ANALYSIS ---
-# @app.route('/api/v1/files/upload', methods=['POST'])
-# @require_api_key
-# def upload_file():
-#     """Upload and analyze a file"""
-#     if not file_analyzer:
-#         return jsonify({"error": "File Analyzer not loaded"}), 503
-#     
-#     try:
-#         if 'file' not in request.files:
-#             return jsonify({"error": "No file provided"}), 400
-#         
-#         file = request.files['file']
-#         
-#         if file.filename == '':
-#             return jsonify({"error": "No file selected"}), 400
-#         
-#         # Save file
-#         file_data = file.read()
-#         filepath = file_analyzer.save_upload(file_data, file.filename)
-#         
-#         # Analyze file
-#         analysis = file_analyzer.analyze_file(filepath)
-#         
-#         # Show full AI analysis
-#         if analysis.get("status") == "success":
-#             ai_analysis = analysis.get("ai_analysis", "No analysis available")
-#         else:
-#             ai_analysis = "Analysis failed"
-#         
-#         return jsonify({
-#             "status": "success",
-#             "message": "File uploaded and analyzed",
-#             "analysis": analysis
-#         })
-#     except Exception as e:
-#         return jsonify({"error": str(e)}), 500
+@app.route('/api/v1/files/upload', methods=['POST'])
+@require_api_key
+def upload_file():
+    """Upload and analyze a file"""
+    if not file_analyzer:
+        return jsonify({"error": "File Analyzer not loaded"}), 503
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Save file
+        file_data = file.read()
+        filepath = file_analyzer.save_upload(file_data, file.filename)
+        
+        # Analyze file
+        analysis = file_analyzer.analyze_file(filepath)
+        
+        # Get AI analysis text
+        ai_analysis = analysis.get("ai_analysis") or analysis.get("analysis", "File analyzed successfully")
+        
+        return jsonify({
+            "status": "success",
+            "message": "File uploaded and analyzed",
+            "filename": os.path.basename(filepath),
+            "filepath": filepath,
+            "url": f"/data/Uploads/{os.path.basename(filepath)}",
+            "analysis": analysis,
+            "ai_summary": ai_analysis
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/api/v1/files/analyze', methods=['POST'])
 @require_api_key

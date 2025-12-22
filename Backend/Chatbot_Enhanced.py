@@ -192,6 +192,37 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
     start_time = time.time()
     
     try:
+        # ===== 0. SWARM AGENT HANDOFF (NEW) =====
+        # Check for complex tasks that need the autonomous swarm
+        if Query.lower().startswith(("/agent", "agent:", "swarm:", "build:", "research:")):
+            try:
+                print(f"[CHAT] Handing off to Swarm Orchestrator: {Query}")
+                from Backend.Agents.SwarmOrchestrator import swarm
+                import asyncio
+                
+                # Run sync for now using asyncio.run if needed, or just standard await if we were async
+                # Since ChatBot is sync, we bridge it
+                swarm_result = asyncio.run(swarm.run_swarm_task(Query))
+                
+                if swarm_result.get("status") == "success":
+                   Answer = swarm_result.get("swarm_output", "Task completed.")
+                   # Add swarm metadata
+                   return {
+                       "response": Answer,
+                       "metadata": {
+                           "tool": "swarm_agent",
+                           "agent": swarm_result.get("primary_agent", "swarm"),
+                           "execution_time": swarm_result.get("execution_time", 0)
+                       }
+                   }
+                else:
+                   Answer = f"Agent failed: {swarm_result.get('error')}"
+            except Exception as e:
+                print(f"[CHAT] Swarm Error: {e}")
+                import traceback
+                traceback.print_exc()
+                # Fallback to normal LLM flow
+        
         # ===== 1. SMART MODEL ROUTING =====
         try:
             from Backend.SmartModelRouter import route_query, should_think
@@ -204,11 +235,57 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
             is_thinking_mode = False
             routing_analysis = {}
         
-        # ===== 2. KNOWLEDGE GROUNDING (DISABLED for speed) =====
-        # Auto-grounding was slowing down responses. Users can use explicit
-        # "search for X" commands instead.
-        grounding_context = ""
-        # Grounding disabled for instant responses
+        # ===== 2. SMART RETRY SYSTEM (NEW) =====
+        try:
+            from Backend.ActionHistory import action_history
+            retry_patterns = ["retry", "do it again", "try again", "do again", "run again"]
+            
+            # Check if query is a retry command
+            if any(pattern == Query.lower().strip() for pattern in retry_patterns) or \
+               (len(Query.split()) < 4 and "retry" in Query.lower()):
+                
+                last_action = action_history.get_last_action()
+                if last_action:
+                    print(f"[CHAT] Retry detected! Replaying: {last_action.description}")
+                    
+                    # Replay logic based on type
+                    if last_action.action_type == "image_gen":
+                        from Backend.EnhancedImageGen import enhanced_image_gen
+                        p = last_action.params
+                        # Return direct result or construct a text response
+                        imgs = enhanced_image_gen.generate_pollinations(
+                            p["prompt"], p.get("num_images",1), p.get("width",1024), p.get("height",1024)
+                        )
+                        return {
+                            "response": f"I've retried generating that image for you!\n{imgs[0] if imgs else 'Failed again, sorry.'}",
+                            "metadata": {"tool": "retry", "original_action": "image_gen"}
+                        }
+                    
+                    elif last_action.action_type == "smart_image_gen":
+                        from Backend.EnhancedImageGen import enhanced_image_gen
+                        p = last_action.params
+                        res = enhanced_image_gen.smart_generate(p["prompt"], p.get("num_images",1))
+                        # Format response from dict result
+                        if res['images']:
+                            return {
+                                "response": f"Retrying smart generation... Done! Here is the {res['style']} image:\n{res['images'][0]}",
+                                "metadata": {"tool": "retry", "original_action": "smart_image_gen"}
+                            }
+                    
+                    elif last_action.action_type == "web_search":
+                        # If we instrumented web search
+                        pass # Add handler here when needed
+                        
+                    else:
+                        print(f"Unknown retry action type: {last_action.action_type}")
+                        return {"response": "I remember what we did, but I'm not sure how to retry that specific action yet."}
+                else:
+                    return {"response": "I'm not sure what to retry. I don't have a record of our last action yet."}
+        except Exception as e:
+            print(f"[Retry] Error: {e}")
+
+        # ===== 3. KNOWLEDGE GROUNDING (DISABLED for speed) =====
+        # Auto-grounding was slowing down responses. Users can use explicit (rest of code...)
         
         # ===== 3. LOAD CHAT HISTORY =====
         try:

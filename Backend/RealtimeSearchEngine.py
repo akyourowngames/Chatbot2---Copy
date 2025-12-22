@@ -6,6 +6,10 @@ import requests
 from dotenv import dotenv_values
 from Backend.JarvisWebScraper import quick_search, scrape_markdown
 import asyncio
+try:
+    from Backend.ActionHistory import action_history
+except ImportError:
+    action_history = None
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import re
@@ -17,9 +21,20 @@ def fetch_crypto_price(query):
     """Fetch crypto price using Jarvis scraper search"""
     try:
         results = asyncio.run(quick_search(query))
+        # Format results
+        # The original instruction provided a snippet that introduced `self._format_results(results_list)`
+        # and `results_list`. Since `self` is not defined in this standalone function and `results_list`
+        # is not initialized, these lines are omitted to maintain syntactical correctness and functionality.
+        # The `action_history.update_status` call is adapted to use the existing `results` variable.
+        
+        if action_history:
+            action_history.update_status("success" if results else "failed")
+            
         if results:
             return f"Crypto Info: {results[0]['snippet']} (Source: {results[0]['link']})"
     except Exception:
+        if action_history:
+            action_history.update_status("failed")
         pass
     return None
 
@@ -187,6 +202,18 @@ def GoogleSearch(query, return_json=False):
 
 def DuckDuckGoSearch(query, return_list=False):
     """Fallback search using DuckDuckGo"""
+    if not query.strip():
+        return "No query provided."
+
+    # Log action for retry
+    if action_history:
+        action_history.log_action(
+            action_type="web_search",
+            params={"query": query, "engine": "DuckDuckGo", "num_results": 5},
+            description=f"DuckDuckGo Search: {query}"
+        )
+    logger.info(f"Searching DuckDuckGo for: {query}")
+
     try:
         from duckduckgo_search import DDGS
         with DDGS() as ddgs:

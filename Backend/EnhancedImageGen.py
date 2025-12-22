@@ -11,6 +11,10 @@ from datetime import datetime
 from typing import List, Optional, Dict
 import asyncio
 from pathlib import Path
+try:
+    from Backend.ActionHistory import action_history
+except ImportError:
+    action_history = None
 
 class EnhancedImageGenerator:
     def __init__(self):
@@ -23,20 +27,30 @@ class EnhancedImageGenerator:
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
     
     def generate_pollinations(self, prompt: str, num_images: int = 1, 
-                             width: int = 1024, height: int = 1024) -> List[str]:
+                             width: int = 1024, height: int = 1024, model: str = "flux") -> List[str]:
         """
         Generate images using Pollinations AI (Free, no API key needed)
+        Now defaults to the powerful 'flux' model.
         
         Args:
             prompt: Image description
             num_images: Number of images to generate
             width: Image width
             height: Image height
+            model: Model to use (default: flux)
             
         Returns:
             List of image file paths
         """
         images = []
+        
+        # Log action for retry
+        if action_history:
+            action_history.log_action(
+                action_type="image_gen",
+                params={"prompt": prompt, "num_images": num_images, "width": width, "height": height, "model": model},
+                description=f"Generate image ({model}): {prompt[:30]}..."
+            )
         
         for i in range(num_images):
             try:
@@ -45,7 +59,8 @@ class EnhancedImageGenerator:
                 
                 # Generate unique URL with seed for variety
                 seed = datetime.now().microsecond + i
-                url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true"
+                # Append model parameter (flux is the new state-of-the-art free model)
+                url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model={model}"
                 
                 # Download image
                 response = requests.get(url, timeout=30)
@@ -318,6 +333,14 @@ Respond with ONLY the enhanced prompt, no explanations. Keep it under 100 words.
         Smart generate: AI analyzes the prompt and picks the best style automatically.
         Returns images with metadata about what style was chosen.
         """
+        # Log action for retry (will successfully override the inner basic log if called)
+        if action_history:
+            action_history.log_action(
+                action_type="smart_image_gen",
+                params={"prompt": prompt, "num_images": num_images},
+                description=f"Smart Gen: {prompt[:30]}..."
+            )
+
         try:
             from Backend.LLM import ChatCompletion
             
@@ -349,6 +372,7 @@ Reply with ONLY the style name, nothing else."""
             print(f"[ImageGen V2] Smart Generate chose style: {chosen_style}")
             
             # Generate with chosen style
+            # Using Flux model for best quality on all styles
             images = self.generate_with_style(prompt, chosen_style, num_images)
             
             return {
