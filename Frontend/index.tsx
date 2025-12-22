@@ -175,6 +175,300 @@ let canvasRawContent = '';
     LOG.info('CANVAS', 'Content downloaded');
 };
 
+// === 🚀 ULTRA-VIOLET WILD BOOTUP SEQUENCE ===
+const BOOT_LOGS_ULTRA = [
+    "ATTACHING_NEURAL_INTERFACE... [OK]",
+    "STAGING_COGNITIVE_ARRAY_v9.4... [DONE]",
+    "MAPPING_USER_SYNAPSE_PATTERNS... SUCCESS",
+    "ESTABLISHING_QUANTUM_HANDSHAKE...",
+    "DECRYPTING_OPERATOR_PRIVILEGES... [Lvl_10]",
+    "SYNCING_LOCAL_TEMPORAL_FLUX...",
+    "STABILIZING_DOPAMINE_FEED_LOOPS... [OK]",
+    "INITIATING_HIGH_LEVEL_OVERRIDE...",
+    "INTERFACE_STABILITY: 100%",
+    "NEURAL_LATENCY: <0.01ms",
+    "UPLINK_STATUS: ABSOLUTE",
+    "KAI_INTEL: TRANSCENDENT"
+];
+
+async function runBootSequence(user?: any): Promise<void> {
+    const overlay = document.getElementById('bootup-overlay');
+    if (!overlay) return;
+
+    overlay.classList.remove('hidden');
+    LOG.info('BOOT', 'Initiating Ultra-Violet sequence');
+
+    // Stage 0: Neural Link Initiation
+    const stage0 = document.getElementById('boot-stage-0');
+    const warningBar = document.getElementById('warning-bar');
+    const warningText = document.getElementById('warning-text');
+    const violetLayer = document.getElementById('violet-glitch-layer');
+
+    if (stage0 && warningBar && warningText) {
+        setTimeout(() => { if (warningBar) warningBar.style.width = '1000px'; if (warningBar) warningBar.style.transition = 'width 1.2s cubic-bezier(0.19, 1, 0.22, 1)'; }, 100);
+        setTimeout(() => { if (warningText) warningText.style.opacity = '1'; }, 600);
+
+        // Flicker Violet Layer
+        let flickers = 0;
+        const hint = setInterval(() => {
+            if (violetLayer) violetLayer.style.opacity = flickers % 2 === 0 ? '0.4' : '0';
+            flickers++;
+            if (flickers > 12) {
+                clearInterval(hint);
+                if (violetLayer) violetLayer.style.opacity = '0';
+            }
+        }, 80);
+    }
+
+    // Stage 1: The Punch (KAI INTEL)
+    await new Promise(r => setTimeout(r, 1600));
+    if (stage0) stage0.classList.add('hidden');
+
+    const stage1 = document.getElementById('boot-stage-1');
+    const titleKai = overlay.querySelector('.boot-title-kai') as HTMLElement;
+    const titleIntel = overlay.querySelector('.boot-title-intel') as HTMLElement;
+    const subtitle = overlay.querySelector('.boot-subtitle-wild') as HTMLElement;
+
+    if (stage1) {
+        stage1.classList.remove('hidden');
+        document.body.classList.add('shake-wild');
+
+        setTimeout(() => {
+            if (titleKai) { titleKai.style.opacity = '1'; titleKai.style.transform = 'scale(1)'; titleKai.style.filter = 'blur(0)'; }
+            if (titleIntel) { titleIntel.style.opacity = '1'; titleIntel.style.transform = 'scale(1)'; titleIntel.style.filter = 'blur(0)'; }
+        }, 100);
+
+        setTimeout(() => { if (subtitle) subtitle.style.opacity = '1'; }, 500);
+        setTimeout(() => { document.body.classList.remove('shake-wild'); }, 600);
+    }
+
+    // Stage 2: Operator ID Reveal
+    await new Promise(r => setTimeout(r, 1400));
+    if (stage1) stage1.classList.add('hidden');
+
+    const stage2 = document.getElementById('boot-stage-2');
+    const percentEl = document.getElementById('boot-percent');
+    const usernameReveal = document.getElementById('boot-username-reveal');
+    const welcomeUser = document.getElementById('welcome-username');
+
+    if (stage2) {
+        stage2.classList.remove('hidden');
+        const displayName = user?.displayName || user?.email?.split('@')[0] || 'GUEST_OPERATOR';
+        if (usernameReveal) usernameReveal.textContent = displayName.toUpperCase();
+        if (welcomeUser) welcomeUser.textContent = displayName.toUpperCase();
+
+        let count = 0;
+        const interval = setInterval(() => {
+            count += Math.floor(Math.random() * 15) + 5;
+            if (count >= 100) {
+                count = 100;
+                clearInterval(interval);
+                if (usernameReveal) {
+                    usernameReveal.style.opacity = '1';
+                    usernameReveal.classList.add('glitch-text-wild');
+                }
+            }
+            if (percentEl) percentEl.textContent = `${count.toString().padStart(2, '0')}%`;
+        }, 40);
+    }
+
+    // Stage 3: Workspace Construction
+    await new Promise(r => setTimeout(r, 1200));
+    if (stage2) stage2.classList.add('hidden');
+
+    const stage3 = document.getElementById('boot-stage-3');
+    const terminal = document.getElementById('boot-terminal-wild');
+    if (stage3 && terminal) {
+        stage3.classList.remove('hidden');
+        for (let i = 0; i < BOOT_LOGS_ULTRA.length; i++) {
+            await new Promise(r => setTimeout(r, 40));
+            const logLine = document.createElement('div');
+            logLine.className = 'flex gap-4 font-black text-indigo-400 animate-pulse';
+            logLine.innerHTML = `<span class="opacity-40">>></span><span>${BOOT_LOGS_ULTRA[i]}</span>`;
+            terminal.appendChild(logLine);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    }
+
+    // Stage 4: WELCOME HOME
+    await new Promise(r => setTimeout(r, 1200));
+    if (stage3) stage3.classList.add('hidden');
+
+    const stage4 = document.getElementById('boot-stage-4');
+    const seizedBox = document.getElementById('seized-box');
+    const opId = document.getElementById('op-id-v2');
+    const flash = document.getElementById('flash-violet');
+
+    if (stage4 && seizedBox) {
+        stage4.classList.remove('hidden');
+        if (flash) {
+            flash.style.opacity = '1';
+            setTimeout(() => { if (flash) flash.style.opacity = '0'; }, 150);
+        }
+        document.body.classList.add('shake-wild');
+
+        setTimeout(() => {
+            if (seizedBox) {
+                seizedBox.style.opacity = '1';
+                seizedBox.style.transform = 'scale(1)';
+            }
+        }, 100);
+
+        setTimeout(() => { if (opId) opId.style.opacity = '1'; }, 800);
+        setTimeout(() => document.body.classList.remove('shake-wild'), 800);
+    }
+
+    // Final Transition
+    await new Promise(r => setTimeout(r, 2200));
+    overlay.style.transition = 'all 0.6s cubic-bezier(0.19, 1, 0.22, 1)';
+    overlay.style.opacity = '0';
+    overlay.style.transform = 'scale(1.5)';
+    overlay.style.filter = 'blur(20px)';
+
+    setTimeout(() => {
+        overlay.classList.add('hidden');
+        overlay.style.opacity = '1';
+        overlay.style.transform = 'scale(1)';
+        overlay.style.filter = 'none';
+        LOG.info('BOOT', 'UPLINK_COMPLETE');
+    }, 600);
+}
+
+// Check if user needs bootup (first login)
+function shouldShowBootup(userId: string): boolean {
+    const key = `kai_bootup_shown_${userId}`;
+    const shown = localStorage.getItem(key);
+    if (!shown) {
+        localStorage.setItem(key, 'true');
+        return true;
+    }
+    return false;
+}
+
+(window as any).runBootSequence = runBootSequence;
+
+// === 📋 MESSAGE ACTIONS ===
+let lastUserMessage = '';
+let lastUserAttachment: string | null = null;
+
+(window as any).copyMessage = async (msgId: string) => {
+    const msgEl = document.getElementById(msgId);
+    if (!msgEl) return;
+
+    const bodyEl = msgEl.querySelector('.markdown-body');
+    const text = bodyEl?.textContent || '';
+
+    try {
+        await navigator.clipboard.writeText(text);
+        // Visual feedback on button
+        const btn = msgEl.querySelector('.action-copy');
+        if (btn) {
+            btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
+            btn.classList.add('text-emerald-400');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            setTimeout(() => {
+                btn.innerHTML = '<i data-lucide="copy" class="w-3.5 h-3.5"></i>';
+                btn.classList.remove('text-emerald-400');
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }, 1500);
+        }
+        notify('MESSAGE_COPIED');
+    } catch (e) {
+        notify('COPY_FAILED', 'error');
+    }
+};
+
+(window as any).regenerateResponse = async () => {
+    if (!lastUserMessage) {
+        notify('NO_MESSAGE_TO_REGENERATE', 'error');
+        return;
+    }
+
+    // Remove last assistant message
+    const messages = messagesList?.querySelectorAll('.msg-block.assistant');
+    if (messages && messages.length > 0) {
+        messages[messages.length - 1].remove();
+    }
+
+    // Resend the message
+    notify('REGENERATING...');
+    await sendMessage(lastUserMessage, lastUserAttachment);
+};
+
+(window as any).deleteMessage = (msgId: string) => {
+    const msgEl = document.getElementById(msgId);
+    if (!msgEl) return;
+
+    // Animate out
+    msgEl.style.transition = 'all 0.3s ease';
+    msgEl.style.opacity = '0';
+    msgEl.style.transform = 'translateX(-20px)';
+
+    setTimeout(() => {
+        msgEl.remove();
+        notify('MESSAGE_DELETED');
+    }, 300);
+};
+
+// === ⌨️ TYPEWRITER STREAMING EFFECT ===
+let isStreaming = false;
+let streamAbortController: AbortController | null = null;
+
+async function typewriterEffect(element: HTMLElement, text: string, speed: number = 15): Promise<void> {
+    isStreaming = true;
+
+    // Add cursor to element
+    const cursor = document.createElement('span');
+    cursor.className = 'typing-cursor';
+    cursor.innerHTML = '█';
+    cursor.style.cssText = 'animation: blink 0.7s infinite; color: #6366f1; font-weight: normal;';
+
+    let currentIndex = 0;
+    const chunks = text.split(/(\s+|```[\s\S]*?```|`[^`]+`|\*\*[^*]+\*\*|\n)/); // Split on spaces, code blocks, inline code, bold, newlines
+
+    return new Promise((resolve) => {
+        function typeNext() {
+            if (!isStreaming || currentIndex >= chunks.length) {
+                cursor.remove();
+                isStreaming = false;
+                // Re-render with full formatting
+                element.innerHTML = formatMessage(text);
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                if (typeof Prism !== 'undefined') Prism.highlightAllUnder(element);
+                resolve();
+                return;
+            }
+
+            // Add next chunk
+            const chunk = chunks[currentIndex];
+            if (cursor.parentNode) cursor.remove();
+
+            // Simple text accumulation for smooth effect
+            const visibleText = chunks.slice(0, currentIndex + 1).join('');
+            element.innerHTML = formatMessage(visibleText);
+            element.appendChild(cursor);
+
+            currentIndex++;
+            scrollToBottom();
+
+            // Variable speed based on content
+            const delay = chunk.includes('```') ? 5 : chunk === '\n' ? 50 : speed;
+            setTimeout(typeNext, delay);
+        }
+
+        typeNext();
+    });
+}
+
+(window as any).stopGenerating = () => {
+    isStreaming = false;
+    if (streamAbortController) {
+        streamAbortController.abort();
+        streamAbortController = null;
+    }
+    notify('GENERATION_STOPPED');
+};
+
 // Formatting
 function formatMessage(text: string) {
     if (typeof marked === 'undefined') return text;
@@ -907,14 +1201,49 @@ function notify(text: string, type: 'info' | 'error' = 'info') {
 
 function addMessage(role: string, content: string, attachedFile: string | null = null, metadata: any = null) {
     if (!messagesList) return;
-    const block = document.createElement('div');
-    block.className = `msg-block ${role} group`;
 
+    // Generate unique message ID
+    const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Store last user message for regeneration
+    if (role === 'user') {
+        lastUserMessage = content;
+        lastUserAttachment = attachedFile;
+    }
+
+    const block = document.createElement('div');
+    block.id = msgId;
+    block.className = `msg-block ${role} group relative`;
+
+    // Header with actions
     const header = document.createElement('div');
-    header.className = 'flex items-center gap-2 mb-3 opacity-60 font-mono text-[10px] uppercase tracking-[0.2em]';
-    header.innerHTML = role === 'assistant'
+    header.className = 'flex items-center justify-between mb-3';
+
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'flex items-center gap-2 opacity-60 font-mono text-[10px] uppercase tracking-[0.2em]';
+    headerLeft.innerHTML = role === 'assistant'
         ? `<div class="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div> <span class="text-indigo-400 font-bold">KAI_SYS_INTEL</span> <span>${new Date().toLocaleTimeString()}</span>`
         : `<span class="text-white/60 font-bold">OPERATOR_TRANS</span> <span>${new Date().toLocaleTimeString()}</span>`;
+
+    // Hover action bar
+    const actionBar = document.createElement('div');
+    actionBar.className = 'msg-actions flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200';
+    actionBar.innerHTML = `
+        <button onclick="copyMessage('${msgId}')" class="action-copy p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded transition-all" title="Copy message">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+        </button>
+        ${role === 'assistant' ? `
+        <button onclick="regenerateResponse()" class="p-1.5 text-white/40 hover:text-indigo-400 hover:bg-indigo-500/10 rounded transition-all" title="Regenerate response">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        </button>
+        ` : ''}
+        <button onclick="deleteMessage('${msgId}')" class="p-1.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded transition-all" title="Delete message">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        </button>
+    `;
+
+    header.appendChild(headerLeft);
+    header.appendChild(actionBar);
 
     const body = document.createElement('div');
     body.className = `markdown-body text-sm leading-relaxed ${role === 'assistant' ? 'text-gray-200' : 'text-gray-400'}`;
@@ -1054,10 +1383,22 @@ async function initApp() {
 
 // Auth State Observer
 if (auth) {
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
             LOG.info('AUTH', 'Uplink active', { email: user.email });
             document.getElementById('auth-container')!.style.display = 'none';
+
+            // Check if this is user's first login (show bootup only once)
+            if (shouldShowBootup(user.uid)) {
+                // Keep main interface hidden during bootup
+                document.getElementById('main-interface')!.style.opacity = '0';
+                document.getElementById('main-interface')!.style.pointerEvents = 'none';
+
+                // Run bootup sequence
+                await runBootSequence(user);
+            }
+
+            // Now show main interface
             document.getElementById('main-interface')!.style.opacity = '1';
             document.getElementById('main-interface')!.style.pointerEvents = 'auto';
             initApp();
@@ -1119,7 +1460,72 @@ if (auth) {
             typingIndicator.remove();
         }
 
-        addMessage('assistant', data.response || "NO_DATA", null, data);
+        // Create message block for streaming
+        const msgId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const streamBlock = document.createElement('div');
+        streamBlock.id = msgId;
+        streamBlock.className = 'msg-block assistant group relative';
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between mb-3';
+        header.innerHTML = `
+            <div class="flex items-center gap-2 opacity-60 font-mono text-[10px] uppercase tracking-[0.2em]">
+                <div class="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
+                <span class="text-indigo-400 font-bold">KAI_SYS_INTEL</span>
+                <span>${new Date().toLocaleTimeString()}</span>
+            </div>
+            <button id="stop-gen-${msgId}" onclick="stopGenerating()" class="stop-gen-btn flex items-center gap-1.5 px-2 py-1 text-[9px] font-mono text-white/60 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded transition-all uppercase tracking-widest">
+                <i data-lucide="square" class="w-3 h-3"></i> Stop
+            </button>
+        `;
+
+        const body = document.createElement('div');
+        body.className = 'markdown-body text-sm leading-relaxed text-gray-200';
+
+        streamBlock.appendChild(header);
+        streamBlock.appendChild(body);
+        messagesList?.appendChild(streamBlock);
+        scrollToBottom();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        // Apply typewriter effect
+        const responseText = data.response || "NO_DATA";
+        await typewriterEffect(body, responseText);
+
+        // Remove stop button after streaming complete
+        const stopBtn = document.getElementById(`stop-gen-${msgId}`);
+        if (stopBtn) stopBtn.remove();
+
+        // Add action bar after streaming
+        const actionBar = document.createElement('div');
+        actionBar.className = 'msg-actions flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute top-3 right-3';
+        actionBar.innerHTML = `
+            <button onclick="copyMessage('${msgId}')" class="action-copy p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded transition-all" title="Copy">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="regenerateResponse()" class="p-1.5 text-white/40 hover:text-indigo-400 hover:bg-indigo-500/10 rounded transition-all" title="Regenerate">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="deleteMessage('${msgId}')" class="p-1.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded transition-all" title="Delete">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+        `;
+        streamBlock.appendChild(actionBar);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        // Handle rich media (append after streaming)
+        if (data.type === 'anime' && data.anime) {
+            renderAnimePlayer(body, data.anime);
+        }
+        if (data.type === 'spotify' && data.spotify) {
+            renderSpotifyPlayer(body, data.spotify);
+        }
+        if (data.type && data.data && addMessage.renderers) {
+            const renderer = addMessage.renderers[`render${data.type.charAt(0).toUpperCase() + data.type.slice(1)}Card`]
+                || addMessage.renderers[`render${data.type.charAt(0).toUpperCase() + data.type.slice(1)}List`];
+            if (renderer) renderer(body, data.data);
+        }
 
         // 🗣️ AUTO-SPEAK Logic (Voice Mode)
         if ((window as any).isVoiceMode) {

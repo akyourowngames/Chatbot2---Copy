@@ -1,0 +1,8 @@
+{
+  "name": "KAI OS - Tactical Interface",
+  "description": "A high-performance, cyberpunk-inspired boot sequence and dashboard for the KAI Intel AI assistant, featuring terminal logs, telemetry data, and sleek motion design.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

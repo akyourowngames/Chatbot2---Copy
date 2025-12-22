@@ -22,7 +22,19 @@ services:
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: GROQ_API_KEY
-        sync: false  # Set manually in dashboard
+        sync: false  # Legacy fallback
+      - key: GROQ_API_KEY_1
+        sync: false  # Set in Render dashboard
+      - key: GROQ_API_KEY_2
+        sync: false
+      - key: GROQ_API_KEY_3
+        sync: false
+      - key: GROQ_API_KEY_4
+        sync: false
+      - key: GROQ_API_KEY_5
+        sync: false
+      - key: GROQ_API_KEY_6
+        sync: false
       - key: GOOGLE_API_KEY
         sync: false
       - key: GOOGLE_CX

@@ -2,10 +2,13 @@
 Unified LLM Provider (Groq + Cohere + Fallback)
 ===============================================
 Handles API calls to LLMs with automatic failover and retry logic.
+
+🚀 MULTI-KEY ROTATION: 6 Groq API keys for ~600k TPD capacity!
+
 Strategies:
-1. Try Groq (Llama 3.3 70b) -> Retry once on 429
-2. If Rate Limit persists -> Try Cohere (Command R+)
-3. If that fails -> Try Groq (Llama 3.1 8b - Instant)
+1. Rotate through 6 Groq keys (round-robin)
+2. On 429 -> Skip to next key immediately
+3. If all keys exhausted -> Fallback to Gemini -> Cohere -> Instant
 """
 
 import os
@@ -15,23 +18,77 @@ from groq import Groq
 import cohere
 import time
 import random
+import threading
 
 import google.generativeai as genai
 
 env_vars = dotenv_values(".env")
 
-# API Keys
-GROQ_API_KEY = env_vars.get("GroqAPIKey", "") or os.environ.get("GROQ_API_KEY")
+# ==================== MULTI-KEY ROTATION SYSTEM ====================
+# 6 Groq API Keys for 6x capacity (~600k tokens/day)
+GROQ_API_KEYS = [
+    os.environ.get("GROQ_API_KEY_1") or env_vars.get("GROQ_API_KEY_1", ""),
+    os.environ.get("GROQ_API_KEY_2") or env_vars.get("GROQ_API_KEY_2", ""),
+    os.environ.get("GROQ_API_KEY_3") or env_vars.get("GROQ_API_KEY_3", ""),
+    os.environ.get("GROQ_API_KEY_4") or env_vars.get("GROQ_API_KEY_4", ""),
+    os.environ.get("GROQ_API_KEY_5") or env_vars.get("GROQ_API_KEY_5", ""),
+    os.environ.get("GROQ_API_KEY_6") or env_vars.get("GROQ_API_KEY_6", ""),
+    # Fallback to original key if new ones not set
+    os.environ.get("GROQ_API_KEY") or env_vars.get("GroqAPIKey", ""),
+]
+
+# Filter out empty keys and create clients
+GROQ_CLIENTS = []
+for i, key in enumerate(GROQ_API_KEYS):
+    if key and len(key) > 10:
+        try:
+            client = Groq(api_key=key)
+            GROQ_CLIENTS.append({"client": client, "key_index": i, "rate_limited_until": 0})
+            print(f"[LLM] Groq Key #{i+1} initialized ✓")
+        except Exception as e:
+            print(f"[LLM] Groq Key #{i+1} failed: {e}")
+
+# Thread-safe key rotation
+_current_key_index = 0
+_key_lock = threading.Lock()
+
+def get_next_groq_client():
+    """Round-robin rotation with rate-limit awareness"""
+    global _current_key_index
+    
+    if not GROQ_CLIENTS:
+        return None
+    
+    current_time = time.time()
+    
+    with _key_lock:
+        # Try each key until we find one not rate-limited
+        for _ in range(len(GROQ_CLIENTS)):
+            client_info = GROQ_CLIENTS[_current_key_index % len(GROQ_CLIENTS)]
+            _current_key_index += 1
+            
+            # Skip if rate-limited (wait 60 seconds before retry)
+            if client_info["rate_limited_until"] > current_time:
+                continue
+            
+            return client_info
+        
+        # All keys rate-limited, return the one with earliest unlock
+        return min(GROQ_CLIENTS, key=lambda x: x["rate_limited_until"])
+
+def mark_key_rate_limited(client_info, wait_seconds=60):
+    """Mark a key as rate-limited for a period"""
+    client_info["rate_limited_until"] = time.time() + wait_seconds
+    print(f"[LLM] Key #{client_info['key_index']+1} rate-limited for {wait_seconds}s")
+
+# Legacy single client for backward compatibility
+groq_client = GROQ_CLIENTS[0]["client"] if GROQ_CLIENTS else None
+
+print(f"[LLM] 🚀 Multi-Key System: {len(GROQ_CLIENTS)} Groq keys active!")
+
+# Other API Keys
 COHERE_API_KEY = env_vars.get("CohereAPIKey", "") or os.environ.get("COHERE_API_KEY")
 GEMINI_API_KEY = env_vars.get("GeminiAPIKey", "") or os.environ.get("GEMINI_API_KEY")
-
-# Clients
-groq_client = None
-if GROQ_API_KEY and len(GROQ_API_KEY) > 10:
-    try:
-        groq_client = Groq(api_key=GROQ_API_KEY)
-    except Exception as e:
-        print(f"[LLM] Groq Init Failed: {e}")
 
 cohere_client = None
 if COHERE_API_KEY and len(COHERE_API_KEY) > 10:
@@ -52,10 +109,10 @@ if GEMINI_API_KEY and len(GEMINI_API_KEY) > 10:
 def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.3-70b-versatile", user_id="default", inject_memory=True):
     """
     Unified chat completion function with robust error handling.
-    NOW WITH MEMORY INTEGRATION - KAI remembers everything!
+    🚀 MULTI-KEY ROTATION: Automatically rotates through 6 Groq keys!
     """
-    if not groq_client:
-        return "System Error: Groq API Key is missing or invalid. Please check .env file."
+    if not GROQ_CLIENTS:
+        return "System Error: No Groq API Keys configured. Please check .env file."
 
     # ==================== MEMORY INJECTION ====================
     memory_context = ""
@@ -135,11 +192,17 @@ Remember: When asked who made you, proudly mention KRISH - the high school geniu
             messages.insert(0, {'role': 'system', 'content': f"{kai_identity}{memory_context}"})
             
             
-    # Retry Loop
-    max_retries = 2
-    for attempt in range(max_retries + 1):
+    # ==================== MULTI-KEY ROTATION LOOP ====================
+    keys_tried = 0
+    max_keys_to_try = len(GROQ_CLIENTS) + 1  # Try all keys once + 1 retry
+    
+    while keys_tried < max_keys_to_try:
+        client_info = get_next_groq_client()
+        if not client_info:
+            break
+            
         try:
-            response = groq_client.chat.completions.create(
+            response = client_info["client"].chat.completions.create(
                 model=model,
                 messages=messages,
                 max_tokens=1024,
@@ -152,30 +215,32 @@ Remember: When asked who made you, proudly mention KRISH - the high school geniu
             
         except Exception as e:
             error_msg = str(e).lower()
-            print(f"[LLM] Groq Error (Attempt {attempt+1}/{max_retries+1}): {e}")
+            keys_tried += 1
+            print(f"[LLM] Groq Key #{client_info['key_index']+1} Error: {e}")
             
             # Check for Rate Limit (429)
             if "429" in error_msg or "rate limit" in error_msg:
-                if attempt < max_retries:
-                    wait_time = 2 + (attempt * 2) + random.uniform(0, 1) # Exponential backoff
-                    print(f"[LLM] Rate Limit hit. Waiting {wait_time:.2f}s...")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    # After retries, fail over to Gemini -> Cohere -> Instant
-                    if model != "llama-3.1-8b-instant":
-                         # Try Gemini first as it's fast and has high rate limits
-                        fallback = _gemini_fallback(messages)
-                        if "overloaded" not in fallback:
-                             return fallback
-                        
-                        # If Cohere fails, try Instant model
-                        print("[LLM] Switching to Llama 3.1 8B Instant (Last Resort)...")
-                        return ChatCompletion(messages, text_only=text_only, model="llama-3.1-8b-instant")
+                # Mark this key as rate-limited and try next key immediately
+                mark_key_rate_limited(client_info, wait_seconds=120)
+                print(f"[LLM] Rotating to next key... ({keys_tried}/{len(GROQ_CLIENTS)} tried)")
+                continue
             
             # Other errors (Auth, BadRequest) -> Fail immediately or return error
             if "authentication" in error_msg or "unauthorized" in error_msg:
                  return f"Authentication Error: {e}"
+    
+    # All Groq keys exhausted - Fallback chain
+    print("[LLM] All Groq keys exhausted! Trying fallbacks...")
+    
+    if model != "llama-3.1-8b-instant":
+        # Try Gemini first
+        fallback = _gemini_fallback(messages)
+        if "overloaded" not in fallback.lower():
+            return fallback
+        
+        # Try Llama 8B Instant as last resort
+        print("[LLM] Switching to Llama 3.1 8B Instant (Last Resort)...")
+        return ChatCompletion(messages, text_only=text_only, model="llama-3.1-8b-instant")
 
     return "I am currently overloaded. Please check your API keys or try again in a moment."
 
