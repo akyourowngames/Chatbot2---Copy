@@ -56,7 +56,7 @@ class SpotifyPlayer:
     
     def search(self, query: str, search_type: str = "track", limit: int = 10, artist: str = None):
         """
-        Search Spotify catalog with improved matching
+        🚀 UPGRADED Spotify Search with intelligent query parsing
         
         Args:
             query: Search query (song/album name)
@@ -75,37 +75,85 @@ class SpotifyPlayer:
             url = f"{self.base_url}/search"
             headers = {"Authorization": f"Bearer {token}"}
             
-            # Clean query - remove "on spotify", "play", etc.
-            clean_query = query.lower()
-            for phrase in ["on spotify", "play ", "spotify", "song ", "music "]:
+            # === ENHANCED QUERY CLEANING ===
+            clean_query = query.lower().strip()
+            
+            # Remove common noise phrases (more comprehensive)
+            noise_phrases = [
+                "on spotify", "in spotify", "from spotify", "spotify",
+                "play ", "play the ", "play me ", "play some ",
+                "song ", "the song ", "a song ",
+                "music ", "some music ", "the music ",
+                "can you play", "please play", "i want to hear", "i wanna hear",
+                "put on ", "queue ", "listen to ", "start playing ",
+                "play the song", "play song"
+            ]
+            for phrase in noise_phrases:
                 clean_query = clean_query.replace(phrase, "")
             clean_query = clean_query.strip()
             
-            # Build smart search query
+            # === SMART ARTIST/SONG EXTRACTION ===
             search_query = clean_query
             parsed_artist = artist
+            parsed_track = None
             
             if search_type == "track":
-                # Parse "song by artist" format
-                if " by " in clean_query:
-                    parts = clean_query.split(" by ", 1)
-                    track_name = parts[0].strip()
-                    parsed_artist = parts[1].strip() if len(parts) > 1 else ""
-                    if parsed_artist:
-                        # Use both formats for better matching
-                        search_query = f'{track_name} {parsed_artist}'
-                        print(f"[Spotify] Parsed: track='{track_name}' artist='{parsed_artist}'")
+                # Pattern 1: "song by artist" or "song - artist"
+                by_patterns = [" by ", " - ", " from ", " feat ", " ft ", " featuring "]
+                for pattern in by_patterns:
+                    if pattern in clean_query:
+                        parts = clean_query.split(pattern, 1)
+                        parsed_track = parts[0].strip()
+                        parsed_artist = parts[1].strip() if len(parts) > 1 else ""
+                        break
+                
+                # Pattern 2: "artist's song" (e.g., "drake's one dance")
+                if "'s " in clean_query and not parsed_track:
+                    parts = clean_query.split("'s ", 1)
+                    parsed_artist = parts[0].strip()
+                    parsed_track = parts[1].strip() if len(parts) > 1 else ""
+                
+                # Build optimized search query
+                if parsed_track and parsed_artist:
+                    # Use Spotify's field syntax for precise matching
+                    search_query = f'track:"{parsed_track}" artist:"{parsed_artist}"'
+                    print(f"[Spotify] Parsed: track='{parsed_track}' artist='{parsed_artist}'")
+                elif parsed_artist and not parsed_track:
+                    # Just artist name - get their top tracks
+                    search_query = f'artist:"{parsed_artist}"'
                 elif artist:
-                    search_query = f'{clean_query} {artist}'
+                    search_query = f'track:"{clean_query}" artist:"{artist}"'
+                else:
+                    search_query = clean_query
+            
+            # === GENRE/MOOD DETECTION ===
+            genre_map = {
+                "chill": "chill vibes",
+                "sad": "sad songs",
+                "happy": "feel good hits",
+                "party": "party hits",
+                "workout": "workout music",
+                "study": "focus music",
+                "sleep": "sleep music",
+                "romantic": "love songs",
+                "bollywood": "bollywood hits",
+                "hindi": "hindi songs",
+                "punjabi": "punjabi hits"
+            }
+            for mood, genre_query in genre_map.items():
+                if mood in clean_query:
+                    search_type = "playlist"
+                    search_query = genre_query
+                    break
             
             params = {
                 "q": search_query,
                 "type": search_type,
                 "limit": limit,
-                "market": "IN"  # Use India market for Hindi songs
+                "market": "IN"  # India market for local songs
             }
             
-            print(f"[Spotify] Search query: '{search_query}'")
+            print(f"[Spotify] Search: '{search_query}' (type={search_type})")
             response = requests.get(url, headers=headers, params=params, timeout=10)
             
             if response.status_code == 200:
@@ -130,7 +178,6 @@ class SpotifyPlayer:
                             result["album"] = item.get("album", {}).get("name", "")
                             result["duration_ms"] = item.get("duration_ms", 0)
                             result["preview_url"] = item.get("preview_url")
-                            # Get album art
                             images = item.get("album", {}).get("images", [])
                             result["thumbnail"] = images[0]["url"] if images else None
                             
@@ -202,42 +249,57 @@ class SpotifyPlayer:
     
     def play(self, query: str):
         """
-        Search and return playable result for chat
+        🚀 ENHANCED play - intelligently determines what to search for
         
         Args:
-            query: What to play (song name, artist, etc)
+            query: What to play (song name, artist, genre, mood, etc)
             
         Returns:
             Dict with embed URL and metadata for chat display
         """
-        # Determine search type from query
-        search_type = "track"  # Default to track
+        query_lower = query.lower().strip()
+        search_type = "track"  # Default
+        clean_query = query_lower
         
-        query_lower = query.lower()
-        if "playlist" in query_lower:
+        # === SMART TYPE DETECTION ===
+        # Playlist indicators
+        if any(kw in query_lower for kw in ["playlist", "mix", "collection"]):
             search_type = "playlist"
-            query = query_lower.replace("playlist", "").strip()
-        elif "album" in query_lower:
+            clean_query = query_lower.replace("playlist", "").replace("mix", "").strip()
+        # Album indicators
+        elif any(kw in query_lower for kw in ["album", "ep ", "deluxe", "edition"]):
             search_type = "album"
-            query = query_lower.replace("album", "").strip()
-        elif "artist" in query_lower or "by" not in query_lower:
-            # If just a name with no "by", might be artist
-            pass
-            
-        # Search Spotify
-        results = self.search(query, search_type, limit=1)
+            clean_query = query_lower.replace("album", "").strip()
+        # Artist-only indicators (no song mentioned)
+        elif any(kw in query_lower for kw in ["songs by", "music by", "tracks by", "top songs"]):
+            search_type = "artist"
+            for phrase in ["songs by", "music by", "tracks by", "top songs by", "top songs"]:
+                clean_query = clean_query.replace(phrase, "").strip()
+        # Genre/mood → playlist
+        elif any(genre in query_lower for genre in ["chill", "sad", "happy", "party", "workout", "study", "sleep", "romantic", "bollywood", "hindi", "punjabi", "lofi", "jazz"]):
+            search_type = "playlist"
+        
+        # === PRIMARY SEARCH ===
+        results = self.search(clean_query, search_type, limit=5)
+        
+        # === FALLBACK: If no track found, try as artist ===
+        if results.get("status") == "success" and not results.get("results") and search_type == "track":
+            print(f"[Spotify] No track found, trying as artist...")
+            results = self.search(clean_query, "artist", limit=3)
         
         if results.get("status") == "success" and results.get("results"):
+            # Use actual search type from results (may have changed)
+            actual_type = results.get("type", search_type)
             item = results["results"][0]
             
             # Format response for chat
-            if search_type == "track":
-                message = f"🎵 Now playing: **{item['name']}** by {item['artists']}"
-            elif search_type == "artist":
+            if actual_type == "track":
+                message = f"🎵 Now playing: **{item['name']}** by {item.get('artists', 'Unknown')}"
+            elif actual_type == "artist":
                 message = f"🎤 Playing top tracks from **{item['name']}**"
-            elif search_type == "album":
-                message = f"💿 Playing album: **{item['name']}** by {item['artists']}"
-            elif search_type == "playlist":
+            elif actual_type == "album":
+                message = f"💿 Playing album: **{item['name']}** by {item.get('artists', 'Unknown')}"
+            elif actual_type == "playlist":
                 message = f"📋 Playing playlist: **{item['name']}** ({item.get('tracks_total', 0)} tracks)"
             else:
                 message = f"🎵 Playing: **{item['name']}**"
@@ -252,14 +314,14 @@ class SpotifyPlayer:
                     "thumbnail": item.get("thumbnail"),
                     "external_url": item["external_url"],
                     "artists": item.get("artists", ""),
-                    "search_type": search_type
+                    "search_type": actual_type
                 }
             }
         else:
             # Fallback message
             return {
                 "status": "not_found",
-                "message": f"🔍 Couldn't find '{query}' on Spotify. Try a different search term.",
+                "message": f"🔍 Couldn't find '{query}' on Spotify. Try being more specific (e.g., 'Shape of You by Ed Sheeran').",
                 "type": "text"
             }
     

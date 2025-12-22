@@ -184,10 +184,6 @@ def FirstLayerDMM(prompt: str = "test"):
         elif trigger_type == "code":
             # Handle Code Execution - NEW
             return [f"code {command}"]
-        
-        elif trigger_type == "anime":
-            # Handle Anime Streaming - NEW
-            return [f"anime {command}"]
     
     # AUTO-DETECT PDF/SUPABASE URLs in message (for direct URL summarization)
     import re
@@ -209,11 +205,6 @@ def FirstLayerDMM(prompt: str = "test"):
     code_keywords = ["run this code", "execute code", "write python", "debug code", "fix this error"]
     if any(kw in prompt_lower for kw in code_keywords):
         return [f"code {prompt}"]
-    
-    # AUTO-DETECT ANIME REQUESTS
-    anime_keywords = ["watch anime", "play anime", "stream anime", "trending anime", "search anime", "anime episode"]
-    if any(kw in prompt_lower for kw in anime_keywords):
-        return [f"anime {prompt}"]
     
     # FAST REGEX PATTERNS (50-100ms response)
     if "time" in prompt_lower and "what" in prompt_lower:

@@ -167,92 +167,46 @@ class SmartTrigger:
                 "keywords": ["open", "close", "launch", "start", "quit"]
             },
             
-            # 🎵 Music & Spotify - BEAST MODE
+            # 🎵 SPOTIFY - ULTRA ENHANCED Music Detection
             "spotify": {
                 "patterns": [
-                    # Direct play commands
-                    r"(?:jarvis\s+)?play\s+(.+?)(?:\s+on\s+spotify)?$",
-                    r"(?:jarvis\s+)?(?:play|put on|queue)\s+(?:the\s+)?(?:song\s+)?(.+?)(?:\s+by\s+.+)?",
-                    r"(?:jarvis\s+)?(?:play|listen to)\s+(.+?)\s+by\s+(.+)",
-                    # Spotify specific
+                    # Direct play with optional artist
+                    r"(?:jarvis\s+)?play\s+(.+?)(?:\s+by\s+(.+))?(?:\s+on\s+spotify)?$",
+                    r"(?:jarvis\s+)?(?:play|put on|queue)\s+(?:the\s+)?(?:song\s+)?(.+)",
+                    # Spotify commands
                     r"(?:jarvis\s+)?spotify\s+(?:play\s+)?(.+)?",
-                    r"(?:jarvis\s+)?(?:play|stream)\s+(?:some\s+)?music",
-                    r"(?:jarvis\s+)?(?:play|put on)\s+(?:my|some)\s+(?:liked\s+songs|favorites|playlist)",
+                    r"(?:jarvis\s+)?(?:play|stream)\s+(?:some\s+)?(?:music|songs?)",
                     # Artist/album commands
                     r"(?:jarvis\s+)?play\s+(?:songs?\s+)?(?:by|from)\s+(.+)",
-                    r"(?:jarvis\s+)?play\s+(?:the\s+)?album\s+(.+)",
+                    r"(?:jarvis\s+)?play\s+(?:the\s+)?(?:album|playlist)\s+(.+)",
+                    # Genre/mood commands
+                    r"(?:jarvis\s+)?play\s+(?:some\s+)?(?:chill|sad|happy|party|workout|study|sleep|romantic|bollywood|hindi|punjabi|lofi)\s*(?:music|songs?)?",
                     # Controls
                     r"(?:jarvis\s+)?(?:pause|stop|resume|next|skip|previous)\s*(?:song|track|music)?",
                 ],
                 "keywords": [
-                    # Core keywords
-                    "play", "play music", "play song", "play spotify",
-                    "spotify", "spotify play", "on spotify",
-                    "listen to", "listen to music", "put on",
-                    # Playback
-                    "pause", "pause music", "stop music", "resume", "resume music",
-                    "next song", "skip", "skip song", "previous song", "previous",
-                    # Discovery
-                    "play something", "music", "song", "track", "album",
-                    "liked songs", "my playlist", "favorites",
-                    # Genres
-                    "play pop", "play rock", "play hip hop", "play jazz",
-                    "play classical", "play edm", "play country"
-                ]
-            },
-            
-            # Web Scraping - Enhanced patterns
-            "scrape": {
-                "patterns": [
-                    r"(?:jarvis\s+)?(?:scrape|extract|get)\s+(?:data\s+)?(?:from\s+)?(.+)",
-                    r"(?:jarvis\s+)?(?:fetch|retrieve)\s+(?:information\s+)?(?:from\s+)?(.+)",
-                    r"(?:jarvis\s+)?(?:analyze|read|parse)\s+(?:the\s+)?(?:website|page|site)\s+(.+)",
-                    r"(?:jarvis\s+)?(?:what's on|what is on|summarize)\s+(.+\.(?:com|org|net|io|co).*)",
-                ],
-                "keywords": [
-                    "scrape", "scrape website", "scrape url", "scrape page",
-                    "extract data", "extract from", "get data from",
-                    "fetch website", "fetch page", "fetch url",
-                    "analyze website", "analyze page", "read website",
-                    "parse website", "parse page", "get content from"
-                ]
-            },
-            
-            # Live Streams (Radio & TV) - NEW
-            "stream": {
-                "patterns": [
-                    r"(?:jarvis\s+)?(?:play|stream|tune\s+in\s+to)\s+(?:the\s+)?(?:radio|music\s+radio|live\s+radio)\s*(.+)?",
-                    r"(?:jarvis\s+)?(?:play|watch|stream)\s+(?:live\s+)?(?:tv|news|television)\s*(.+)?",
-                    r"(?:jarvis\s+)?(?:listen\s+to|tune\s+to)\s+(.+?)(?:\s+radio|\s+stream)?",
-                    r"(?:jarvis\s+)?(?:play|stream)\s+(?:lofi|jazz|classical|ambient|focus|chill)\s*(?:music|radio|beats)?",
-                ],
-                "keywords": [
-                    "play radio", "stream radio", "live radio", "tune in",
-                    "listen to radio", "lofi radio", "jazz radio", "classical radio",
-                    "stream lofi", "chill beats radio", "focus radio",
-                    "watch news", "live news", "stream news", "live tv",
-                    "watch tv", "stream tv", "news channel", "sky news", "bbc news",
-                    "ambient radio", "nature sounds radio", "rain sounds radio"
-                ]
-            },
-            
-            # Spotify Music - NEW (for songs, artists, albums)
-            "spotify": {
-                "patterns": [
-                    r"(?:jarvis\s+)?(?:play|listen to)\s+(?:the\s+)?(?:song\s+)?(.+?)(?:\s+on\s+spotify)?",
-                    r"(?:jarvis\s+)?(?:spotify|music)\s+(.+)",
-                    r"(?:jarvis\s+)?(?:play|queue)\s+(?:some\s+)?(.+?)(?:\s+music)?",
-                ],
-                "keywords": [
-                    "play", "play music", "play song", "play songs", "listen to",
-                    "spotify", "on spotify", "play on spotify",
-                    "play artist", "play album", "play playlist",
-                    "queue", "queue song", "add to queue",
+                    # Core play commands
+                    "play", "play music", "play song", "play songs", "play a song",
+                    "spotify", "spotify play", "on spotify", "play on spotify",
+                    "listen to", "listen to music", "put on", "queue",
+                    # Artist/album
+                    "play artist", "play album", "play playlist", "songs by", "music by",
                     "play drake", "play taylor", "play weeknd", "play ed sheeran",
-                    "play pop", "play rock", "play hip hop", "play jazz music",
-                    "play classical music", "play indie", "play electronic",
-                    "play lofi", "play chill", "play relaxing music",
-                    "what song", "next song", "skip song", "previous song"
+                    "play arijit", "play ap dhillon", "play diljit", "play badshah",
+                    # Genres (expanded)
+                    "play pop", "play rock", "play hip hop", "play jazz", "play rnb",
+                    "play classical", "play edm", "play country", "play indie",
+                    "play electronic", "play metal", "play reggae", "play folk",
+                    # Moods
+                    "play chill", "play sad", "play happy", "play party",
+                    "play relaxing", "play upbeat", "play romantic", "play workout",
+                    "play study", "play focus", "play sleep", "play lofi",
+                    # Regional
+                    "play bollywood", "play hindi", "play punjabi", "play tamil",
+                    "play telugu", "play kannada", "play marathi", "play bhojpuri",
+                    # Controls
+                    "pause", "pause music", "stop music", "resume", "resume music",
+                    "next song", "skip", "skip song", "previous song", "previous"
                 ]
             },
             
@@ -517,25 +471,7 @@ class SmartTrigger:
                     "run code", "run this code", "execute code", "execute python",
                     "write code", "write python", "create code", "generate code",
                     "debug code", "fix code", "fix this error", "debug this",
-                    "explain code", "what does this code do", "help me code",
                     "write a script", "code for", "program that", "python code"
-                ]
-            },
-            
-            # Anime Streaming (NEW)
-            "anime": {
-                "patterns": [
-                    r"(?:jarvis\s+)?(?:watch|play|stream)\s+(?:anime\s+)?(.+?)(?:\s+episode\s+(\d+))?",
-                    r"(?:jarvis\s+)?(?:search|find)\s+(?:anime\s+)?(.+)",
-                    r"(?:jarvis\s+)?(?:trending|popular)\s+anime",
-                    r"(?:jarvis\s+)?(?:anime\s+)?(?:info|details|about)\s+(.+)",
-                    r"(?:jarvis\s+)?(?:what|which)\s+anime\s+(?:to watch|is good|is trending)",
-                ],
-                "keywords": [
-                    "watch anime", "play anime", "stream anime", "anime episode",
-                    "search anime", "find anime", "trending anime", "popular anime",
-                    "anime info", "anime details", "anime this season",
-                    "what anime", "which anime", "best anime", "new anime"
                 ]
             }
         }
