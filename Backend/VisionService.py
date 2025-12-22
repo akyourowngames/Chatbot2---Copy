@@ -19,7 +19,7 @@ env_vars = dotenv_values(env_path)
 
 class VisionService:
     def __init__(self):
-        self.models = ["models/gemini-2.0-flash", "models/gemini-1.5-flash-latest", "gemini-pro-vision"]
+        self.models = ["models/gemini-2.5-flash", "models/gemini-2.0-flash", "models/gemini-flash-latest", "models/gemini-pro-latest"]
         self.api_keys = self._load_api_keys()
         self.current_key_idx = 0
         
