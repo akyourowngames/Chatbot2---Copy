@@ -3576,17 +3576,15 @@ def speech_synthesize():
         return jsonify({"error": str(e)}), 500
 
 # --- VISION & IMAGES ---
-@app.route('/api/v1/vision/analyze', methods=['POST'])
+# Note: /api/v1/vision/analyze endpoint is defined in the VISION API section below (line ~5431)
+# This section now only handles screen-based analysis via a different endpoint
+
+@app.route('/api/v1/vision/screen', methods=['POST'])
 @require_api_key
-def vision_analyze():
+def vision_screen_analyze():
+    """Analyze the current screen (screenshot-based) - for desktop automation"""
     data = request.json
     query = data.get('query', 'Describe this screen')
-    
-    # Check if image file uploaded
-    # For now, Vision.py captures screenshot. 
-    # To support upload, we need to modify Vision.py or handle it here.
-    # The user "Vision Analysis" feature usually implies looking at the screen (JARVIS eyes).
-    # But if there is a file upload...
     
     try:
         if VisionAnalysis:
@@ -3595,9 +3593,6 @@ def vision_analyze():
             # Save to history for context awareness
             try:
                 from Backend.Chatbot_Enhanced import add_interaction_to_history
-                # context_query = f"[User uploaded an image/screenshot] {query}"
-                # actually, usually query is "Describe this screen". 
-                # We'll tag it clearly.
                 add_interaction_to_history(query, result)
             except Exception as h_err:
                 print(f"[WARN] Failed to save vision to history: {h_err}")
