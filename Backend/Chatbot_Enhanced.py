@@ -288,13 +288,26 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
         
         print(f"[CHAT] Response generated in {generation_time:.2f}s using {model_name}")
         
-        return AnswerModifier(Answer=Answer)
+        # Return dict with metadata for API
+        return {
+            "response": AnswerModifier(Answer=Answer),
+            "metadata": {
+                "memory_saved": True if "Saved to memory" in Answer or "Remembered" in Answer else False, # Simple heuristic for now, better if ContextualMemory returns status
+                "memory_accessed": bool(ConversationContext),
+                "model": model_name,
+                "provider": provider,
+                "generation_time": generation_time
+            }
+        }
     
     except Exception as e:
         import traceback
         print(f"[CHAT] Error: {e}")
         traceback.print_exc()
-        return "I encountered an error processing your request. Please try again."
+        return {
+            "response": "I encountered an error processing your request. Please try again.",
+            "metadata": {"error": str(e)}
+        }
 
 
 def _call_gemini(messages: list, model_name: str = "gemini-2.0-flash-exp") -> str:

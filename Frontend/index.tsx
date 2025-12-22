@@ -71,6 +71,117 @@ const chatHistoryList = document.getElementById('chat-history-list');
 const sessionIdDisplay = document.getElementById('session-id-display');
 const attachmentArea = document.getElementById('attachment-area');
 const authForm = document.getElementById('auth-form') as HTMLFormElement;
+
+// === MEMORY CORE VISUALIZATION ===
+// Inject styles for the brain pulse
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes brainPulse {
+    0% { transform: scale(1); filter: drop-shadow(0 0 0px #6366f1); }
+    50% { transform: scale(1.1); filter: drop-shadow(0 0 10px #818cf8); }
+    100% { transform: scale(1); filter: drop-shadow(0 0 0px #6366f1); }
+  }
+  .brain-active { animation: brainPulse 2s infinite ease-in-out; }
+  .memory-toast {
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #e0e7ff; padding: 12px 20px; border-radius: 8px;
+    backdrop-filter: blur(10px); box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transform: translateY(-20px); opacity: 0; transition: all 0.3s ease;
+    display: flex; align-items: center; gap: 10px; font-family: monospace; font-size: 12px;
+  }
+  .memory-toast.show { transform: translateY(0); opacity: 1; }
+`;
+document.head.appendChild(style);
+
+// Memory Core UI Injection
+function injectMemoryCore() {
+    const sidebarHeader = document.querySelector('#sidebar .p-4.border-b');
+    if (sidebarHeader && !document.getElementById('memory-core-container')) {
+        const coreHTML = `
+            <div id="memory-core-container" class="mt-4 p-3 bg-black/20 rounded-lg border border-white/5 flex items-center justify-between group cursor-pointer hover:bg-white/5 transition-colors">
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <div id="brain-icon" class="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400 transition-all duration-500">
+                            <i data-lucide="brain-circuit" class="w-5 h-5"></i>
+                        </div>
+                        <div id="memory-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-[#0f172a] opacity-0 transition-opacity"></div>
+                    </div>
+                    <div>
+                        <div class="text-[11px] font-mono text-indigo-300 uppercase tracking-wider">Memory Core</div>
+                        <div id="memory-status" class="text-[10px] text-white/40">Online - Idle</div>
+                    </div>
+                </div>
+                <div class="text-xs text-white/20 group-hover:text-white/60 transition-colors">
+                    <i data-lucide="database" class="w-3 h-3"></i>
+                </div>
+            </div>
+        `;
+        sidebarHeader.insertAdjacentHTML('beforeend', coreHTML);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+}
+
+function triggerMemoryPulse(action: 'save' | 'access' | 'idle') {
+    const brain = document.getElementById('brain-icon');
+    const status = document.getElementById('memory-status');
+    const dot = document.getElementById('memory-dot');
+
+    if (!brain || !status) return;
+
+    if (action === 'save') {
+        brain.classList.add('brain-active');
+        brain.classList.replace('text-indigo-400', 'text-emerald-400');
+        brain.classList.replace('bg-indigo-500/10', 'bg-emerald-500/10');
+        status.textContent = "WRITING TO CLOUD...";
+        status.classList.add('text-emerald-400');
+        if (dot) dot.style.opacity = '1';
+
+        showMemoryToast("Values saved to Long-Term Memory", 'save');
+
+        setTimeout(() => {
+            brain.classList.remove('brain-active');
+            brain.classList.replace('text-emerald-400', 'text-indigo-400');
+            brain.classList.replace('bg-emerald-500/10', 'bg-indigo-500/10');
+            status.textContent = "Online - Idle";
+            status.classList.remove('text-emerald-400');
+            if (dot) dot.style.opacity = '0';
+        }, 3000);
+    }
+    else if (action === 'access') {
+        brain.classList.add('brain-active');
+        brain.classList.replace('text-indigo-400', 'text-cyan-400');
+        status.textContent = "ACCESSING CLOUD...";
+        status.classList.add('text-cyan-400');
+
+        setTimeout(() => {
+            brain.classList.remove('brain-active');
+            brain.classList.replace('text-cyan-400', 'text-indigo-400');
+            status.textContent = "Online - Idle";
+            status.classList.remove('text-cyan-400');
+        }, 2000);
+    }
+}
+
+function showMemoryToast(msg: string, type: 'save' | 'info') {
+    const toast = document.createElement('div');
+    toast.className = 'memory-toast';
+    toast.innerHTML = `
+        <i data-lucide="${type === 'save' ? 'save' : 'brain-circuit'}" class="w-4 h-4 ${type === 'save' ? 'text-emerald-400' : 'text-cyan-400'}"></i>
+        <span>${msg}</span>
+    `;
+    document.body.appendChild(toast);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Animate in
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    // Remove after 3s
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
 const authEmail = document.getElementById('auth-email') as HTMLInputElement;
 const authPassword = document.getElementById('auth-password') as HTMLInputElement;
 const authSubmitBtn = document.getElementById('auth-submit-btn') as HTMLButtonElement;
@@ -301,6 +412,7 @@ async function runBootSequence(user?: any): Promise<void> {
 
     if (stage4 && seizedBox) {
         stage4.classList.remove('hidden');
+        injectMemoryCore(); // <--- INJECT MEMORY CORE HERE
         if (flash) {
             flash.style.opacity = '1';
             setTimeout(() => { if (flash) flash.style.opacity = '0'; }, 150);
@@ -1448,10 +1560,20 @@ if (auth) {
         });
         const data = await response.json();
 
-        // 🔍 DEBUG: Log API response to trace Spotify/media metadata
-        LOG.info('API', 'Response received', { type: data.type, hasSpotify: !!data.spotify, hasAnime: !!data.anime });
+        // 🧠 MEMORY VISUALIZATION TRIGGER
+        // Check for metadata from the new ChatBot return structure
+        if (data.metadata) {
+            if (data.metadata.memory_saved) {
+                triggerMemoryPulse('save');
+            } else if (data.metadata.memory_accessed) {
+                triggerMemoryPulse('access');
+            }
+        }
+
+        // 🔍 DEBUG: Log API response
+        LOG.info('API', 'Response received', { type: data.type, hasSpotify: !!data.spotify, metadata: data.metadata });
+
         if (data.type === 'spotify' || data.type === 'music') {
-            LOG.info('SPOTIFY', 'Full response data', data);
             LOG.info('SPOTIFY', 'Embed URL', data.spotify?.embed_url);
         }
 
@@ -1815,7 +1937,8 @@ function stopListening() {
     if (document.body.classList.contains('overlay-mode')) {
         sidebar!.style.display = 'none';
         document.body.style.background = 'transparent';
-        // More styles would be needed in CSS, but this is a start
+        // More styles would be needed in CSS, but// This is a placeholder as I need to find the function first.
+        // I will cancel this tool call and use view_file.t
         notify('MINI_MODE ACTIVE');
     } else {
         sidebar!.style.display = 'flex';
