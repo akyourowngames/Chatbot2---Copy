@@ -2,7 +2,8 @@
 Contextual Memory System - JARVIS Level (UPGRADED)
 ===================================================
 Remembers conversation context, learns preferences, builds knowledge graph.
-Now with: importance scoring, categories, auto-extraction, and semantic integration.
+Now with: importance scoring, categories, auto-extraction, semantic integration.
+UPGRADED: Supabase sync for persistence across server restarts!
 """
 
 import json
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ContextualMemory:
-    """Enhanced contextual memory with intelligence features"""
+    """Enhanced contextual memory with Supabase persistence"""
     
     # Memory categories
     CATEGORIES = ["personal", "work", "preference", "task", "emotion", "project", "general"]
@@ -31,11 +32,15 @@ class ContextualMemory:
         # Integration with intelligence modules (lazy load)
         self._memory_intel = None
         self._semantic_memory = None
+        self._supabase = None  # Lazy-loaded Supabase connection
+        
+        # === LOAD FROM SUPABASE ON STARTUP ===
+        self._sync_from_cloud()
         
         logger.info(f"[MEMORY] Loaded {len(self.memory.get('facts', []))} facts, {len(self.memory.get('conversations', []))} conversations")
         
     def _load_memory(self) -> Dict:
-        """Load long-term memory"""
+        """Load long-term memory from local file (fast cache)"""
         if os.path.exists(self.memory_file):
             try:
                 with open(self.memory_file, 'r', encoding='utf-8') as f:
@@ -81,14 +86,58 @@ class ContextualMemory:
             "context_window": []  # NEW: sliding context window
         }
     
+    @property
+    def supabase(self):
+        """Lazy load Supabase connection"""
+        if self._supabase is None:
+            try:
+                from Backend.SupabaseDB import supabase_db
+                self._supabase = supabase_db
+            except Exception as e:
+                logger.warning(f"[MEMORY] Supabase not available: {e}")
+        return self._supabase
+    
+    def _sync_from_cloud(self):
+        """Load memories from Supabase on startup"""
+        if self.supabase:
+            try:
+                cloud_memories = self.supabase.get_memories(limit=200)
+                if cloud_memories:
+                    # Merge cloud memories with local
+                    local_contents = set(f.get('content', '') for f in self.memory.get('facts', []))
+                    for mem in cloud_memories:
+                        if mem.get('content') and mem['content'] not in local_contents:
+                            self.memory['facts'].append({
+                                'id': mem.get('id', ''),
+                                'content': mem['content'],
+                                'category': mem.get('category', 'general'),
+                                'importance': mem.get('importance', 0.5),
+                                'timestamp': mem.get('created_at', datetime.now().isoformat()),
+                                'last_accessed': mem.get('last_accessed', datetime.now().isoformat()),
+                                'access_count': mem.get('access_count', 0),
+                                'confidence': 1.0,
+                                'cloud_synced': True
+                            })
+                    logger.info(f"[MEMORY] 🌐 Synced {len(cloud_memories)} memories from Supabase")
+                    self._save_memory_local()  # Save to local cache
+            except Exception as e:
+                logger.warning(f"[MEMORY] Cloud sync error (will use local): {e}")
+    
     def _save_memory(self):
-        """Save memory to file"""
+        """Save memory to both local file AND Supabase"""
+        # Local save (fast cache)
+        self._save_memory_local()
+        
+        # Cloud sync happens in remember_fact directly
+    
+    def _save_memory_local(self):
+        """Save memory to local file only"""
         try:
             os.makedirs(os.path.dirname(self.memory_file), exist_ok=True)
             with open(self.memory_file, 'w', encoding='utf-8') as f:
                 json.dump(self.memory, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            logger.error(f"[MEMORY] Save error: {e}")
+            logger.error(f"[MEMORY] Local save error: {e}")
     
     @property
     def memory_intel(self):
@@ -114,7 +163,7 @@ class ContextualMemory:
     
     def remember_fact(self, fact: str, category: str = "general") -> bool:
         """
-        Store a new fact with metadata
+        Store a new fact with metadata - NOW SYNCS TO SUPABASE!
         
         Args:
             fact: The fact to remember
@@ -158,13 +207,32 @@ class ContextualMemory:
         
         self.memory["facts"].append(fact_entry)
         
+        
+        # === SYNC TO SUPABASE (PERSISTENT) ===
+        # Do this FIRST to ensure data is saved even if semantic memory fails
+        if self.supabase:
+            try:
+                self.supabase.save_memory(
+                    content=fact,
+                    category=category,
+                    importance=importance,
+                    metadata={"source": "contextual_memory"}
+                )
+                fact_entry["cloud_synced"] = True
+                logger.info(f"[MEMORY] ☁️ Synced to Supabase: {fact[:40]}...")
+            except Exception as e:
+                logger.warning(f"[MEMORY] Cloud sync failed (saved locally): {e}")
+
         # Also add to semantic memory for vector search
-        if self.semantic_memory:
-            self.semantic_memory.add_memory(fact, {
-                "category": category,
-                "importance": importance,
-                "source": "contextual"
-            })
+        try:
+            if self.semantic_memory:
+                self.semantic_memory.add_memory(fact, {
+                    "category": category,
+                    "importance": importance,
+                    "source": "contextual"
+                })
+        except Exception as e:
+            logger.warning(f"[MEMORY] Semantic memory update failed: {e}")
         
         self._save_memory()
         logger.info(f"[MEMORY] Remembered: {fact[:50]}... (category: {category})")

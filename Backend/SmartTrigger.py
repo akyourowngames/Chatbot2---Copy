@@ -1,22 +1,39 @@
 """
-Smart Trigger System - JARVIS Level
-====================================
-Intelligent phrase detection with flexible activation
+Smart Trigger System - JARVIS Level (UPGRADED)
+===============================================
+Intelligent phrase detection with ENSEMBLE approach:
+Regex patterns + Semantic classifier for best accuracy.
 """
 
 import re
 from typing import List, Tuple, Optional
 
 class SmartTrigger:
-    def __init__(self, use_classifier=False):
+    def __init__(self, use_classifier=True):  # ENABLED BY DEFAULT
         self.use_classifier = use_classifier
         self.classifier = None
+        
+        # === INTENT MAPPING: LocalClassifier -> SmartTrigger ===
+        self.classifier_intent_map = {
+            "vision_analysis": "vision",
+            "web_search": "chrome",
+            "memory_update": "memory",
+            "memory_query": "memory",
+            "code_generation": "code",
+            "system_command": "system",
+            "file_operation": "file",
+            "workflow_trigger": "workflow",
+            "chat_response": "general",
+            "conversation_meta": "general"
+        }
+        
         if self.use_classifier:
             try:
                 from Backend.LocalClassifier import LocalClassifier
-                self.classifier = LocalClassifier(use_model=True)
+                self.classifier = LocalClassifier(use_model=False)  # Fast keyword mode
+                print("[SmartTrigger] 🧠 Classifier ENABLED for ensemble detection")
             except Exception as e:
-                print(f"[SmartTrigger] Failed to load LocalClassifier: {e}")
+                print(f"[SmartTrigger] Classifier load error: {e}")
         
         # Define trigger patterns with flexibility
         self.triggers = {
@@ -505,30 +522,24 @@ class SmartTrigger:
                 if 0.7 > regex_result[2]:  # Only if no better match found
                     regex_result = (trigger_name, query, 0.7)
 
-        # 2. SEMANTIC CLASSIFICATION (Run in parallel if classifier available)
+        # 2. SEMANTIC CLASSIFICATION (Run if classifier available)
         if self.use_classifier and self.classifier:
             try:
                 result = self.classifier.classify(query)
                 intent = result.get("intent")
                 conf = result.get("confidence", 0.0)
                 
-                # Map classifier intent to SmartTrigger types
-                mapping = {
-                    "vision_analysis": "vision",
-                    "web_search": "chrome",
-                    "memory_update": "memory",
-                    "memory_query": "memory",
-                    "code_generation": "general",
-                    "system_command": "system",
-                    "file_operation": "file",
-                    "chat_response": "general"
-                }
+                # Use class-level intent mapping
+                mapped_trigger = self.classifier_intent_map.get(intent, "general")
                 
-                mapped_trigger = mapping.get(intent, "general")
+                # Only use classifier result if it's actionable and confident
                 if mapped_trigger != "general" and conf > 0.4:
                     semantic_result = (mapped_trigger, query, conf)
+                elif mapped_trigger == "general" and conf > 0.6:
+                    # High confidence general = let it through
+                    semantic_result = ("general", query, conf * 0.8)
             except Exception as e:
-                print(f"[SmartTrigger] Semantic classification error: {e}")
+                print(f"[SmartTrigger] Classifier error: {e}")
 
         # 3. ENSEMBLE: Compare and return BEST result
         print(f"[SmartTrigger-Ensemble] Regex: {regex_result[0]}({regex_result[2]:.2f}), Semantic: {semantic_result[0]}({semantic_result[2]:.2f})")

@@ -498,6 +498,171 @@ class SupabaseDB:
         except Exception as e:
             logger.error(f"[SUPABASE] Get WhatsApp history error: {e}")
             return []
+    
+    # ==================== KAI MEMORIES (PERSISTENT) ====================
+    
+    def save_memory(self, content: str, category: str = "general", 
+                    importance: float = 0.5, metadata: dict = None, 
+                    user_id: str = "default") -> bool:
+        """
+        Save a memory to Supabase for persistence.
+        
+        Args:
+            content: The memory content
+            category: Category (personal, work, preference, etc.)
+            importance: Importance score 0-1
+            metadata: Additional metadata
+            user_id: User identifier
+            
+        Returns:
+            True if saved successfully
+        """
+        try:
+            # Check for duplicate using content similarity
+            existing = self.search_memories(content, user_id, limit=1)
+            if existing and self._is_similar(existing[0].get('content', ''), content):
+                # Update existing instead
+                self.client.table('kai_memories').update({
+                    'importance': max(existing[0].get('importance', 0.5), importance),
+                    'access_count': existing[0].get('access_count', 0) + 1,
+                    'last_accessed': datetime.now().isoformat()
+                }).eq('id', existing[0]['id']).execute()
+                logger.info(f"[MEMORY] Updated existing: {content[:50]}...")
+                return True
+            
+            # Insert new memory
+            self.client.table('kai_memories').insert({
+                'user_id': user_id,
+                'content': content,
+                'category': category,
+                'importance': importance,
+                'metadata': json.dumps(metadata or {}),
+                'access_count': 0,
+                'last_accessed': datetime.now().isoformat()
+            }).execute()
+            
+            logger.info(f"[MEMORY] Saved: {content[:50]}... (category: {category})")
+            return True
+            
+        except Exception as e:
+            error_str = str(e).lower()
+            # Auto-create table if it doesn't exist
+            if "relation" in error_str and "does not exist" in error_str:
+                logger.info("[MEMORY] Table doesn't exist, creating kai_memories...")
+                if self._create_memories_table():
+                    return self.save_memory(content, category, importance, metadata, user_id)
+            logger.error(f"[MEMORY] Save error: {e}")
+            return False
+    
+    def _is_similar(self, text1: str, text2: str, threshold: float = 0.8) -> bool:
+        """Check text similarity for deduplication"""
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        if not words1 or not words2:
+            return False
+        overlap = len(words1.intersection(words2))
+        max_len = max(len(words1), len(words2))
+        return (overlap / max_len) >= threshold
+    
+    def _create_memories_table(self) -> bool:
+        """Create kai_memories table via RPC or direct SQL"""
+        try:
+            # Try using Supabase RPC if available
+            self.client.rpc('create_kai_memories_table', {}).execute()
+            logger.info("[MEMORY] Created kai_memories table via RPC")
+            return True
+        except Exception as rpc_error:
+            logger.warning(f"[MEMORY] RPC failed, table may need manual creation: {rpc_error}")
+            # Return False - table needs to be created manually in Supabase dashboard
+            return False
+    
+    def get_memories(self, user_id: str = "default", category: str = None, 
+                     limit: int = 50) -> list:
+        """
+        Get memories for a user.
+        
+        Args:
+            user_id: User identifier
+            category: Optional category filter
+            limit: Max memories to return
+            
+        Returns:
+            List of memory dicts
+        """
+        try:
+            query = self.client.table('kai_memories').select('*').eq('user_id', user_id)
+            
+            if category:
+                query = query.eq('category', category)
+            
+            data = query.order('importance', desc=True).order('last_accessed', desc=True).limit(limit).execute()
+            return data.data if data.data else []
+            
+        except Exception as e:
+            logger.error(f"[MEMORY] Get memories error: {e}")
+            return []
+    
+    def search_memories(self, query: str, user_id: str = "default", limit: int = 10) -> list:
+        """
+        Search memories by content.
+        
+        Args:
+            query: Search query
+            user_id: User identifier
+            limit: Max results
+            
+        Returns:
+            List of matching memories
+        """
+        try:
+            data = self.client.table('kai_memories')\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .ilike('content', f'%{query}%')\
+                .order('importance', desc=True)\
+                .limit(limit)\
+                .execute()
+            
+            # Update access count for found memories
+            if data.data:
+                for mem in data.data:
+                    try:
+                        self.client.table('kai_memories').update({
+                            'access_count': mem.get('access_count', 0) + 1,
+                            'last_accessed': datetime.now().isoformat()
+                        }).eq('id', mem['id']).execute()
+                    except:
+                        pass
+            
+            return data.data if data.data else []
+            
+        except Exception as e:
+            logger.error(f"[MEMORY] Search error: {e}")
+            return []
+    
+    def get_memory_stats(self, user_id: str = "default") -> dict:
+        """Get memory statistics for a user"""
+        try:
+            data = self.client.table('kai_memories')\
+                .select('category')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if not data.data:
+                return {"total": 0, "categories": {}}
+            
+            categories = {}
+            for mem in data.data:
+                cat = mem.get('category', 'general')
+                categories[cat] = categories.get(cat, 0) + 1
+            
+            return {
+                "total": len(data.data),
+                "categories": categories
+            }
+        except Exception as e:
+            logger.error(f"[MEMORY] Stats error: {e}")
+            return {"total": 0, "categories": {}}
 
 # Import timedelta for analytics
 from datetime import timedelta
