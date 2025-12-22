@@ -1080,6 +1080,59 @@
         </div>
     </main>
 
+    <!-- CANVAS SIDEBAR -->
+    <div id="canvas-backdrop"
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] opacity-0 pointer-events-none transition-opacity duration-300"
+        onclick="closeCanvas()"></div>
+
+    <aside id="canvas-panel"
+        class="fixed top-0 right-0 h-full w-full md:w-[600px] lg:w-[700px] bg-[#0a0a0f]/98 backdrop-blur-xl border-l border-indigo-500/20 z-[90] transform translate-x-full transition-transform duration-300 ease-out flex flex-col shadow-2xl">
+        <!-- Canvas Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                    <i data-lucide="file-text" class="w-4 h-4 text-indigo-400"></i>
+                </div>
+                <div>
+                    <div id="canvas-title" class="text-sm font-bold text-white">Canvas Draft</div>
+                    <div class="text-[9px] font-mono text-white/40 uppercase tracking-widest">DOCUMENT_BUFFER</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="copyCanvasContent()"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-mono text-white/60 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded transition-all uppercase tracking-widest">
+                    <i data-lucide="copy" class="w-3 h-3"></i> Copy
+                </button>
+                <button onclick="downloadCanvasContent()"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-mono text-white/60 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded transition-all uppercase tracking-widest">
+                    <i data-lucide="download" class="w-3 h-3"></i> Download
+                </button>
+                <button onclick="closeCanvas()"
+                    class="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded transition-all ml-2">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Content -->
+        <div id="canvas-content" class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div class="prose prose-invert prose-sm max-w-none">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+
+        <!-- Canvas Footer -->
+        <div class="px-6 py-3 border-t border-white/5 bg-black/40 flex items-center justify-between">
+            <div class="text-[9px] font-mono text-white/30 uppercase tracking-widest">
+                <span id="canvas-char-count">0</span> characters
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-[9px] font-mono text-indigo-400/60 uppercase tracking-widest">Canvas Mode</span>
+                <div class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+            </div>
+        </div>
+    </aside>
+
     <div id="notification-area" class="fixed top-20 right-6 w-80 z-[200] space-y-3 pointer-events-none"></div>
 
     <script src="index.tsx" type="module"></script>

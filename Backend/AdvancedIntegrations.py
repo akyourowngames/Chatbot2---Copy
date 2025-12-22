@@ -86,10 +86,10 @@ class AdvancedIntegrations:
     # ==================== NEWS ====================
     
     def get_news(self, topic: str = "technology", limit: int = 5) -> List[Dict]:
-        """Get latest news"""
+        """Get latest news using free GNews API"""
         try:
-            # Using free NewsAPI
-            url = f"https://newsapi.org/v2/everything?q={topic}&pageSize={limit}&apiKey=demo"
+            # Using free GNews API - no API key required
+            url = f"https://gnews.io/api/v4/search?q={topic}&max={limit}&lang=en&apikey=demo"
             response = requests.get(url, timeout=5)
             
             if response.status_code == 200:
@@ -98,16 +98,45 @@ class AdvancedIntegrations:
                 
                 for article in data.get('articles', [])[:limit]:
                     articles.append({
-                        "title": article['title'],
-                        "description": article['description'],
-                        "url": article['url'],
-                        "source": article['source']['name'],
-                        "published": article['publishedAt']
+                        "title": article.get('title', ''),
+                        "description": article.get('description', ''),
+                        "url": article.get('url', ''),
+                        "source": article.get('source', {}).get('name', 'Unknown'),
+                        "published": article.get('publishedAt', '')
+                    })
+                
+                if articles:
+                    return articles
+        except Exception as e:
+            print(f"[NEWS] GNews API failed: {e}")
+        
+        # Fallback: Use free RSS-based news
+        try:
+            # Use Google News RSS feed as fallback
+            import xml.etree.ElementTree as ET
+            rss_url = f"https://news.google.com/rss/search?q={topic}&hl=en-US&gl=US&ceid=US:en"
+            response = requests.get(rss_url, timeout=5)
+            
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+                articles = []
+                
+                for item in root.findall('.//item')[:limit]:
+                    title = item.find('title')
+                    link = item.find('link')
+                    source = item.find('source')
+                    
+                    articles.append({
+                        "title": title.text if title is not None else "Untitled",
+                        "description": "",
+                        "url": link.text if link is not None else "#",
+                        "source": source.text if source is not None else "Google News",
+                        "published": ""
                     })
                 
                 return articles
-        except:
-            pass
+        except Exception as e:
+            print(f"[NEWS] RSS fallback failed: {e}")
         
         return []
     

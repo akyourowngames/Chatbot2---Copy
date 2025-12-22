@@ -1777,19 +1777,27 @@ def chat():
                  response_msg = "Here is the information you requested."
                  
                  if trigger_type == "weather":
-                     # Extract city or default
-                     city = "London" # Default
-                     words = command.split()
-                     if "in" in words:
-                         try:
-                             city = words[words.index("in") + 1]
-                             # simple cleanup for "New York" etc
-                             if len(words) > words.index("in") + 2:
-                                  next_word = words[words.index("in") + 2]
-                                  if next_word[0].isupper():
-                                      city += " " + next_word
-                         except: pass
+                     # Extract city from command - improved parsing
+                     city = "London"  # Default
                      
+                     if command:
+                         words = command.split()
+                         if "in" in words:
+                             # Handle "weather in mumbai" format
+                             try:
+                                 idx = words.index("in")
+                                 city_parts = words[idx + 1:]
+                                 city = " ".join(city_parts) if city_parts else "London"
+                             except: pass
+                         else:
+                             # Handle "@weather mumbai" format - take remaining words as city
+                             # Filter out common non-city words
+                             skip_words = ["weather", "forecast", "temperature", "temp", "for", "the", "what", "is", "check", "show", "me", "get"]
+                             city_words = [w for w in words if w.lower() not in skip_words]
+                             if city_words:
+                                 city = " ".join(city_words)
+                     
+                     print(f"[WEATHER] Extracted city: {city}")
                      data = integrations.get_weather(city)
                      if "error" not in data:
                          response_msg = f"Current weather in {data['city']}: {data['temperature']}, {data['condition']}."

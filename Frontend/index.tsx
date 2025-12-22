@@ -80,16 +80,117 @@ const authProgress = document.getElementById('auth-progress') as HTMLElement;
 const authBar = document.getElementById('auth-bar') as HTMLElement;
 const authPercent = document.getElementById('auth-percent') as HTMLElement;
 
+// Code Block Counter for unique IDs
+let codeBlockCounter = 0;
+
+// Copy to clipboard function
+(window as any).copyCode = async (id: string) => {
+    const codeEl = document.querySelector(`#${id} code`);
+    const btn = document.querySelector(`#${id}-btn`) as HTMLElement;
+    if (!codeEl || !btn) return;
+
+    try {
+        await navigator.clipboard.writeText(codeEl.textContent || '');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> Copied!`;
+        btn.classList.add('text-emerald-400');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('text-emerald-400');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }, 2000);
+    } catch (e) {
+        LOG.error('CLIPBOARD', 'Copy failed', e);
+    }
+};
+
+// === 📄 CANVAS SIDEBAR ===
+let canvasRawContent = '';
+
+(window as any).openCanvas = (content: string, title: string = 'Canvas Draft') => {
+    const panel = document.getElementById('canvas-panel');
+    const backdrop = document.getElementById('canvas-backdrop');
+    const contentEl = document.getElementById('canvas-content');
+    const titleEl = document.getElementById('canvas-title');
+    const charCountEl = document.getElementById('canvas-char-count');
+
+    if (!panel || !backdrop || !contentEl) return;
+
+    canvasRawContent = content;
+
+    // Format and inject content
+    const formattedContent = formatMessage(content);
+    contentEl.innerHTML = `<div class="markdown-body text-sm leading-relaxed text-gray-200">${formattedContent}</div>`;
+
+    if (titleEl) titleEl.textContent = title;
+    if (charCountEl) charCountEl.textContent = content.length.toString();
+
+    // Open panel with animation
+    panel.classList.remove('translate-x-full');
+    backdrop.classList.remove('opacity-0', 'pointer-events-none');
+    backdrop.classList.add('opacity-100', 'pointer-events-auto');
+
+    // Re-initialize icons and syntax highlighting
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    if (typeof Prism !== 'undefined') Prism.highlightAllUnder(contentEl);
+
+    LOG.info('CANVAS', 'Panel opened', { title, chars: content.length });
+};
+
+(window as any).closeCanvas = () => {
+    const panel = document.getElementById('canvas-panel');
+    const backdrop = document.getElementById('canvas-backdrop');
+
+    if (!panel || !backdrop) return;
+
+    panel.classList.add('translate-x-full');
+    backdrop.classList.add('opacity-0', 'pointer-events-none');
+    backdrop.classList.remove('opacity-100', 'pointer-events-auto');
+
+    LOG.info('CANVAS', 'Panel closed');
+};
+
+(window as any).copyCanvasContent = async () => {
+    try {
+        await navigator.clipboard.writeText(canvasRawContent);
+        notify('CONTENT_COPIED');
+    } catch (e) {
+        LOG.error('CANVAS', 'Copy failed', e);
+        notify('COPY_FAILED', 'error');
+    }
+};
+
+(window as any).downloadCanvasContent = () => {
+    const blob = new Blob([canvasRawContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kai_canvas_${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    notify('CONTENT_EXPORTED');
+    LOG.info('CANVAS', 'Content downloaded');
+};
+
 // Formatting
 function formatMessage(text: string) {
     if (typeof marked === 'undefined') return text;
     const renderer = new marked.Renderer();
     renderer.code = (code: string, language: string) => {
-        return `<div class="code-container my-4 border border-white/10 group relative">
+        const blockId = `code-block-${++codeBlockCounter}`;
+        // Escape HTML entities in code for safe embedding
+        const escapedCode = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<div id="${blockId}" class="code-container my-4 border border-white/10 group relative rounded-lg overflow-hidden">
             <div class="px-4 py-2 bg-white/5 border-b border-white/10 flex justify-between items-center">
                 <span class="text-[9px] font-mono text-indigo-300/70 uppercase tracking-widest">${language || 'RAW_BUFFER'}</span>
+                <button id="${blockId}-btn" onclick="copyCode('${blockId}')" class="flex items-center gap-1.5 px-2 py-1 text-[9px] font-mono text-white/40 hover:text-white hover:bg-white/10 rounded transition-all uppercase tracking-widest">
+                    <i data-lucide="copy" class="w-3 h-3"></i> Copy code
+                </button>
             </div>
-            <pre class="p-4 custom-scrollbar overflow-x-auto"><code class="language-${language}">${code}</code></pre>
+            <pre class="p-4 custom-scrollbar overflow-x-auto bg-black/30"><code class="language-${language}">${escapedCode}</code></pre>
         </div>`;
     };
     renderer.image = (href: string, title: string, text: string) => {
@@ -451,7 +552,26 @@ function renderWeatherCard(container: HTMLElement, data: any) {
 }
 
 function renderNewsList(container: HTMLElement, data: any) {
-    if (!data || !data.articles) return;
+    if (!data) return;
+
+    // Handle empty articles array
+    if (!data.articles || data.articles.length === 0) {
+        const emptyHtml = `
+        <div class="mt-4 rounded-xl border border-white/10 bg-black/40 backdrop-blur-md overflow-hidden animate-in fade-in duration-300">
+            <div class="px-4 py-3 bg-white/5 border-b border-white/5 flex items-center justify-between">
+                <span class="text-[10px] font-mono uppercase tracking-widest text-white/50">LATEST_HEADLINES</span>
+            </div>
+            <div class="p-6 text-center">
+                <i data-lucide="newspaper" class="w-8 h-8 text-white/20 mx-auto mb-3"></i>
+                <div class="text-sm text-white/40">No headlines available</div>
+                <div class="text-xs text-white/20 mt-1">Try a different topic or check back later</div>
+            </div>
+        </div>`;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = emptyHtml;
+        container.appendChild(wrapper);
+        return;
+    }
 
     let articlesHtml = data.articles.map((article: any) => `
         <a href="${article.url}" target="_blank" class="block p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all group/item mb-2">
@@ -856,7 +976,22 @@ function addMessage(role: string, content: string, attachedFile: string | null =
         if (metadata.type === 'calendar') renderCalendarWidget(body, metadata.data);
     }
 
-
+    // 📄 OPEN IN CANVAS BUTTON - For long responses or code blocks  
+    if (role === 'assistant' && (content.length > 500 || content.includes('```'))) {
+        const canvasBtn = document.createElement('div');
+        canvasBtn.className = 'mt-4 pt-4 border-t border-white/5';
+        // Store content for canvas - use data attribute to avoid escaping issues
+        const contentId = `canvas-content-${Date.now()}`;
+        (window as any)[contentId] = content;
+        canvasBtn.innerHTML = `
+            <button onclick="openCanvas(window['${contentId}'], 'Response Document')" 
+                    class="flex items-center gap-2 px-4 py-2 text-[10px] font-mono text-indigo-400 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 hover:border-indigo-500/40 rounded-lg transition-all uppercase tracking-widest group">
+                <i data-lucide="panel-right-open" class="w-4 h-4 group-hover:translate-x-0.5 transition-transform"></i>
+                Open in Canvas
+            </button>
+        `;
+        body.appendChild(canvasBtn);
+    }
 
     messagesList.appendChild(block);
     scrollToBottom();
