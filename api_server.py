@@ -245,6 +245,18 @@ Listen = None
 document_generator = None
 enhanced_image_gen = None
 chat_parser = None
+file_analyzer = None
+vqa_service = None
+enhanced_automation = None
+
+# Initialize file_analyzer for file uploads
+try:
+    from Backend.FileAnalyzer import FileAnalyzer
+    file_analyzer = FileAnalyzer()
+    print("[OK] FileAnalyzer loaded")
+except Exception as e:
+    print(f"[WARN] FileAnalyzer not available: {e}")
+    file_analyzer = None
 
 class SystemStatus:
     def __init__(self):
