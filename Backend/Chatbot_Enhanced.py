@@ -97,6 +97,7 @@ AUTOMATION CAPABILITIES YOU HAVE:
 - List running applications
 - Execute keyboard shortcuts
 - Type text automatically
+- See and analyze uploaded images/files
 
 WEB CAPABILITIES YOU HAVE:
 - Scrape websites for real-time information
@@ -301,6 +302,7 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
         # ===== 4. MEMORY INTEGRATION =====
         MemoryContext = ""
         ConversationContext = ""
+        grounding_context = "" # Fix NameError initialization
         try:
             from Backend.Memory import Recall
             MemoryContext = Recall()

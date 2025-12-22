@@ -48,16 +48,16 @@ class FileAnalyzer:
         return 'unknown'
     
     def analyze_with_vqa(self, filepath: str, question: str = "Describe this image in detail") -> Dict[str, Any]:
-        """Analyze image using VQA service with custom question"""
+        """Analyze image using Vision service with custom question"""
         try:
-            from Backend.vqa_service import get_vqa_service
+            from Backend.VisionService import get_vision_service
             
-            vqa = get_vqa_service()
-            result = vqa.analyze_image_vqa(filepath, question)
+            vision = get_vision_service()
+            result = vision.analyze(filepath, question)
             
             return result
         except Exception as e:
-            print(f"[VQA] Error: {e}")
+            print(f"[Vision] Error: {e}")
             return {"success": False, "error": str(e)}
     
     def get_smart_caption(self, filepath: str) -> str:
@@ -68,10 +68,10 @@ class FileAnalyzer:
             if cached and cached.get('caption'):
                 return cached['caption']
             
-            # Generate new caption with VQA
-            from Backend.vqa_service import get_vqa_service
-            vqa = get_vqa_service()
-            caption = vqa.generate_caption(filepath)
+            # Generate new caption with Vision API
+            from Backend.VisionService import get_vision_service
+            vision = get_vision_service()
+            caption = vision.generate_caption(filepath)
             
             if caption:
                 # Cache the caption
@@ -129,7 +129,7 @@ class FileAnalyzer:
         """Analyze image file with both technical details and AI description"""
         try:
             from PIL import Image
-            from Backend.vqa_service import get_vqa_service
+            from Backend.VisionService import get_vision_service
             
             img = Image.open(filepath)
             
@@ -145,13 +145,13 @@ class FileAnalyzer:
                 "file_size": os.path.getsize(filepath),
             }
             
-            # Get AI description using new VQA service
+            # Get AI description using Groq Vision (Llama 3.2 Vision)
             try:
-                vqa_service = get_vqa_service()
-                caption = vqa_service.generate_caption(filepath)
+                vision_service = get_vision_service()
+                caption = vision_service.generate_caption(filepath)
                 ai_description = f"🤖 AI Analysis: {caption}" if caption else "✅ Image uploaded successfully"
             except Exception as e:
-                print(f"[VQA ERROR] {e}")
+                print(f"[Vision ERROR] {e}")
                 ai_description = "✅ Image uploaded successfully"
             
             # Combine technical and AI analysis

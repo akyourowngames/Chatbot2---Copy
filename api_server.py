@@ -5427,6 +5427,118 @@ def upload_file():
         return jsonify({"error": str(e)}), 500
 
 
+# --- VISION API (Groq Llama 3.2 Vision) ---
+@app.route('/api/v1/vision/analyze', methods=['POST'])
+@require_api_key
+def vision_analyze():
+    """Analyze an image with AI vision - describe, OCR, or answer questions"""
+    try:
+        from Backend.VisionService import get_vision_service
+        vision = get_vision_service()
+        
+        data = request.json
+        image_url = data.get('image_url', '')
+        prompt = data.get('prompt', 'Describe this image in detail.')
+        
+        if not image_url:
+            return jsonify({"error": "image_url required"}), 400
+        
+        result = vision.analyze(image_url, prompt)
+        
+        if result.get("success"):
+            return jsonify({
+                "status": "success",
+                "type": "vision_analysis",
+                "description": result.get("description"),
+                "model": result.get("model"),
+                "tokens_used": result.get("tokens_used", 0)
+            })
+        else:
+            return jsonify({"error": result.get("error", "Analysis failed")}), 400
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/vision/describe', methods=['POST'])
+@require_api_key  
+def vision_describe():
+    """Get a detailed description of an image"""
+    try:
+        from Backend.VisionService import get_vision_service
+        vision = get_vision_service()
+        
+        data = request.json
+        image_url = data.get('image_url', '')
+        
+        if not image_url:
+            return jsonify({"error": "image_url required"}), 400
+        
+        description = vision.describe(image_url)
+        
+        return jsonify({
+            "status": "success",
+            "type": "vision_description",
+            "description": description
+        })
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/vision/ocr', methods=['POST'])
+@require_api_key
+def vision_ocr():
+    """Extract text from an image (OCR)"""
+    try:
+        from Backend.VisionService import get_vision_service
+        vision = get_vision_service()
+        
+        data = request.json
+        image_url = data.get('image_url', '')
+        
+        if not image_url:
+            return jsonify({"error": "image_url required"}), 400
+        
+        text = vision.extract_text(image_url)
+        
+        return jsonify({
+            "status": "success",
+            "type": "ocr",
+            "extracted_text": text
+        })
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/vision/ask', methods=['POST'])
+@require_api_key
+def vision_ask():
+    """Answer a question about an image"""
+    try:
+        from Backend.VisionService import get_vision_service
+        vision = get_vision_service()
+        
+        data = request.json
+        image_url = data.get('image_url', '')
+        question = data.get('question', '')
+        
+        if not image_url:
+            return jsonify({"error": "image_url required"}), 400
+        if not question:
+            return jsonify({"error": "question required"}), 400
+        
+        answer = vision.answer_question(image_url, question)
+        
+        return jsonify({
+            "status": "success",
+            "type": "visual_qa",
+            "question": question,
+            "answer": answer
+        })
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/v1/files/analyze', methods=['POST'])
 @require_api_key
 def analyze_uploaded_file():
