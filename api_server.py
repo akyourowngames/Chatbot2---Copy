@@ -1414,6 +1414,7 @@ def chat():
     if not query: return jsonify({"error": "Query required"}), 400
     
     query_lower = query.lower().strip()
+    chat_metadata = {} # Initialize metadata container
     
     # === SPOTIFY MUSIC PLAYER (Cloud Ready - No YouTube Fallback) ===
     # Music requests are now routed through SmartTrigger to use Spotify only
@@ -3449,14 +3450,29 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
              print(f"[SMART-TRIGGER] No specific automation triggers. Using ChatBot for conversation.")
              
              # Use ChatBot for general conversational queries
+             # Initialize metadata for response
+             chat_metadata = {} 
+             
              if ChatBot:
                  print("[DEBUG] Using ChatBot for general query")
-                 response_text = ChatBot(query)
+                 cb_response = ChatBot(query)
+                 
+                 # Handle dictionary response from Enhanced Chatbot
+                 if isinstance(cb_response, dict):
+                     response_text = cb_response.get("response", "")
+                     chat_metadata = cb_response.get("metadata", {})
+                 else:
+                     response_text = str(cb_response)
              else:
                  # Lazy load ChatBot
                  print("[DEBUG] Loading ChatBot module")
                  from Backend.Chatbot_Enhanced import ChatBot as CB
-                 response_text = CB(query)
+                 cb_response = CB(query)
+                 if isinstance(cb_response, dict):
+                     response_text = cb_response.get("response", "")
+                     chat_metadata = cb_response.get("metadata", {})
+                 else:
+                     response_text = str(cb_response)
              
              print(f"[DEBUG] ChatBot Response: {response_text[:100] if response_text else 'None'}...")
         else:
@@ -3493,7 +3509,8 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
 
         return jsonify({
             "response": response_text,
-            "command_executed": True
+            "command_executed": True,
+            "metadata": chat_metadata
         })
 
 
