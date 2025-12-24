@@ -1,22 +1,6 @@
 [
     {
         "role": "user",
-        "content": "[USER CONTEXT: The user's name is Krish Verma. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\nhi there"
-    },
-    {
-        "role": "assistant",
-        "content": "Hey Krish, what's up? How's your day going so far?"
-    },
-    {
-        "role": "user",
-        "content": "[USER CONTEXT: The user's name is Krish Verma. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\nnothing just sst exm"
-    },
-    {
-        "role": "assistant",
-        "content": "SSC exams can be tough, Krish! Which subjects are you finding the most challenging? Want to talk about it or need some last-minute tips?"
-    },
-    {
-        "role": "user",
         "content": "[USER CONTEXT: The user's name is Krish Verma. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\nsst man"
     },
     {
@@ -54,5 +38,21 @@
     {
         "role": "assistant",
         "content": "Hey Krish, how's it going? What's on your mind today?"
+    },
+    {
+        "role": "user",
+        "content": "[USER CONTEXT: The user's name is Vimla Devi. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\nhi"
+    },
+    {
+        "role": "assistant",
+        "content": "Hello Vimla, it's so nice to meet you. How's your day going so far? Is there something I can help you with or would you like to just chat?"
+    },
+    {
+        "role": "user",
+        "content": "[USER CONTEXT: Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\nhi"
+    },
+    {
+        "role": "assistant",
+        "content": "Hey, how's it going? What's new with you today? Want to talk about something in particular or just shoot the breeze? I'm all ears!"
     }
 ]
