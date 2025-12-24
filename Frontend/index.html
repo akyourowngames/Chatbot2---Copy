@@ -968,6 +968,234 @@
 
             to {}
         }
+
+        /* ========== 🦴 SKELETON LOADERS - BEAST MODE ========== */
+        @keyframes skeleton-shimmer {
+            0% {
+                background-position: -200% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
+            }
+        }
+
+        @keyframes skeleton-pulse {
+
+            0%,
+            100% {
+                opacity: 0.4;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg,
+                    rgba(99, 102, 241, 0.05) 0%,
+                    rgba(99, 102, 241, 0.15) 20%,
+                    rgba(129, 140, 248, 0.25) 40%,
+                    rgba(99, 102, 241, 0.15) 60%,
+                    rgba(99, 102, 241, 0.05) 100%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s ease-in-out infinite;
+            border-radius: 4px;
+        }
+
+        .skeleton-dark {
+            background: linear-gradient(90deg,
+                    rgba(30, 30, 40, 0.6) 0%,
+                    rgba(50, 50, 70, 0.8) 20%,
+                    rgba(70, 70, 100, 0.6) 40%,
+                    rgba(50, 50, 70, 0.8) 60%,
+                    rgba(30, 30, 40, 0.6) 100%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.8s ease-in-out infinite;
+            border-radius: 4px;
+        }
+
+        .skeleton-pulse {
+            animation: skeleton-pulse 1.5s ease-in-out infinite;
+        }
+
+        /* Message Skeleton */
+        .skeleton-message {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(10, 10, 15, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.1);
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .skeleton-message-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .skeleton-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+        }
+
+        .skeleton-line {
+            height: 12px;
+            border-radius: 6px;
+        }
+
+        .skeleton-line-short {
+            width: 30%;
+        }
+
+        .skeleton-line-medium {
+            width: 60%;
+        }
+
+        .skeleton-line-long {
+            width: 90%;
+        }
+
+        .skeleton-line-full {
+            width: 100%;
+        }
+
+        /* Chat History Skeleton */
+        .skeleton-chat-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .skeleton-chat-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        .skeleton-chat-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* Settings Panel Skeleton */
+        .skeleton-settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .skeleton-toggle {
+            width: 48px;
+            height: 24px;
+            border-radius: 9999px;
+        }
+
+        /* Card Skeleton */
+        .skeleton-card {
+            background: rgba(10, 10, 15, 0.8);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .skeleton-card-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .skeleton-card-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            flex-shrink: 0;
+        }
+
+        /* Grid Skeleton */
+        .skeleton-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 16px;
+        }
+
+        .skeleton-grid-item {
+            height: 120px;
+            border-radius: 12px;
+        }
+
+        /* Typing Indicator Skeleton */
+        .skeleton-typing {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 16px;
+        }
+
+        .skeleton-typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(99, 102, 241, 0.6);
+            animation: skeleton-pulse 1.2s ease-in-out infinite;
+        }
+
+        .skeleton-typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .skeleton-typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        /* Processing Skeleton with Glow */
+        .skeleton-processing {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .skeleton-processing::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(99, 102, 241, 0.3),
+                    transparent);
+            animation: skeleton-shimmer 1.2s ease-in-out infinite;
+        }
+
+        /* File Upload Skeleton */
+        .skeleton-file {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(10, 10, 15, 0.6);
+            border: 1px dashed rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+        }
+
+        .skeleton-file-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+        }
     </style>
     <script type="importmap">
 {

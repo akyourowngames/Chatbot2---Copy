@@ -43,7 +43,7 @@ try {
 }
 
 // 📡 API Configuration
-const USE_CLOUD_API = true; // Set to true for production (Render), false for local dev
+const USE_CLOUD_API = false; // Set to true for production (Render), false for local dev
 const BASE_URL = USE_CLOUD_API ? 'https://kai-api-nxxv.onrender.com' : 'http://localhost:5000';
 const API_URL = `${BASE_URL}/api/v1`;
 
@@ -408,6 +408,137 @@ function showMemoryToast(msg: string, type: 'save' | 'info') {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+// ========== 🦴 SKELETON LOADERS - BEAST MODE ==========
+const Skeleton = {
+    // Generate a single message skeleton
+    message: () => `
+        <div class="skeleton-message">
+            <div class="skeleton-message-header">
+                <div class="skeleton skeleton-avatar"></div>
+                <div class="skeleton skeleton-line skeleton-line-short"></div>
+            </div>
+            <div class="skeleton skeleton-line skeleton-line-long"></div>
+            <div class="skeleton skeleton-line skeleton-line-medium"></div>
+            <div class="skeleton skeleton-line skeleton-line-short"></div>
+        </div>
+    `,
+
+    // Generate multiple message skeletons
+    messages: (count: number = 3) => {
+        return Array(count).fill(null).map(() => Skeleton.message()).join('');
+    },
+
+    // Chat history item skeleton
+    chatItem: () => `
+        <div class="skeleton-chat-item">
+            <div class="skeleton skeleton-dark skeleton-chat-icon"></div>
+            <div class="skeleton-chat-content">
+                <div class="skeleton skeleton-dark skeleton-line skeleton-line-medium"></div>
+                <div class="skeleton skeleton-dark skeleton-line skeleton-line-short"></div>
+            </div>
+        </div>
+    `,
+
+    // Multiple chat history skeletons
+    chatHistory: (count: number = 5) => {
+        return Array(count).fill(null).map(() => Skeleton.chatItem()).join('');
+    },
+
+    // Typing indicator with animated dots
+    typing: () => `
+        <div class="skeleton-message" id="typing-skeleton">
+            <div class="skeleton-message-header">
+                <div class="skeleton skeleton-avatar skeleton-pulse"></div>
+                <div class="skeleton skeleton-line skeleton-line-short"></div>
+            </div>
+            <div class="skeleton-typing">
+                <div class="skeleton-typing-dot"></div>
+                <div class="skeleton-typing-dot"></div>
+                <div class="skeleton-typing-dot"></div>
+            </div>
+        </div>
+    `,
+
+    // Card skeleton for rich content
+    card: () => `
+        <div class="skeleton-card skeleton-processing">
+            <div class="skeleton-card-header">
+                <div class="skeleton skeleton-card-image"></div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+                    <div class="skeleton skeleton-line skeleton-line-medium"></div>
+                    <div class="skeleton skeleton-line skeleton-line-short"></div>
+                </div>
+            </div>
+            <div class="skeleton skeleton-line skeleton-line-full"></div>
+            <div class="skeleton skeleton-line skeleton-line-long" style="margin-top: 8px;"></div>
+        </div>
+    `,
+
+    // Settings skeleton
+    settings: (count: number = 4) => {
+        return Array(count).fill(null).map(() => `
+            <div class="skeleton-settings-item">
+                <div class="skeleton skeleton-line" style="width: 40%;"></div>
+                <div class="skeleton skeleton-dark skeleton-toggle"></div>
+            </div>
+        `).join('');
+    },
+
+    // File processing skeleton
+    file: () => `
+        <div class="skeleton-file skeleton-processing">
+            <div class="skeleton skeleton-file-icon"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                <div class="skeleton skeleton-line skeleton-line-medium"></div>
+                <div class="skeleton skeleton-line skeleton-line-short"></div>
+            </div>
+        </div>
+    `,
+
+    // Grid skeleton for search results
+    grid: (count: number = 4) => `
+        <div class="skeleton-grid">
+            ${Array(count).fill(null).map(() => '<div class="skeleton skeleton-grid-item"></div>').join('')}
+        </div>
+    `,
+
+    // Show skeleton in a container
+    show: (container: HTMLElement | null, type: 'message' | 'messages' | 'chatHistory' | 'typing' | 'card' | 'settings' | 'file' | 'grid', count?: number) => {
+        if (!container) return;
+        switch (type) {
+            case 'message': container.innerHTML = Skeleton.message(); break;
+            case 'messages': container.innerHTML = Skeleton.messages(count || 3); break;
+            case 'chatHistory': container.innerHTML = Skeleton.chatHistory(count || 5); break;
+            case 'typing': container.insertAdjacentHTML('beforeend', Skeleton.typing()); break;
+            case 'card': container.innerHTML = Skeleton.card(); break;
+            case 'settings': container.innerHTML = Skeleton.settings(count || 4); break;
+            case 'file': container.innerHTML = Skeleton.file(); break;
+            case 'grid': container.innerHTML = Skeleton.grid(count || 4); break;
+        }
+    },
+
+    // Hide/remove a specific skeleton
+    hide: (id: string = 'typing-skeleton') => {
+        const skeleton = document.getElementById(id);
+        if (skeleton) {
+            skeleton.style.opacity = '0';
+            skeleton.style.transform = 'translateY(-10px)';
+            setTimeout(() => skeleton.remove(), 300);
+        }
+    },
+
+    // Clear all skeletons from a container
+    clear: (container: HTMLElement | null) => {
+        if (!container) return;
+        const skeletons = container.querySelectorAll('[class*="skeleton-"]');
+        skeletons.forEach(s => s.remove());
+    }
+};
+
+// Expose globally
+(window as any).Skeleton = Skeleton;
+
 const authEmail = document.getElementById('auth-email') as HTMLInputElement;
 const authPassword = document.getElementById('auth-password') as HTMLInputElement;
 const authSubmitBtn = document.getElementById('auth-submit-btn') as HTMLButtonElement;
@@ -1996,20 +2127,32 @@ if (auth) {
 
     isProcessing = true;
 
-    // 💬 Show typing indicator
-    let typingIndicator: HTMLElement | null = null;
+    // 🦴 SKELETON: Show premium typing indicator
+    let typingSkeletonId = 'typing-skeleton-' + Date.now();
     if (messagesList) {
-        typingIndicator = document.createElement('div');
-        typingIndicator.className = 'typing-indicator';
-        typingIndicator.innerHTML = `
-            <div class="dot"></div>
-            <div class="dot"></div>
-            <div class="dot"></div>
-            <span class="ml-3 text-xs font-mono text-white/50 uppercase tracking-widest">KAI is processing...</span>
-        `;
-        messagesList.appendChild(typingIndicator);
+        messagesList.insertAdjacentHTML('beforeend', `
+            <div class="skeleton-message" id="${typingSkeletonId}">
+                <div class="skeleton-message-header">
+                    <div class="skeleton skeleton-avatar skeleton-pulse"></div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-mono text-indigo-400 uppercase tracking-widest">KAI_PROCESSING</span>
+                    </div>
+                </div>
+                <div class="skeleton-typing">
+                    <div class="skeleton-typing-dot"></div>
+                    <div class="skeleton-typing-dot"></div>
+                    <div class="skeleton-typing-dot"></div>
+                    <span class="ml-3 text-xs font-mono text-white/40 uppercase tracking-widest">Neural processing...</span>
+                </div>
+                <div class="mt-3 space-y-2">
+                    <div class="skeleton skeleton-line skeleton-line-long"></div>
+                    <div class="skeleton skeleton-line skeleton-line-medium"></div>
+                </div>
+            </div>
+        `);
         scrollToBottom();
     }
+    let typingIndicator = document.getElementById(typingSkeletonId);
 
     try {
         // Get user preferences for personalized responses
