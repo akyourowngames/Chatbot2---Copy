@@ -329,34 +329,44 @@ class SupabaseDB:
             logger.error(f"[SUPABASE] File upload error: {e}")
             return None
     
-    def upload_pdf(self, file_path: str, folder: str = 'documents') -> str:
+    def upload_pdf(self, file_path: str, folder: str = 'documents', user_id: str = None) -> str:
         """
         Upload PDF to Supabase Storage
         
         Args:
             file_path: Local PDF file path
             folder: Folder name in storage (documents/captures)
+            user_id: Optional user ID for user-specific storage
             
         Returns:
             Public URL of uploaded PDF
         """
         filename = os.path.basename(file_path)
-        storage_path = f"{folder}/{filename}"
+        # Use user-specific path if user_id provided
+        if user_id:
+            storage_path = f"{user_id}/{folder}/{filename}"
+        else:
+            storage_path = f"{folder}/{filename}"
         return self.upload_file(file_path, storage_path, bucket='kai-images', content_type='application/pdf')
     
-    def upload_image(self, file_path: str, folder: str = 'generated') -> str:
+    def upload_image(self, file_path: str, folder: str = 'generated', user_id: str = None) -> str:
         """
         Upload image to Supabase Storage
         
         Args:
             file_path: Local image file path
             folder: Folder name in storage
+            user_id: Optional user ID for user-specific storage
             
         Returns:
             Public URL of uploaded image
         """
         filename = os.path.basename(file_path)
-        storage_path = f"{folder}/{filename}"
+        # Use user-specific path if user_id provided
+        if user_id:
+            storage_path = f"{user_id}/{folder}/{filename}"
+        else:
+            storage_path = f"{folder}/{filename}"
         
         # Auto-detect image type
         ext = os.path.splitext(file_path)[1].lower()
@@ -663,6 +673,254 @@ class SupabaseDB:
         except Exception as e:
             logger.error(f"[MEMORY] Stats error: {e}")
             return {"total": 0, "categories": {}}
+    
+    # ==================== USER SETTINGS ====================
+    
+    def save_user_settings(self, user_id: str, settings_data: dict) -> bool:
+        """
+        Save all user settings to Supabase.
+        
+        Args:
+            user_id: Firebase/Auth user ID
+            settings_data: Full settings object with profile, security, notifications, etc.
+            
+        Returns:
+            True if saved successfully
+        """
+        try:
+            # Prepare data for upsert
+            record = {
+                'user_id': user_id,
+                'profile': json.dumps(settings_data.get('profile', {})),
+                'security': json.dumps(settings_data.get('security', {})),
+                'notifications': json.dumps(settings_data.get('notifications', {})),
+                'model_preferences': json.dumps(settings_data.get('modelPreferences', {})),
+                'language': json.dumps(settings_data.get('language', {})),
+                'api_keys': json.dumps(settings_data.get('apiKeys', {})),  # Already base64 encoded from frontend
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            # Upsert (insert or update)
+            self.client.table('user_settings').upsert(record, on_conflict='user_id').execute()
+            
+            logger.info(f"[SETTINGS] Saved settings for user: {user_id[:8]}...")
+            return True
+            
+        except Exception as e:
+            error_str = str(e).lower()
+            if "relation" in error_str and "does not exist" in error_str:
+                logger.warning("[SETTINGS] Table doesn't exist. Please create 'user_settings' table in Supabase.")
+            logger.error(f"[SETTINGS] Save error: {e}")
+            return False
+    
+    def get_user_settings(self, user_id: str) -> dict:
+        """
+        Get all user settings from Supabase.
+        
+        Args:
+            user_id: Firebase/Auth user ID
+            
+        Returns:
+            Settings dict or empty dict if not found
+        """
+        try:
+            data = self.client.table('user_settings')\
+                .select('*')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if not data.data:
+                return {}
+            
+            record = data.data[0]
+            
+            # Parse JSON fields
+            return {
+                'profile': json.loads(record.get('profile', '{}') or '{}'),
+                'security': json.loads(record.get('security', '{}') or '{}'),
+                'notifications': json.loads(record.get('notifications', '{}') or '{}'),
+                'modelPreferences': json.loads(record.get('model_preferences', '{}') or '{}'),
+                'language': json.loads(record.get('language', '{}') or '{}'),
+                'apiKeys': json.loads(record.get('api_keys', '{}') or '{}'),
+                'updatedAt': record.get('updated_at'),
+                'createdAt': record.get('created_at')
+            }
+            
+        except Exception as e:
+            logger.error(f"[SETTINGS] Get settings error: {e}")
+            return {}
+    
+    def update_user_profile(self, user_id: str, profile_data: dict) -> bool:
+        """
+        Update user profile specifically.
+        
+        Args:
+            user_id: Firebase/Auth user ID
+            profile_data: Profile dict with name, email, bio, avatar_url, etc.
+            
+        Returns:
+            True if updated successfully
+        """
+        try:
+            # Get existing settings first
+            existing = self.get_user_settings(user_id)
+            
+            # Merge profile data
+            existing_profile = existing.get('profile', {})
+            existing_profile.update(profile_data)
+            
+            # Calculate stats
+            stats = self._calculate_user_stats(user_id)
+            existing_profile['stats'] = stats
+            existing_profile['lastSync'] = datetime.now().isoformat()
+            
+            # Update just the profile field
+            if existing:
+                self.client.table('user_settings').update({
+                    'profile': json.dumps(existing_profile),
+                    'updated_at': datetime.now().isoformat()
+                }).eq('user_id', user_id).execute()
+            else:
+                # Create new record
+                self.client.table('user_settings').insert({
+                    'user_id': user_id,
+                    'profile': json.dumps(existing_profile),
+                    'updated_at': datetime.now().isoformat()
+                }).execute()
+            
+            logger.info(f"[SETTINGS] Updated profile for user: {user_id[:8]}...")
+            return True
+            
+        except Exception as e:
+            logger.error(f"[SETTINGS] Update profile error: {e}")
+            return False
+    
+    def get_user_profile(self, user_id: str) -> dict:
+        """
+        Get user profile with stats.
+        
+        Args:
+            user_id: Firebase/Auth user ID
+            
+        Returns:
+            Profile dict with stats, rank, achievements
+        """
+        try:
+            settings = self.get_user_settings(user_id)
+            profile = settings.get('profile', {})
+            
+            # Add computed stats
+            stats = self._calculate_user_stats(user_id)
+            profile['stats'] = stats
+            
+            # Calculate rank
+            profile['rank'] = self._calculate_rank(stats)
+            
+            # Get achievements
+            profile['achievements'] = self._get_achievements(stats, user_id)
+            
+            return profile
+            
+        except Exception as e:
+            logger.error(f"[SETTINGS] Get profile error: {e}")
+            return {}
+    
+    def _calculate_user_stats(self, user_id: str) -> dict:
+        """Calculate user statistics for profile display"""
+        try:
+            # Count messages
+            msg_data = self.client.table('messages').select('id', count='exact').execute()
+            message_count = msg_data.count if hasattr(msg_data, 'count') else len(msg_data.data) if msg_data.data else 0
+            
+            # Count synced memories
+            mem_stats = self.get_memory_stats(user_id)
+            
+            # Count conversations
+            conv_data = self.client.table('conversations').select('id', count='exact').execute()
+            conv_count = conv_data.count if hasattr(conv_data, 'count') else len(conv_data.data) if conv_data.data else 0
+            
+            # Calculate account age (mock - would need user creation date)
+            account_age_days = 30  # Default
+            
+            return {
+                'messageCount': message_count,
+                'memoriesSynced': mem_stats.get('total', 0),
+                'conversationCount': conv_count,
+                'accountAgeDays': account_age_days,
+                'weeklyActivity': [3, 5, 2, 7, 4, 6, 5]  # Mock activity data
+            }
+            
+        except Exception as e:
+            logger.error(f"[SETTINGS] Calculate stats error: {e}")
+            return {
+                'messageCount': 0,
+                'memoriesSynced': 0,
+                'conversationCount': 0,
+                'accountAgeDays': 0,
+                'weeklyActivity': [0, 0, 0, 0, 0, 0, 0]
+            }
+    
+    def _calculate_rank(self, stats: dict) -> dict:
+        """Calculate user rank based on usage"""
+        messages = stats.get('messageCount', 0)
+        memories = stats.get('memoriesSynced', 0)
+        
+        score = messages + (memories * 10)
+        
+        if score >= 1000:
+            return {'title': 'DIRECTOR', 'level': 5, 'color': '#f59e0b'}
+        elif score >= 500:
+            return {'title': 'COMMANDER', 'level': 4, 'color': '#8b5cf6'}
+        elif score >= 200:
+            return {'title': 'CAPTAIN', 'level': 3, 'color': '#6366f1'}
+        elif score >= 50:
+            return {'title': 'LIEUTENANT', 'level': 2, 'color': '#10b981'}
+        else:
+            return {'title': 'OPERATIVE', 'level': 1, 'color': '#64748b'}
+    
+    def _get_achievements(self, stats: dict, user_id: str) -> list:
+        """Get user achievements based on activity"""
+        achievements = []
+        
+        # Early Adopter (always show for now)
+        achievements.append({
+            'id': 'early_adopter',
+            'name': 'Early Adopter',
+            'icon': '🏆',
+            'description': 'Joined during alpha phase',
+            'unlocked': True
+        })
+        
+        # Power User
+        if stats.get('messageCount', 0) >= 100:
+            achievements.append({
+                'id': 'power_user',
+                'name': 'Power User',
+                'icon': '⚡',
+                'description': 'Sent 100+ messages',
+                'unlocked': True
+            })
+        
+        # Memory Master
+        if stats.get('memoriesSynced', 0) >= 50:
+            achievements.append({
+                'id': 'memory_master',
+                'name': 'Memory Master',
+                'icon': '🧠',
+                'description': 'Synced 50+ memories',
+                'unlocked': True
+            })
+        
+        # Security First
+        achievements.append({
+            'id': 'security_first',
+            'name': 'Security First',
+            'icon': '🔒',
+            'description': 'Enabled TLS encryption',
+            'unlocked': True
+        })
+        
+        return achievements
 
 # Import timedelta for analytics
 from datetime import timedelta

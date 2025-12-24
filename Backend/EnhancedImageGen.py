@@ -27,7 +27,8 @@ class EnhancedImageGenerator:
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
     
     def generate_pollinations(self, prompt: str, num_images: int = 1, 
-                             width: int = 1024, height: int = 1024, model: str = "flux") -> List[str]:
+                             width: int = 1024, height: int = 1024, model: str = "flux",
+                             user_id: str = None) -> List[str]:
         """
         Generate images using Pollinations AI (Free, no API key needed)
         Now defaults to the powerful 'flux' model.
@@ -38,19 +39,12 @@ class EnhancedImageGenerator:
             width: Image width
             height: Image height
             model: Model to use (default: flux)
+            user_id: Optional user ID for user-specific storage
             
         Returns:
             List of image file paths
         """
         images = []
-        
-        # Log action for retry
-        if action_history:
-            action_history.log_action(
-                action_type="image_gen",
-                params={"prompt": prompt, "num_images": num_images, "width": width, "height": height, "model": model},
-                description=f"Generate image ({model}): {prompt[:30]}..."
-            )
         
         for i in range(num_images):
             try:
@@ -79,7 +73,8 @@ class EnhancedImageGenerator:
                         from Backend.SupabaseDB import supabase_db
                         if supabase_db:
                             print(f"[EnhancedImageGen] Uploading image {i+1} to Supabase...")
-                            cloud_url = supabase_db.upload_image(filepath, folder='')
+                            # Pass user_id for user-specific storage
+                            cloud_url = supabase_db.upload_image(filepath, folder='generated', user_id=user_id)
                             if cloud_url:
                                 print(f"✓ Generated and uploaded image {i+1}/{num_images} to Supabase")
                                 # Keep local file as backup, but return cloud URL
@@ -101,17 +96,26 @@ class EnhancedImageGenerator:
             except Exception as e:
                 print(f"Error generating image {i+1}: {e}")
         
+        # Log action for retry ONLY AFTER SUCCESS
+        if images and action_history:
+            action_history.log_action(
+                action_type="image_gen",
+                params={"prompt": prompt, "num_images": num_images, "width": width, "height": height, "model": model},
+                description=f"Generate image ({model}): {prompt[:30]}..."
+            )
+        
         return images
     
     def generate_with_style(self, prompt: str, style: str = "realistic", 
-                           num_images: int = 1) -> List[str]:
+                           num_images: int = 1, user_id: str = None) -> List[str]:
         """
         Generate images with specific artistic styles
         
         Args:
             prompt: Base prompt
-            style: Style preset (realistic, anime, oil_painting, watercolor, sketch, 3d_render, etc.)
+            style: Style preset
             num_images: Number of images
+            user_id: Optional user ID for user-specific storage
             
         Returns:
             List of image paths
@@ -151,42 +155,27 @@ class EnhancedImageGenerator:
         style_suffix = style_prompts.get(style, style_prompts["realistic"])
         enhanced_prompt = f"{prompt}, {style_suffix}"
         
-        return self.generate_pollinations(enhanced_prompt, num_images)
+        return self.generate_pollinations(enhanced_prompt, num_images, user_id=user_id)
     
     def generate_variations(self, base_prompt: str, variations: List[str], 
-                           num_per_variation: int = 1) -> Dict[str, List[str]]:
+                           num_per_variation: int = 1, user_id: str = None) -> Dict[str, List[str]]:
         """
         Generate multiple variations of a base prompt
-        
-        Args:
-            base_prompt: Base image description
-            variations: List of variation descriptions
-            num_per_variation: Images per variation
-            
-        Returns:
-            Dict mapping variation to image paths
         """
         results = {}
         
         for variation in variations:
             full_prompt = f"{base_prompt}, {variation}"
-            images = self.generate_pollinations(full_prompt, num_per_variation)
+            images = self.generate_pollinations(full_prompt, num_per_variation, user_id=user_id)
             results[variation] = images
         
         return results
     
-    def generate_hd(self, prompt: str, num_images: int = 1) -> List[str]:
+    def generate_hd(self, prompt: str, num_images: int = 1, user_id: str = None) -> List[str]:
         """
         Generate high-definition images (1920x1080)
-        
-        Args:
-            prompt: Image description
-            num_images: Number of images
-            
-        Returns:
-            List of image paths
         """
-        return self.generate_pollinations(prompt, num_images, width=1920, height=1080)
+        return self.generate_pollinations(prompt, num_images, width=1920, height=1080, user_id=user_id)
     
     def generate_square(self, prompt: str, num_images: int = 1, size: int = 1024) -> List[str]:
         """
@@ -333,14 +322,6 @@ Respond with ONLY the enhanced prompt, no explanations. Keep it under 100 words.
         Smart generate: AI analyzes the prompt and picks the best style automatically.
         Returns images with metadata about what style was chosen.
         """
-        # Log action for retry (will successfully override the inner basic log if called)
-        if action_history:
-            action_history.log_action(
-                action_type="smart_image_gen",
-                params={"prompt": prompt, "num_images": num_images},
-                description=f"Smart Gen: {prompt[:30]}..."
-            )
-
         try:
             from Backend.LLM import ChatCompletion
             
@@ -374,6 +355,14 @@ Reply with ONLY the style name, nothing else."""
             # Generate with chosen style
             # Using Flux model for best quality on all styles
             images = self.generate_with_style(prompt, chosen_style, num_images)
+            
+            # Log action for retry ONLY AFTER SUCCESS
+            if images and action_history:
+                action_history.log_action(
+                    action_type="smart_image_gen",
+                    params={"prompt": prompt, "num_images": num_images, "style": chosen_style},
+                    description=f"Smart Gen ({chosen_style}): {prompt[:30]}..."
+                )
             
             return {
                 "status": "success",

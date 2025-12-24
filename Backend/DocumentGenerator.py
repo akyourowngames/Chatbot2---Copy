@@ -136,10 +136,16 @@ class DocumentGenerator:
         
         canvas.restoreState()
 
-    def generate_pdf(self, topic: str, content: Dict[str, Any] = None, filename: str = None) -> Dict[str, str]:
+    def generate_pdf(self, topic: str, content: Dict[str, Any] = None, filename: str = None, user_id: str = None) -> Dict[str, str]:
         """
         Generate a beast-level PDF document.
         If content is None, it generates it via LLM.
+        
+        Args:
+            topic: Document topic
+            content: Pre-generated content (optional)
+            filename: Custom filename (optional)
+            user_id: User ID for user-specific storage (optional)
         
         Returns:
             Dict with 'filepath' (local) and 'url' (cloud or local path)
@@ -223,7 +229,8 @@ class DocumentGenerator:
             from Backend.SupabaseDB import supabase_db
             if supabase_db:
                 print(f"[DocumentGenerator] Uploading PDF to Supabase (kai-images bucket)...")
-                cloud_url = supabase_db.upload_pdf(filepath, folder='documents')
+                # Pass user_id for user-specific storage
+                cloud_url = supabase_db.upload_pdf(filepath, folder='documents', user_id=user_id)
                 if cloud_url:
                     print(f"[DocumentGenerator] Uploaded to: {cloud_url}")
                     pdf_url = cloud_url
@@ -242,7 +249,7 @@ class DocumentGenerator:
 
     # ==================== PPTX GENERATION ====================
 
-    def generate_presentation(self, topic: str, content: Dict[str, Any] = None, filename: str = None) -> str:
+    def generate_presentation(self, topic: str, content: Dict[str, Any] = None, filename: str = None, user_id: str = None) -> str:
         """
         Generate a beast-level PowerPoint presentation.
         """
@@ -296,16 +303,26 @@ class DocumentGenerator:
                     p.space_after = Pt(10)
 
         prs.save(filepath)
+
+        # Upload to Supabase if available
+        try:
+            from Backend.SupabaseDB import supabase_db
+            if supabase_db:
+                cloud_url = supabase_db.upload_file(filepath, f"documents/{filename}" if not user_id else f"{user_id}/documents/{filename}", bucket='kai-images', content_type='application/vnd.openxmlformats-officedocument.presentationml.presentation')
+                print(f"[DOC] Uploaded PPTX to Supabase: {cloud_url}")
+        except Exception as e:
+            print(f"[WARN] Failed to upload PPTX to Supabase: {e}")
+
         return filepath
 
-    def create_document(self, topic: str, doc_type: str = "pdf") -> str:
+    def create_document(self, topic: str, doc_type: str = "pdf", user_id: str = None) -> str:
         """
         Unified entry point to create a document or presentation from a topic.
         """
         if "presentation" in doc_type.lower() or "ppt" in doc_type.lower():
-            return self.generate_presentation(topic)
+            return self.generate_presentation(topic, user_id=user_id)
         else:
-            return self.generate_pdf(topic)
+            return self.generate_pdf(topic, user_id=user_id)
 
 # Global Instance
 document_generator = DocumentGenerator()

@@ -120,6 +120,34 @@ except ImportError as e:
     VISION_AVAILABLE = False
     upload_endpoint = list_endpoint = download_endpoint = delete_endpoint = None
     analyze_endpoint = analyze_image_endpoint = None
+
+# ==================== PRELOAD MEMORY SYSTEM ====================
+# Load all memory systems at startup so first message is fast
+try:
+    from Backend.ContextualMemory import contextual_memory
+    print(f"[OK] ContextualMemory preloaded: {len(contextual_memory.memory.get('facts', []))} facts synced from Supabase")
+except Exception as e:
+    print(f"[WARN] ContextualMemory preload failed: {e}")
+    contextual_memory = None
+
+# Preload SemanticMemory (SentenceTransformer model takes 1-2s to load)
+try:
+    from Backend.SemanticMemory import SemanticMemory
+    _semantic_memory = SemanticMemory()  # This loads the all-MiniLM-L6-v2 model
+    print(f"[OK] SemanticMemory preloaded: {len(_semantic_memory.memories)} memories loaded")
+except Exception as e:
+    print(f"[WARN] SemanticMemory preload failed: {e}")
+    _semantic_memory = None
+
+# Preload MemoryIntelligence 
+try:
+    from Backend.MemoryIntelligence import MemoryIntelligence
+    _memory_intelligence = MemoryIntelligence()
+    print(f"[OK] MemoryIntelligence preloaded")
+except Exception as e:
+    print(f"[WARN] MemoryIntelligence preload failed: {e}")
+    _memory_intelligence = None
+
 # from Backend.Dispatcher import dispatcher # KAI Intelligence Engine (Bypassed)
 
 # ==================== HEALTH CHECK (CRITICAL) ====================
@@ -129,6 +157,7 @@ def health():
 
 # ==================== FILE SERVING ====================
 @app.route('/data/<path:filename>')
+@app.route('/Data/<path:filename>')  # Also handle uppercase for frontend
 def serve_files(filename):
     """Serve generic files from Data directory"""
     try:
@@ -217,7 +246,7 @@ workflow_engine = None
 file_manager = None
 Remember = None
 Recall = None
-ultimate_pc = None
+# ultimate_pc removed - using psutil directly
 ai_predictor = None
 performance_optimizer = None
 window_manager = None
@@ -374,6 +403,28 @@ def get_current_user():
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # 1. Try JWT Auth first (Priority for user isolation)
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            try:
+                token = auth_header.split()[1]
+                # Check if extract_user_from_token is available (imported above)
+                if 'extract_user_from_token' in globals():
+                    user_info = extract_user_from_token(token)
+                    if user_info:
+                        request.current_user = user_info
+                        # Legacy support
+                        request.user = {"name": user_info.get("email"), "tier": "pro"} 
+                        return f(*args, **kwargs)
+            except Exception:
+                pass # Fallback to normal flow if token invalid
+
+        # Skip authentication in development mode (any key accepted)
+        if not IS_PRODUCTION:
+            request.user = {"name": "dev", "tier": "free"}
+            request.current_user = {"user_id": "dev", "email": "dev@localhost.com", "role": "user"}
+            return f(*args, **kwargs)
+        
         # Skip authentication if no API keys configured (demo mode)
         if not API_KEYS:
             request.user = {"name": "demo", "tier": "free"}
@@ -605,8 +656,8 @@ def upload_document():
         # Cleanup temp file
         try:
             os.remove(temp_path)
-        except:
-            pass
+        except OSError as cleanup_err:
+            print(f"[UPLOAD] Warning: Could not cleanup temp file: {cleanup_err}")
         
         if result.get('status') == 'success':
             return jsonify({
@@ -730,11 +781,7 @@ def delete_user_account():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- DATA SERVING ---
-@app.route('/data/<path:filename>')
-def serve_data(filename):
-    """Serve files from Data directory (images, audio)"""
-    return send_from_directory(DATA_DIR, filename)
+# NOTE: Data serving routes already defined above (serve_files function handles /data/<path:filename> and /Data/<path:filename>)
 
 # ==================== MEMORY ENDPOINTS ====================
 
@@ -1168,8 +1215,8 @@ def generate_image_api():
             return jsonify({"error": "Prompt required"}), 400
         
         # Using Enhanced Image Gen if available
-        if enhanced_image_gen:
-            images = enhanced_image_gen.generate_with_style(prompt, style, num_images=1)
+            user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+            images = enhanced_image_gen.generate_with_style(prompt, style, num_images=1, user_id=user_id)
             if images:
                 # Convert local path to URL if needed, or if it returns URL
                 # enhanced_image_gen usually returns absolute path or relative?
@@ -1385,7 +1432,6 @@ def delete_all_conversations():
 @rate_limit("chat")
 def chat():
     global ChatBot
-    global ChatBot
     
     # Robust loading of ChatBot
     if not ChatBot:
@@ -1403,25 +1449,230 @@ def chat():
 
     data = request.json
     query = data.get('query', '')
-    image_path = data.get('image_path') # Support for uploaded images
+    image_path = data.get('image_path')  # Legacy support
+    attachments = data.get('attachments', [])  # New: array of {name, url, type}
+    user_preferences = data.get('user_preferences')  # User profile settings
     
-    # === VISION AWARENESS UPGRADE ===
-    # If an image is provided, analyze it immediately and inject context
-    if image_path:
-        print(f"[VISION] Received image: {image_path}")
+    # === USER PREFERENCES CONTEXT (NEW) ===
+    # Build personalized context from user settings
+    user_context = ""
+    if user_preferences:
+        name = user_preferences.get('name', '')
+        nickname = user_preferences.get('nickname', '')
+        bio = user_preferences.get('bio', '')
+        response_style = user_preferences.get('responseStyle', 'casual')
+        response_language = user_preferences.get('responseLanguage', 'english')
+        interests = user_preferences.get('interests', [])
+        
+        # Build context string
+        user_context_parts = []
+        if name or nickname:
+            display_name = nickname or name
+            user_context_parts.append(f"The user's name is {name}." + (f" Call them '{nickname}' casually." if nickname else ""))
+        if bio:
+            user_context_parts.append(f"About the user: {bio}")
+        if interests:
+            user_context_parts.append(f"User's interests: {', '.join(interests)}")
+        
+        # Response style preferences
+        style_instructions = {
+            'professional': "Respond in a professional and formal manner.",
+            'casual': "Be casual and friendly in your responses.",
+            'brief': "Keep responses brief and concise.",
+            'detailed': "Provide detailed and thorough explanations.",
+            'technical': "Be technical and precise in explanations."
+        }
+        if response_style in style_instructions:
+            user_context_parts.append(style_instructions[response_style])
+        
+        # Language preference - ALWAYS add explicit instruction to override chat history
+        # Support ANY language dynamically
+        lang_lower = response_language.lower() if response_language else 'english'
+        
+        language_instructions = {
+            'hindi': "IMPORTANT: Respond primarily in Hindi (हिंदी में जवाब दें).",
+            'hinglish': "IMPORTANT: Respond in Hinglish (mix of Hindi and English).",
+            'english': "IMPORTANT: Respond in English only.",
+            'spanish': "IMPORTANT: Respond in Spanish (Responde en español).",
+            'french': "IMPORTANT: Respond in French (Répondez en français).",
+            'german': "IMPORTANT: Respond in German (Antworten Sie auf Deutsch).",
+            'japanese': "IMPORTANT: Respond in Japanese (日本語で答えてください).",
+            'chinese': "IMPORTANT: Respond in Chinese (请用中文回答).",
+            'korean': "IMPORTANT: Respond in Korean (한국어로 대답해 주세요).",
+            'portuguese': "IMPORTANT: Respond in Portuguese (Responda em português).",
+            'italian': "IMPORTANT: Respond in Italian (Rispondi in italiano).",
+            'russian': "IMPORTANT: Respond in Russian (Отвечайте на русском).",
+            'arabic': "IMPORTANT: Respond in Arabic (أجب بالعربية).",
+        }
+        
+        if lang_lower in language_instructions:
+            user_context_parts.append(language_instructions[lang_lower])
+        elif lang_lower != 'auto':
+            # For any other language, generate dynamic instruction
+            user_context_parts.append(f"IMPORTANT: Respond in {response_language}.")
+        
+        if user_context_parts:
+            user_context = "[USER CONTEXT: " + " ".join(user_context_parts) + "]\n\n"
+            print(f"[CHAT] User preferences loaded: {name or 'Anonymous'}, style={response_style}, lang={response_language}")
+    
+    # === ATTACHMENT HANDLING (NEW) ===
+    # Process any attached files (images get vision analysis)
+    import os as _os  # Scoped import for this block
+    attachment_context = ""
+    for attachment in attachments:
+        file_name = attachment.get('name', '')
+        file_url = attachment.get('url', '')
+        # Fallback type from frontend, but we'll prefer extension
+        file_type_api = attachment.get('type', 'unknown')
+        
+        # Robust extension detection
+        ext = _os.path.splitext(file_name)[1].lower().lstrip('.')
+        
+        print(f"[ATTACHMENT] Processing: {file_name} (type: {file_type_api}, ext: {ext})")
+        
+
+        # --- PDF PROCESSING (Smart OCR) ---
+        if ext == 'pdf':
+            try:
+                import pdfplumber
+                full_path = _os.path.join(DATA_DIR, 'Uploads', file_name)
+                pdf_text = ""
+                has_images = False
+                
+                with pdfplumber.open(full_path) as pdf:
+                    # Limit to first 15 pages to prevent context overflow
+                    for i, page in enumerate(pdf.pages[:15]):
+                        text = page.extract_text()
+                        if text and text.strip():
+                            pdf_text += f"\n--- Page {i+1} ---\n{text}"
+                        # Check if page has images (indicates scanned PDF)
+                        if page.images:
+                            has_images = True
+                
+                if pdf_text and len(pdf_text.strip()) > 50:
+                    # Text-based PDF - use pdfplumber text
+                    attachment_context += f"\n\n[PDF CONTENT - {file_name}]:\n{pdf_text[:8000]}"
+                    print(f"[PDF] ✅ Extracted {len(pdf_text)} chars from text PDF")
+                else:
+                    # Scanned PDF - Use Gemini Vision OCR
+                    print(f"[PDF] 📸 No text found, attempting OCR with Gemini Vision...")
+                    try:
+                        import pypdfium2 as pdfium
+                        from PIL import Image
+                        from Backend.VisionService import get_vision_service
+                        
+                        # Open PDF with pypdfium2 (already installed with pdfplumber - no Poppler needed!)
+                        pdf_doc = pdfium.PdfDocument(full_path)
+                        vision = get_vision_service()
+                        ocr_text = ""
+                        
+                        # Limit to first 5 pages for OCR
+                        max_pages = min(len(pdf_doc), 5)
+                        
+                        for i in range(max_pages):
+                            page = pdf_doc[i]
+                            # Render page to image (scale=2 for 150 DPI equivalent)
+                            bitmap = page.render(scale=2)
+                            pil_image = bitmap.to_pil()
+                            
+                            # Save temp image
+                            temp_img_path = _os.path.join(DATA_DIR, 'Uploads', f'_ocr_temp_{i}.png')
+                            pil_image.save(temp_img_path, 'PNG')
+                            
+                            # Use Gemini Vision for OCR
+                            result = vision.analyze(temp_img_path, "Extract ALL text from this image. Return only the text content, preserving formatting.")
+                            
+                            if result.get('success'):
+                                page_text = result.get('description', '')
+                                if page_text:
+                                    ocr_text += f"\n--- Page {i+1} (OCR) ---\n{page_text}"
+                            
+                            # Clean up temp file
+                            try:
+                                _os.remove(temp_img_path)
+                            except:
+                                pass
+                        
+                        pdf_doc.close()
+                        
+                        if ocr_text:
+                            attachment_context += f"\n\n[PDF OCR CONTENT - {file_name}]:\n{ocr_text[:8000]}"
+                            print(f"[PDF] ✅ OCR extracted {len(ocr_text)} chars from scanned PDF")
+                        else:
+                            attachment_context += f"\n\n[PDF - {file_name}]: (Scanned PDF - OCR found no readable text)"
+                            
+                    except ImportError as ie:
+                        print(f"[PDF] ⚠️ OCR dependency missing: {ie}")
+                        attachment_context += f"\n\n[PDF - {file_name}]: (Scanned PDF - OCR not available)"
+                    except Exception as ocr_e:
+                        print(f"[PDF] ⚠️ OCR Error: {ocr_e}")
+                        attachment_context += f"\n\n[PDF - {file_name}]: (Scanned PDF - OCR failed)"
+                        
+            except Exception as e:
+                print(f"[ATTACHMENT] PDF Error: {e}")
+                attachment_context += f"\n\n[PDF - {file_name}]: Error reading PDF."
+
+        # --- TEXT/CODE/DATA PROCESSING ---
+        elif ext in ['txt', 'md', 'py', 'js', 'html', 'css', 'json', 'csv', 'cpp', 'c', 'java', 'xml', 'yaml', 'yml']:
+            try:
+                full_path = _os.path.join(DATA_DIR, 'Uploads', file_name)
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    attachment_context += f"\n\n[FILE CONTENT - {file_name}]:\n{content[:8000]}"
+                    print(f"[ATTACHMENT] Read {len(content)} chars from {ext} file")
+            except Exception as e:
+                print(f"[ATTACHMENT] File Read Read Error: {e}")
+
+        # --- IMAGE PROCESSING ---
+        elif file_type_api == 'image' or ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']:
+            try:
+                import os as _os  # Explicit import to avoid scoping issues
+                from Backend.VisionService import get_vision_service
+                vision = get_vision_service()
+                
+                # Build full file path
+                full_path = _os.path.join(DATA_DIR, 'Uploads', file_name)
+                if _os.path.exists(full_path):
+                    # Improved prompt for structured output
+                    vision_prompt = (query or "Describe this image in detail.") + "\n(Format: Structured Markdown with Bold Headers and Bullet Points)"
+                    result = vision.analyze(full_path, vision_prompt)
+                    if result.get('success'):
+                        attachment_context += f"\n\n[IMAGE ANALYSIS - {file_name}]:\n{result.get('description', 'Image analyzed.')}"
+                        print(f"[VISION] Analyzed {file_name}: {result.get('description', '')[:100]}...")
+                    else:
+                        attachment_context += f"\n\n[IMAGE: {file_name}] - Attached but analysis unavailable."
+                else:
+                    print(f"[VISION] File not found: {full_path}")
+                    attachment_context += f"\n\n[IMAGE: {file_name}] - File attached."
+            except Exception as ve:
+                print(f"[VISION] Error processing {file_name}: {ve}")
+                attachment_context += f"\n\n[IMAGE: {file_name}] - Attached (analysis failed)."
+        else:
+            # Non-image attachments
+            attachment_context += f"\n\n[ATTACHED FILE: {file_name} (type: {file_type_api})]"
+    
+    # Save original query for trigger detection (before attachment context injection)
+    original_query = query
+    original_query_lower = query.lower().strip()
+    
+    # Inject attachment context into query
+    if attachment_context:
+        query = f"{query}\n\n[CONTEXT FROM ATTACHMENTS]{attachment_context}"
+    
+    # === LEGACY VISION AWARENESS (for backward compatibility) ===
+    if image_path and not attachments:
+        print(f"[VISION] Received legacy image path: {image_path}")
         try:
-            from Backend.vision.florence_inference import analyze_image_comprehensive
-            vision_result = analyze_image_comprehensive(image_path)
+            from Backend.VisionService import get_vision_service
+            vision = get_vision_service()
+            result = vision.analyze(image_path, query or "Describe this image in detail.")
             
-            if vision_result.get('error'):
-                print(f"[VISION] Error: {vision_result['error']}")
-                # Don't fail, just let chat continue
-            else:
-                description = vision_result.get('friendly_response', '')
+            if result.get('success'):
+                description = result.get('description', '')
                 query += f"\n\n[SYSTEM: I have analyzed the uploaded image. Here is what I see:]\n{description}"
                 print(f"[VISION] Context injected into query.")
         except Exception as ve:
-            print(f"[VISION] Failed to process image: {ve}")
+            print(f"[VISION] Failed to process legacy image: {ve}")
 
     if not query: return jsonify({"error": "Query required"}), 400
     
@@ -1432,6 +1683,10 @@ def chat():
     # Music requests are now routed through SmartTrigger to use Spotify only
     
     try:
+        # === INITIALIZE RESPONSE METADATA ===
+        # Must be initialized early to prevent NameError in return statement
+        chat_metadata = {}
+        
         # === CHAT CONTEXT FOR CONTINUOUS FLOW ===
         # Load recent chat history for LLM context
         chat_context = []
@@ -1446,7 +1701,8 @@ def chat():
         
         # === PRE-CHECK: DIRECT APP/FILE COMMANDS ===
         # These often get misclassified as Chrome commands
-        query_lower = query.lower().strip()
+        # Use original_query_lower (without attachment context) to avoid false matches
+        query_lower = original_query_lower
         
         # Known app names that should NOT go to Chrome
         app_names = [
@@ -1474,7 +1730,7 @@ def chat():
             "@trello": "trello", "@calendar": "calendar", "@weather": "weather",
             "@news": "news", "@crypto": "crypto", "@github": "github",
             "@system": "system_stats", "@nasa": "nasa_apod", "@pdf": "document",
-            "@image": "image", "@spotify": "spotify"
+            "@image": "image", "@spotify": "spotify", "@search": "chrome"
         }
         for mention, ttype in mention_map.items():
             if mention in query_lower:
@@ -1557,6 +1813,7 @@ def chat():
         # "search python" → file (default for ambiguous)  
         # "search google for python" or "search online" → chrome
         if not trigger_type and "search" in query_lower:
+            print(f"[PRE-CHECK] Search keyword detected in query: '{query_lower}'")
             # File search indicators
             file_indicators = ["files", "file", "documents", "downloads", "desktop", "folder", 
                                "in c:", "in d:", "on drive", "on my computer", "locally"]
@@ -1575,11 +1832,11 @@ def chat():
                 trigger_type = "chrome"
                 command = query
                 print(f"[PRE-CHECK] Smart detect: WEB search")
-            # For ambiguous "search X" without context, use file (more useful locally)
+            # For ambiguous "search X" without context, default to WEB search for better results
             elif not is_web_search and not is_file_search:
-                trigger_type = "file"
+                trigger_type = "chrome"  # Now routes to RealtimeSearchEngine
                 command = query
-                print(f"[PRE-CHECK] Ambiguous search → defaulting to FILE search")
+                print(f"[PRE-CHECK] Ambiguous search → defaulting to WEB search")
         
         # === SMART MUSIC vs VIDEO vs SPOTIFY vs ANIME DETECTION ===
         if not trigger_type and ("play" in query_lower or "watch" in query_lower or "stream" in query_lower or "listen" in query_lower):
@@ -1680,7 +1937,7 @@ def chat():
         # Use SmartTrigger only if pre-check didn't match
         if not trigger_type:
             from Backend.SmartTrigger import smart_trigger
-            trigger_type, command, _ = smart_trigger.detect(query)
+            trigger_type, command, _ = smart_trigger.detect(original_query)  # Use original query without attachment context
 
         
 
@@ -2100,7 +2357,8 @@ def chat():
                  
                  print(f"[IMAGE] Clean prompt: {clean_prompt}, Style: {detected_style}")
                  
-                 images = enhanced_image_gen.generate_with_style(clean_prompt, style=detected_style, num_images=1)
+                 user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+                 images = enhanced_image_gen.generate_with_style(clean_prompt, style=detected_style, num_images=1, user_id=user_id)
                  if images:
                      # Helper to convert to URL path relative to server root
                      img_url = f"/data/Images/{os.path.basename(images[0])}"
@@ -2479,32 +2737,43 @@ Say 'Watch {title}' to start streaming!"""
              print(f"[SMART-TRIGGER] Detected {trigger_type} command: {command}")
              
              try:
-                 # Handle SYSTEM commands directly for immediate feedback
+                 # Handle SYSTEM commands directly using psutil (no UltimatePCControl needed)
                  if trigger_type == "system":
-                     from Backend.UltimatePCControl import ultimate_pc
+                     import psutil
+                     # Use global 'os' module (imported at top of file)
                      cmd_lower = command.lower() if command else ""
                      
                      if "battery" in cmd_lower or "power" in cmd_lower:
-                         stats = ultimate_pc.get_beast_stats()
-                         batt = stats.get('battery', {})
-                         percent = batt.get('percent', 'Unknown')
-                         plugged = batt.get('plugged', False)
-                         response_text = f"🔋 Battery: {percent}% [{'⚡ Plugged' if plugged else '🔌 On Battery'}] | RAM Use: {stats['memory']['percent']}%"
+                         battery = psutil.sensors_battery()
+                         if battery:
+                             percent = battery.percent
+                             plugged = battery.power_plugged
+                             mem = psutil.virtual_memory()
+                             response_text = f"🔋 Battery: {percent}% [{'⚡ Plugged' if plugged else '🔌 On Battery'}] | RAM Use: {mem.percent}%"
+                         else:
+                             mem = psutil.virtual_memory()
+                             response_text = f"🖥️ Desktop PC (no battery) | RAM Use: {mem.percent}%"
                      elif "shutdown" in cmd_lower:
-                         ultimate_pc.shutdown(60)
+                         os.system("shutdown /s /t 60")
                          response_text = "⚠️ System will shutdown in 60 seconds."
                      elif "restart" in cmd_lower:
-                         ultimate_pc.restart(60)
+                         os.system("shutdown /r /t 60")
                          response_text = "🔄 System will restart in 60 seconds."
                      elif "sleep" in cmd_lower:
-                         ultimate_pc.sleep()
+                         os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
                          response_text = "😴 System Sleeping."
                      elif "optimize" in cmd_lower or "cleanup" in cmd_lower:
-                         response_text = f"🧹 {ultimate_pc.optimize_system()}"
+                         response_text = "🧹 System optimization initiated. Use Windows Disk Cleanup for best results."
                      elif "stats" in cmd_lower or "health" in cmd_lower or "pc" in cmd_lower:
-                         stats = ultimate_pc.get_beast_stats()
-                         top_hogs = ", ".join([h['name'] for h in stats['hogs'][:3]])
-                         response_text = f"🖥️ **System Health**\n- CPU: {stats['cpu']['total']}% | RAM: {stats['memory']['percent']}%\n- Hogs: {top_hogs}\n- Uptime: {stats['uptime']}"
+                         cpu_percent = psutil.cpu_percent(interval=0.1)
+                         mem = psutil.virtual_memory()
+                         # Get top processes
+                         procs = sorted(psutil.process_iter(['name', 'cpu_percent']), key=lambda p: p.info['cpu_percent'] or 0, reverse=True)[:3]
+                         top_hogs = ", ".join([p.info['name'] for p in procs if p.info['name']])
+                         boot_time = psutil.boot_time()
+                         import datetime
+                         uptime = str(datetime.datetime.now() - datetime.datetime.fromtimestamp(boot_time)).split('.')[0]
+                         response_text = f"🖥️ **System Health**\\n- CPU: {cpu_percent}% | RAM: {mem.percent}%\\n- Top Processes: {top_hogs}\\n- Uptime: {uptime}"
                      elif "screenshot" in cmd_lower:
                          try:
                              from Backend.ChromeAutomation import chrome_bot
@@ -2678,13 +2947,34 @@ Say 'Watch {title}' to start streaming!"""
                              response_text = f"⚠️ Could not find or open '{app_name}'. Make sure it's installed."
 
                  
-                 # Handle CHROME commands
-                 elif trigger_type == "chrome":
-                     if Automation:
-                         asyncio.run(Automation([f"chrome {command}"]))
-                         response_text = f"🌐 Chrome: {command}"
-                     else:
-                         response_text = "Automation module is not loaded."
+                 # Handle WEB SEARCH commands (renamed from chrome - now uses RealtimeSearchEngine)
+                 elif trigger_type == "chrome" or trigger_type == "web_search":
+                     try:
+                         from Backend.RealtimeSearchEngine import RealtimeSearchEngine
+                         search_query = command if command else query
+                         print(f"[WEB-SEARCH] Executing realtime search: {search_query}")
+                         result = RealtimeSearchEngine(search_query)
+                         
+                         # Handle new structured response format
+                         if isinstance(result, dict):
+                             response_text = result.get("text", "No results found.")
+                             sources = result.get("sources", [])
+                             engine = result.get("engine", "unknown")
+                             print(f"[WEB-SEARCH] Engine: {engine}, Sources: {len(sources)}")
+                             
+                             # Return with sources for UI cards
+                             return jsonify({
+                                 "response": response_text,
+                                 "sources": sources,
+                                 "search_engine": engine,
+                                 "type": "web_search"
+                             }), 200
+                         else:
+                             # Fallback for string response
+                             response_text = result if result else "No results found."
+                     except Exception as se:
+                         print(f"[WEB-SEARCH] Error: {se}")
+                         response_text = f"Search error: {str(se)}"
                  
                  # Handle WORKFLOW commands with SmartWorkflows
                  elif trigger_type == "workflow":
@@ -3255,11 +3545,26 @@ What would you like me to do?"""
 
         # 10. VISION COMMANDS
         elif trigger_type == "vision":
-             if VisionAnalysis:
-                 print(f"[SMART-TRIGGER] Vision command detected.")
-                 response_text = VisionAnalysis(command)
+             # Check if this is a PDF/document query with attachment context - use ChatBot instead
+             if attachment_context and ('[PDF' in attachment_context or '[ATTACHED' in attachment_context):
+                 print(f"[VISION] Redirecting to ChatBot - has attachment context, not an image path")
+                 trigger_type = None  # Will fall through to ChatBot
              else:
-                 response_text = "Vision module is not loaded."
+                 try:
+                     from Backend.VisionService import get_vision_service
+                     vision = get_vision_service()
+                     print(f"[SMART-TRIGGER] Vision command detected.")
+                     # Use VisionService for vision analysis - command should be an image path
+                     if hasattr(vision, 'analyze') and command and _os.path.exists(command):
+                         result = vision.analyze(command, "Describe this image in detail.")
+                         response_text = result.get('description', 'Vision analysis completed.')
+                     else:
+                         # Not a valid image path, redirect to ChatBot
+                         print(f"[VISION] Not a valid image path, using ChatBot")
+                         trigger_type = None
+                 except Exception as ve:
+                     print(f"[VISION] Error: {ve}")
+                     response_text = "Vision module is not available."
                  
         # 11. DOCUMENT/PDF GENERATION
 
@@ -3462,12 +3767,13 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
              print(f"[SMART-TRIGGER] No specific automation triggers. Using ChatBot for conversation.")
              
              # Use ChatBot for general conversational queries
-             # Initialize metadata for response
-             chat_metadata = {} 
+             
+             # Prepend user context if available
+             personalized_query = user_context + query if user_context else query
              
              if ChatBot:
                  print("[DEBUG] Using ChatBot for general query")
-                 cb_response = ChatBot(query)
+                 cb_response = ChatBot(personalized_query)
                  
                  # Handle dictionary response from Enhanced Chatbot
                  if isinstance(cb_response, dict):
@@ -3479,7 +3785,7 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
                  # Lazy load ChatBot
                  print("[DEBUG] Loading ChatBot module")
                  from Backend.Chatbot_Enhanced import ChatBot as CB
-                 cb_response = CB(query)
+                 cb_response = CB(personalized_query)
                  if isinstance(cb_response, dict):
                      response_text = cb_response.get("response", "")
                      chat_metadata = cb_response.get("metadata", {})
@@ -3528,10 +3834,20 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
 
         
     except Exception as e:
-        print(f"[ERROR] Chat Processing Failed: {e}")
+        print(f"[ERROR] ========== CHAT ENDPOINT EXCEPTION ==========")
+        print(f"[ERROR] Query: {query[:200] if query else 'None'}...")
+        print(f"[ERROR] Exception: {e}")
+        print(f"[ERROR] Exception Type: {type(e).__name__}")
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        print(f"[ERROR] ================================================")
+        
+        # Return a user-friendly error with details for debugging
+        return jsonify({
+            "error": "Chat processing failed",
+            "details": str(e),
+            "type": type(e).__name__
+        }), 500
 
 
 
@@ -4074,9 +4390,111 @@ def reminders():
 @app.route('/api/v1/system/stats', methods=['GET'])
 @require_api_key
 def system_stats_api():
-    if ultimate_pc:
-        return jsonify({"status": "success", "stats": ultimate_pc.get_system_stats()})
-    return jsonify({"error": "PC Control not loaded"}), 503
+    import psutil
+    try:
+        cpu = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        return jsonify({"status": "success", "stats": {
+            "cpu_percent": cpu,
+            "memory_percent": mem.percent,
+            "memory_used_gb": round(mem.used / (1024**3), 2),
+            "disk_percent": disk.percent
+        }})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ==================== USER SETTINGS API ====================
+
+@app.route('/api/v1/settings/<user_id>', methods=['GET'])
+def get_user_settings(user_id):
+    """Get all user settings"""
+    try:
+        from Backend.SupabaseDB import supabase_db
+        if not supabase_db:
+            return jsonify({"error": "Database not available"}), 503
+        
+        settings = supabase_db.get_user_settings(user_id)
+        return jsonify({
+            "status": "success",
+            "settings": settings
+        })
+    except Exception as e:
+        print(f"[SETTINGS API] Get error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/settings/<user_id>', methods=['PUT'])
+def save_user_settings(user_id):
+    """Save all user settings"""
+    try:
+        from Backend.SupabaseDB import supabase_db
+        if not supabase_db:
+            return jsonify({"error": "Database not available"}), 503
+        
+        data = request.json
+        if not data:
+            return jsonify({"error": "No settings data provided"}), 400
+        
+        success = supabase_db.save_user_settings(user_id, data)
+        
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": "Settings saved successfully"
+            })
+        else:
+            return jsonify({"error": "Failed to save settings"}), 500
+            
+    except Exception as e:
+        print(f"[SETTINGS API] Save error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/profile/<user_id>', methods=['GET'])
+def get_settings_profile(user_id):
+    """Get user profile with stats, rank, and achievements"""
+    try:
+        from Backend.SupabaseDB import supabase_db
+        if not supabase_db:
+            return jsonify({"error": "Database not available"}), 503
+        
+        profile = supabase_db.get_user_profile(user_id)
+        return jsonify({
+            "status": "success",
+            "profile": profile
+        })
+    except Exception as e:
+        print(f"[PROFILE API] Get error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/profile/<user_id>', methods=['PUT'])
+def update_settings_profile(user_id):
+    """Update user profile"""
+    try:
+        from Backend.SupabaseDB import supabase_db
+        if not supabase_db:
+            return jsonify({"error": "Database not available"}), 503
+        
+        data = request.json
+        if not data:
+            return jsonify({"error": "No profile data provided"}), 400
+        
+        success = supabase_db.update_user_profile(user_id, data)
+        
+        if success:
+            # Return updated profile with stats
+            profile = supabase_db.get_user_profile(user_id)
+            return jsonify({
+                "status": "success",
+                "message": "Profile updated successfully",
+                "profile": profile
+            })
+        else:
+            return jsonify({"error": "Failed to update profile"}), 500
+            
+    except Exception as e:
+        print(f"[PROFILE API] Update error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/api/v1/predictions', methods=['GET'])
 @require_api_key
@@ -4215,32 +4633,54 @@ def get_predictions():
 @app.route('/api/v1/system/detailed_stats', methods=['GET'])
 @require_api_key
 def get_system_stats():
-    if not ultimate_pc:
-        return jsonify({"error": "PC Control not loaded"}), 503
-    return jsonify({"stats": ultimate_pc.get_system_stats()})
+    import psutil
+    try:
+        cpu = psutil.cpu_percent(interval=0.1, percpu=True)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        boot = psutil.boot_time()
+        import datetime
+        uptime = str(datetime.datetime.now() - datetime.datetime.fromtimestamp(boot)).split('.')[0]
+        battery = psutil.sensors_battery()
+        return jsonify({"stats": {
+            "cpu_percent": psutil.cpu_percent(interval=0.1),
+            "cpu_per_core": cpu,
+            "memory_percent": mem.percent,
+            "memory_available_gb": round(mem.available / (1024**3), 2),
+            "disk_percent": disk.percent,
+            "uptime": uptime,
+            "battery": {"percent": battery.percent, "plugged": battery.power_plugged} if battery else None
+        }})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/v1/system/control', methods=['POST'])
 @require_api_key
 def system_control():
-    if not ultimate_pc:
-        return jsonify({"error": "PC Control not loaded"}), 503
     data = request.json
     action = data.get('action', '')
     
-    if action == 'shutdown':
-        ultimate_pc.shutdown(60)
-        return jsonify({"message": "Shutting down in 60s"})
-    elif action == 'restart':
-        ultimate_pc.restart(60)
-        return jsonify({"message": "Restarting in 60s"})
-    elif action == 'lock':
-        os.system("rundll32.exe user32.dll,LockWorkStation")
-        return jsonify({"message": "System Locked"})
-    elif action == 'screenshot':
-        file = ultimate_pc.take_screenshot()
-        return jsonify({"message": "Screenshot taken", "file": file})
-        
-    return jsonify({"error": "Unknown action"}), 400
+    try:
+        if action == 'shutdown':
+            os.system("shutdown /s /t 60")
+            return jsonify({"message": "Shutting down in 60s"})
+        elif action == 'restart':
+            os.system("shutdown /r /t 60")
+            return jsonify({"message": "Restarting in 60s"})
+        elif action == 'lock':
+            os.system("rundll32.exe user32.dll,LockWorkStation")
+            return jsonify({"message": "System Locked"})
+        elif action == 'screenshot':
+            import pyautogui
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"screenshot_{timestamp}.png"
+            pyautogui.screenshot(filename)
+            return jsonify({"message": "Screenshot taken", "file": filename})
+        else:
+            return jsonify({"error": "Unknown action"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # --- FILE UPLOAD & ANALYSIS ---
 # --- VISION & FILE UPLOAD ROUTES ---
@@ -4684,7 +5124,8 @@ def create_pdf():
             "sections": sections
         }
         
-        pdf_result = document_generator.generate_pdf(title, pdf_content)
+        user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+        pdf_result = document_generator.generate_pdf(title, pdf_content, user_id=user_id)
         
         # generate_pdf returns a dict with: filepath, url, filename, title
         return jsonify({
@@ -4723,7 +5164,8 @@ def create_powerpoint():
         }
         
         # generate_presentation returns a filepath string
-        filepath = document_generator.generate_presentation(title, ppt_content)
+        user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+        filepath = document_generator.generate_presentation(title, ppt_content, user_id=user_id)
         
         filename = os.path.basename(filepath)
         return jsonify({
@@ -4754,7 +5196,8 @@ def create_report():
             "sections": sections if sections else [{"heading": "Introduction", "content": f"This report covers {topic}.", "type": "paragraph"}]
         }
         
-        pdf_result = document_generator.generate_pdf(topic, pdf_content)
+        user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+        pdf_result = document_generator.generate_pdf(topic, pdf_content, user_id=user_id)
         
         return jsonify({
             "status": "success",
@@ -4783,7 +5226,8 @@ def generate_enhanced_image():
         if not prompt:
             return jsonify({"error": "Prompt required"}), 400
         
-        images = enhanced_image_gen.generate_with_style(prompt, style, num_images)
+        user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+        images = enhanced_image_gen.generate_with_style(prompt, style, num_images, user_id=user_id)
         
         # Convert to relative URLs
         image_urls = [f"/data/Images/{os.path.basename(img)}" for img in images]
@@ -4812,7 +5256,8 @@ def generate_hd_image():
         if not prompt:
             return jsonify({"error": "Prompt required"}), 400
         
-        images = enhanced_image_gen.generate_hd(prompt, num_images)
+        user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+        images = enhanced_image_gen.generate_hd(prompt, num_images, user_id=user_id)
         image_urls = [f"/data/Images/{os.path.basename(img)}" for img in images]
         
         return jsonify({
@@ -4839,7 +5284,8 @@ def generate_image_variations():
         if not prompt:
             return jsonify({"error": "Prompt required"}), 400
         
-        result = enhanced_image_gen.generate_variations(prompt, variations, num_per_variation=1)
+        user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+        result = enhanced_image_gen.generate_variations(prompt, variations, num_per_variation=1, user_id=user_id)
         
         # Format response
         formatted_result = {}
@@ -6920,6 +7366,157 @@ def anime_watchlist_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ==================== ULTIMATE VOICE API ====================
+
+@app.route('/api/v1/voice/speak', methods=['POST'])
+def voice_speak():
+    """
+    Text-to-Speech endpoint.
+    
+    Body: {
+        "text": "Text to speak",
+        "language": "english|hindi|hinglish" (optional, auto-detect),
+        "voice": "specific voice name" (optional),
+        "speed": "+10%" (optional)
+    }
+    
+    Returns: { "status": "success", "audio_url": "/Data/tts_xxx.mp3" }
+    """
+    try:
+        from Backend.UltimateVoice import get_ultimate_voice
+        import asyncio
+        
+        data = request.json or {}
+        text = data.get('text', '')
+        language = data.get('language')  # english, hindi, hinglish
+        voice = data.get('voice')
+        speed = data.get('speed', '+0%')
+        
+        if not text:
+            return jsonify({"error": "Text is required"}), 400
+        
+        voice_service = get_ultimate_voice()
+        
+        # Run async TTS in sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            audio_path = loop.run_until_complete(
+                voice_service.speak_async(text, voice=voice, language=language, speed=speed)
+            )
+        finally:
+            loop.close()
+        
+        if audio_path and os.path.exists(audio_path):
+            # Return relative URL for frontend
+            relative_path = audio_path.replace(os.path.dirname(os.path.abspath(__file__)), '').replace('\\', '/').lstrip('/')
+            return jsonify({
+                "status": "success",
+                "audio_url": f"/{relative_path}",
+                "language": language or voice_service.detect_language(text)
+            }), 200
+        else:
+            return jsonify({"error": "TTS generation failed"}), 500
+            
+    except Exception as e:
+        print(f"[Voice/Speak] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/voice/transcribe', methods=['POST'])
+def voice_transcribe():
+    """
+    Speech-to-Text endpoint using Groq Whisper.
+    
+    Accepts audio file upload or base64 audio.
+    
+    Returns: { "status": "success", "text": "transcribed text" }
+    """
+    try:
+        from Backend.UltimateVoice import get_ultimate_voice
+        import asyncio
+        
+        voice_service = get_ultimate_voice()
+        audio_data = None
+        temp_path = None
+        
+        # Check for file upload
+        if 'audio' in request.files:
+            audio_file = request.files['audio']
+            temp_path = os.path.join(DATA_DIR, f"stt_temp_{int(time.time()*1000)}.wav")
+            audio_file.save(temp_path)
+            with open(temp_path, 'rb') as f:
+                audio_data = f.read()
+        
+        # Check for base64 audio
+        elif request.json and 'audio_base64' in request.json:
+            import base64
+            audio_data = base64.b64decode(request.json['audio_base64'])
+        
+        else:
+            return jsonify({"error": "No audio provided. Send 'audio' file or 'audio_base64'"}), 400
+        
+        # Transcribe
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            text = loop.run_until_complete(
+                voice_service.transcribe_async(audio_data=audio_data)
+            )
+        finally:
+            loop.close()
+        
+        # Clean up temp file
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        
+        if text:
+            return jsonify({
+                "status": "success",
+                "text": text
+            }), 200
+        else:
+            return jsonify({"error": "Transcription failed or no speech detected"}), 400
+            
+    except Exception as e:
+        print(f"[Voice/Transcribe] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/voice/interrupt', methods=['POST'])
+def voice_interrupt():
+    """Stop any ongoing TTS playback (barge-in)."""
+    try:
+        from Backend.UltimateVoice import get_ultimate_voice
+        
+        voice_service = get_ultimate_voice()
+        voice_service.interrupt()
+        
+        return jsonify({"status": "success", "message": "TTS interrupted"}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/voice/voices', methods=['GET'])
+def voice_list_voices():
+    """Get list of available TTS voices."""
+    try:
+        from Backend.UltimateVoice import get_ultimate_voice
+        
+        voice_service = get_ultimate_voice()
+        voices = voice_service.get_available_voices()
+        
+        return jsonify({
+            "status": "success",
+            "voices": voices
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ==================== STARTUP ====================
 
 def load_all_integrations():
@@ -6969,11 +7566,7 @@ def load_all_integrations():
         print("[OK] Loaded video_player")
     except Exception as e: print(f"[FAIL] video_player: {e}")
 
-    try:
-        from Backend.UltimatePCControl import UltimatePCControl
-        gl['ultimate_pc'] = UltimatePCControl()
-        print("[OK] Loaded ultimate_pc")
-    except: pass
+    # UltimatePCControl removed - using psutil directly for system commands
     
     print("[INIT] All integrations loaded.")
 
