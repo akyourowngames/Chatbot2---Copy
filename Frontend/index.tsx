@@ -3435,7 +3435,7 @@ async function uploadAvatar(event: Event) {
     reader.onload = async (e) => {
         const dataUrl = e.target?.result as string;
 
-        // Update avatar preview
+        // Update avatar preview immediately
         const avatarImg = document.getElementById('settings-avatar') as HTMLImageElement;
         if (avatarImg) {
             avatarImg.src = dataUrl;
@@ -3448,14 +3448,9 @@ async function uploadAvatar(event: Event) {
             headerAvatarImg.src = dataUrl;
         }
 
-        // Save to localStorage for persistence (user-specific key)
-        const userId = auth?.currentUser?.uid;
-        if (userId) {
-            localStorage.setItem(`kai_avatar_${userId}`, dataUrl);
-        }
         settingsState.avatar = dataUrl;
 
-        // Try to upload to Supabase if authenticated
+        // 🔥 HYBRID APPROACH: Upload to Supabase Storage, save URL to Firebase Profile
         const user = auth?.currentUser;
         if (user && supabase) {
             try {
@@ -3467,11 +3462,28 @@ async function uploadAvatar(event: Event) {
                 if (data && !error) {
                     const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${data.path}`;
                     settingsState.avatarUrl = publicUrl;
-                    saveSettingsToStorage();
-                    LOG.info('SETTINGS', 'Avatar uploaded to Supabase', { path: data.path });
+
+                    // 🔥 SAVE URL TO FIREBASE PROFILE (syncs across domains!)
+                    try {
+                        // Update cachedUserProfile with new avatar URL
+                        if (cachedUserProfile) {
+                            cachedUserProfile.avatarUrl = publicUrl;
+                            await FirebaseDB.saveUserProfile(user.uid, cachedUserProfile);
+                            LOG.info('SETTINGS', 'Avatar URL saved to Firebase profile', { url: publicUrl });
+                        }
+                    } catch (fbErr) {
+                        LOG.warn('SETTINGS', 'Failed to save avatar URL to Firebase', fbErr);
+                    }
+
+                    // Also cache locally as fallback
+                    localStorage.setItem(`kai_avatar_${user.uid}`, publicUrl);
+
+                    LOG.info('SETTINGS', 'Avatar uploaded to Supabase', { path: data.path, url: publicUrl });
                 }
             } catch (e) {
                 LOG.warn('SETTINGS', 'Failed to upload avatar to Supabase', e);
+                // Fallback: save dataUrl to localStorage only
+                localStorage.setItem(`kai_avatar_${user.uid}`, dataUrl);
             }
         }
 
@@ -3483,24 +3495,38 @@ async function uploadAvatar(event: Event) {
 (window as any).uploadAvatar = uploadAvatar;
 
 // Load saved avatar on settings open AND sync header avatar
+// 🔥 HYBRID: Loads from Firebase profile (syncs across domains) or localStorage fallback
 function loadSavedAvatar() {
     const userId = auth?.currentUser?.uid;
     if (!userId) return;
 
-    const savedAvatar = localStorage.getItem(`kai_avatar_${userId}`);
-    if (savedAvatar) {
-        // Update settings avatar
+    // Helper to apply avatar to UI
+    const applyAvatar = (avatarUrl: string) => {
         const avatarImg = document.getElementById('settings-avatar') as HTMLImageElement;
         if (avatarImg) {
-            avatarImg.src = savedAvatar;
+            avatarImg.src = avatarUrl;
             avatarImg.style.opacity = '1';
         }
-
-        // 🔗 SYNC: Also update the header avatar in top-right corner
         const headerAvatarImg = document.getElementById('user-avatar-img') as HTMLImageElement;
         if (headerAvatarImg) {
-            headerAvatarImg.src = savedAvatar;
+            headerAvatarImg.src = avatarUrl;
         }
+    };
+
+    // 1️⃣ First try: Firebase profile (syncs across domains)
+    if (cachedUserProfile && cachedUserProfile.avatarUrl) {
+        LOG.info('SETTINGS', 'Loading avatar from Firebase profile', { url: cachedUserProfile.avatarUrl });
+        applyAvatar(cachedUserProfile.avatarUrl);
+        // Also update localStorage as cache
+        localStorage.setItem(`kai_avatar_${userId}`, cachedUserProfile.avatarUrl);
+        return;
+    }
+
+    // 2️⃣ Fallback: localStorage (for offline/quick load)
+    const savedAvatar = localStorage.getItem(`kai_avatar_${userId}`);
+    if (savedAvatar) {
+        LOG.info('SETTINGS', 'Loading avatar from localStorage fallback');
+        applyAvatar(savedAvatar);
     }
 }
 
