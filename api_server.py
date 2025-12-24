@@ -148,6 +148,23 @@ except Exception as e:
     print(f"[WARN] MemoryIntelligence preload failed: {e}")
     _memory_intelligence = None
 
+# Preload Per-User Memory System (NEW - Beast Mode)
+try:
+    from Backend.PerUserMemory import per_user_memory, remember, recall, get_context
+    from Backend.PerUserChatbot import PerUserChatBot, get_user_memory_summary
+    _per_user_memory = per_user_memory
+    PER_USER_MEMORY_ENABLED = True
+    print(f"[OK] Per-User Memory System preloaded (Beast Mode)")
+except Exception as e:
+    print(f"[WARN] Per-User Memory System preload failed: {e}")
+    _per_user_memory = None
+    PER_USER_MEMORY_ENABLED = False
+    def remember(*args, **kwargs): return False
+    def recall(*args, **kwargs): return []
+    def get_context(*args, **kwargs): return []
+    def PerUserChatBot(*args, **kwargs): return {"response": "Memory system unavailable", "type": "error"}
+    def get_user_memory_summary(*args, **kwargs): return {}
+
 # from Backend.Dispatcher import dispatcher # KAI Intelligence Engine (Bypassed)
 
 # ==================== HEALTH CHECK (CRITICAL) ====================
@@ -1452,6 +1469,38 @@ def chat():
     image_path = data.get('image_path')  # Legacy support
     attachments = data.get('attachments', [])  # New: array of {name, url, type}
     user_preferences = data.get('user_preferences')  # User profile settings
+    
+    # === PER-USER MEMORY SYSTEM (NEW - Beast Mode) ===
+    user_id = data.get('uid', 'anonymous')  # Firebase UID from frontend
+    session_id = data.get('session_id', 'default')  # Chat session ID
+    
+    # Inject relevant memories into context
+    memory_context = ""
+    memory_accessed = False
+    memory_saved = False
+    
+    if PER_USER_MEMORY_ENABLED and user_id != 'anonymous':
+        try:
+            # 1. Recall semantically similar memories for this user
+            relevant_memories = recall(user_id, query, limit=5)
+            
+            if relevant_memories:
+                memory_accessed = True
+                memory_context = "\n[🧠 MEMORY CONTEXT - What you remember about this user]:\n"
+                for mem in relevant_memories[:5]:
+                    content = mem.get('content', '')[:150]
+                    category = mem.get('category', 'general')
+                    memory_context += f"• [{category}] {content}\n"
+                memory_context += "\nUse these memories to personalize your response naturally.\n"
+                print(f"[MEMORY] Recalled {len(relevant_memories)} memories for user {user_id[:8]}")
+            
+            # 2. Get cross-session context
+            cross_context = get_context(user_id, session_id, query)
+            if cross_context:
+                memory_context += f"\n[Previous sessions context: {len(cross_context)} relevant items]\n"
+                
+        except Exception as mem_error:
+            print(f"[MEMORY] Recall error: {mem_error}")
     
     # === USER PREFERENCES CONTEXT (NEW) ===
     # Build personalized context from user settings
@@ -3768,8 +3817,9 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
              
              # Use ChatBot for general conversational queries
              
-             # Prepend user context if available
-             personalized_query = user_context + query if user_context else query
+             # Prepend user context and memory context if available
+             combined_context = (memory_context or "") + (user_context or "")
+             personalized_query = combined_context + query if combined_context else query
              
              if ChatBot:
                  print("[DEBUG] Using ChatBot for general query")
@@ -3825,10 +3875,48 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
             except Exception as mem_err:
                 print(f"[MEMORY] Failed to save: {mem_err}")
 
+        # === SAVE TO PER-USER MEMORY (Beast Mode) ===
+        if PER_USER_MEMORY_ENABLED and user_id != 'anonymous':
+            try:
+                # Extract important information from the conversation
+                # Check for memory-worthy patterns in user's query
+                query_lower = query.lower()
+                memory_triggers = {
+                    'preference': ['i prefer', 'i like', 'i love', 'i hate', 'i enjoy', 'my favorite'],
+                    'personal': ['my name is', 'i am', "i'm", 'i work', 'i live', 'my job'],
+                    'context': ['working on', 'my project', 'the app', 'the code'],
+                }
+                
+                saved_category = None
+                for category, triggers in memory_triggers.items():
+                    if any(trigger in query_lower for trigger in triggers):
+                        remember(user_id, query, category, 0.6, session_id)
+                        saved_category = category
+                        memory_saved = True
+                        break
+                
+                # Save explicit memory requests
+                if any(phrase in query_lower for phrase in ['remember that', 'remember this', "don't forget"]):
+                    remember(user_id, query, 'explicit', 0.9, session_id)
+                    memory_saved = True
+                    
+                if memory_saved:
+                    print(f"[MEMORY] Saved to per-user memory: {query[:50]}... (cat: {saved_category})")
+            except Exception as mem_save_err:
+                print(f"[MEMORY] Per-user save failed: {mem_save_err}")
+
+        # Include memory metadata in response
+        if 'metadata' not in chat_metadata or chat_metadata.get('metadata') is None:
+            chat_metadata['metadata'] = {}
+        chat_metadata['memory_accessed'] = memory_accessed
+        chat_metadata['memory_saved'] = memory_saved
+
         return jsonify({
             "response": response_text,
             "command_executed": True,
-            "metadata": chat_metadata
+            "metadata": chat_metadata,
+            "memory_accessed": memory_accessed,
+            "memory_saved": memory_saved
         })
 
 
@@ -3849,6 +3937,124 @@ Write in a professional, informative tone. Use clear paragraphs. Do NOT use mark
             "type": type(e).__name__
         }), 500
 
+
+# ==================== PER-USER MEMORY API ====================
+@app.route('/api/v1/memory/stats', methods=['POST'])
+@require_api_key
+def memory_stats():
+    """Get memory statistics for a user"""
+    try:
+        data = request.json
+        user_id = data.get('uid', '')
+        
+        if not user_id:
+            return jsonify({"error": "User ID required"}), 400
+        
+        if not PER_USER_MEMORY_ENABLED:
+            return jsonify({"error": "Memory system not available"}), 503
+        
+        stats = _per_user_memory.get_memory_stats(user_id)
+        return jsonify(stats)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/memory/search', methods=['POST'])
+@require_api_key
+def memory_search():
+    """Search user's memories semantically"""
+    try:
+        data = request.json
+        user_id = data.get('uid', '')
+        query = data.get('query', '')
+        limit = data.get('limit', 5)
+        
+        if not user_id or not query:
+            return jsonify({"error": "User ID and query required"}), 400
+        
+        if not PER_USER_MEMORY_ENABLED:
+            return jsonify({"error": "Memory system not available"}), 503
+        
+        results = recall(user_id, query, limit)
+        # Clean up results (remove embeddings)
+        clean_results = []
+        for r in results:
+            clean_results.append({
+                "content": r.get('content', ''),
+                "category": r.get('category', 'general'),
+                "importance": r.get('importance', 0.5),
+                "similarity": r.get('similarity', 0),
+                "created_at": r.get('created_at', '')
+            })
+        
+        return jsonify({"results": clean_results, "count": len(clean_results)})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/memory/add', methods=['POST'])
+@require_api_key
+def memory_add():
+    """Manually add a memory for a user"""
+    try:
+        data = request.json
+        user_id = data.get('uid', '')
+        content = data.get('content', '')
+        category = data.get('category', 'general')
+        importance = data.get('importance', 0.5)
+        
+        if not user_id or not content:
+            return jsonify({"error": "User ID and content required"}), 400
+        
+        if not PER_USER_MEMORY_ENABLED:
+            return jsonify({"error": "Memory system not available"}), 503
+        
+        success = remember(user_id, content, category, importance)
+        return jsonify({"success": success})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/memory/clear', methods=['POST'])
+@require_api_key
+def memory_clear():
+    """Clear memories for a user (GDPR compliance)"""
+    try:
+        data = request.json
+        user_id = data.get('uid', '')
+        category = data.get('category')  # Optional: clear only specific category
+        
+        if not user_id:
+            return jsonify({"error": "User ID required"}), 400
+        
+        if not PER_USER_MEMORY_ENABLED:
+            return jsonify({"error": "Memory system not available"}), 503
+        
+        success = _per_user_memory.delete_user_memories(user_id, category)
+        return jsonify({"success": success, "message": "Memories cleared" if success else "Failed to clear"})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/v1/memory/compress', methods=['POST'])
+@require_api_key
+def memory_compress():
+    """Compress old memories to save space"""
+    try:
+        data = request.json
+        user_id = data.get('uid', '')
+        
+        if not user_id:
+            return jsonify({"error": "User ID required"}), 400
+        
+        if not PER_USER_MEMORY_ENABLED:
+            return jsonify({"error": "Memory system not available"}), 503
+        
+        compressed_count = _per_user_memory.compress_old_memories(user_id)
+        return jsonify({"compressed": compressed_count})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # --- SPEECH ---
