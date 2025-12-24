@@ -212,7 +212,7 @@ def DuckDuckGoSearch(query, return_list=False):
             params={"query": query, "engine": "DuckDuckGo", "num_results": 5},
             description=f"DuckDuckGo Search: {query}"
         )
-    logger.info(f"Searching DuckDuckGo for: {query}")
+    print(f"[DuckDuckGo] Searching for: {query}")
 
     try:
         from duckduckgo_search import DDGS
@@ -235,67 +235,120 @@ def DuckDuckGoSearch(query, return_list=False):
     return [] if return_list else None
 
 def RealtimeSearchEngine(prompt):
-    global SystemChatBot, messages
+    """
+    🚀 BEAST MODE: Gemini with Google Search Grounding for REAL-TIME web access.
+    Uses Gemini 2.0 Flash with search grounding to get live, intelligent answers.
+    Falls back to DuckDuckGo if Gemini fails.
+    """
+    print(f"[RealtimeSearch] 🔍 Query: {prompt}")
     
-    with open(chatlog_path, "r") as f:
-        messages = load(f)
+    # Clean the query
+    clean_query = prompt.lower().replace("search for", "").replace("@search", "").strip()
+    if not clean_query:
+        clean_query = prompt
     
-    if not any(msg['role'] == 'system' for msg in messages):
-        messages.insert(0, {"role": "system", "content": System})
+    sources = []  # Collect sources for UI cards
     
-    messages.append({"role": "user", "content": f"{prompt}"})
-
-    # 1) Specialized Intents
-    yt = fetch_youtube_best_video(prompt)
-    if yt:
-        messages.append({"role": "assistant", "content": yt})
-        with open(chatlog_path, "w") as f: dump(messages, f, indent=4)
-        try:
-            from pywhatkit import playonyt
-            playonyt(yt)
-        except Exception:
-            pass
-        return AnswerModifier(Answer=f"Playing: {yt}")
-
-    crypto = fetch_crypto_price(prompt)
-    if crypto:
-        messages.append({"role": "assistant", "content": crypto})
-        with open(chatlog_path, "w") as f: dump(messages, f, indent=4)
-        return AnswerModifier(Answer=crypto)
-
-    stock = fetch_stock_quote(prompt)
-    if stock:
-        messages.append({"role": "assistant", "content": stock})
-        with open(chatlog_path, "w") as f: dump(messages, f, indent=4)
-        return AnswerModifier(Answer=stock)
-
-    news = fetch_news_headlines(prompt)
-    if news:
-        messages.append({"role": "assistant", "content": news})
-        with open(chatlog_path, "w") as f: dump(messages, f, indent=4)
-        return AnswerModifier(Answer=news)
-    
-    # 2) Deep Research (The Upgrade)
-    print(f"[RealtimeSearch] Initiating Next-Gen Deep Search for: {prompt}")
-    search_context = DeepSearch(prompt)
-    
-    SystemChatBot.append({"role": "system", "content": search_context})
-    
-    # 3) LLM Synthesis
-    Answer = ChatCompletion(
-        model="llama-3.3-70b-versatile",
-        messages=SystemChatBot + [{"role": "system", "content": Information()}] + messages,
-        text_only=True
-    )
-    
-    Answer = Answer.strip().replace("</s>", "")
-    messages.append({"role": "assistant", "content": Answer})
-    
-    with open(chatlog_path, "w") as f:
-        dump(messages, f, indent=4)
+    # === GEMINI WITH SEARCH GROUNDING (BEAST MODE) ===
+    try:
+        import google.generativeai as genai
         
-    SystemChatBot.pop()
-    return AnswerModifier(Answer=Answer)
+        # Get Gemini API key
+        gemini_key = os.getenv("GEMINI_API_KEY") or env_vars.get("GEMINI_API_KEY")
+        
+        if gemini_key:
+            genai.configure(api_key=gemini_key)
+            
+            # Use Gemini 2.0 Flash with dynamic retrieval (Google Search grounding)
+            model = genai.GenerativeModel(
+                model_name="gemini-2.0-flash-exp",
+                tools="google_search_retrieval"  # Correct syntax for grounding
+            )
+            
+            # Create the search prompt
+            search_prompt = f"""Search the web for the latest information about: {clean_query}
+
+Provide a comprehensive, well-structured answer with:
+- Current facts and data
+- Recent news or updates  
+- Key details the user should know
+
+Be direct and informative. Use markdown formatting."""
+
+            print(f"[RealtimeSearch] 🌐 Using Gemini with Google Search Grounding...")
+            
+            response = model.generate_content(search_prompt)
+            
+            if response and response.text:
+                result_text = response.text
+                
+                # Extract grounding sources if available
+                try:
+                    if hasattr(response, 'candidates') and response.candidates:
+                        candidate = response.candidates[0]
+                        if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
+                            gm = candidate.grounding_metadata
+                            # Get grounding chunks (sources)
+                            if hasattr(gm, 'grounding_chunks'):
+                                for chunk in gm.grounding_chunks[:5]:  # Top 5 sources
+                                    if hasattr(chunk, 'web') and chunk.web:
+                                        sources.append({
+                                            "title": getattr(chunk.web, 'title', 'Source'),
+                                            "url": getattr(chunk.web, 'uri', '')
+                                        })
+                except Exception as src_err:
+                    print(f"[RealtimeSearch] ⚠️ Source extraction error: {src_err}")
+                
+                print(f"[RealtimeSearch] ✅ Gemini grounding response with {len(sources)} sources")
+                
+                # Return structured response with sources
+                return {
+                    "text": f"🔍 **{clean_query}**\n\n{result_text}",
+                    "sources": sources,
+                    "engine": "gemini"
+                }
+            else:
+                print(f"[RealtimeSearch] ⚠️ Empty Gemini response, falling back to DDG")
+                
+    except Exception as e:
+        print(f"[RealtimeSearch] ⚠️ Gemini grounding error: {e}, falling back to DuckDuckGo")
+    
+    # === FALLBACK: DuckDuckGo Direct Search ===
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            results = list(ddgs.text(clean_query, max_results=5))
+            
+            if results:
+                print(f"[RealtimeSearch] 📋 DuckDuckGo: {len(results)} results")
+                
+                response_text = f"🔍 **Web Search Results for: {clean_query}**\n\n"
+                
+                for i, r in enumerate(results, 1):
+                    title = r.get('title', 'No title')
+                    body = r.get('body', 'No description')
+                    href = r.get('href', '')
+                    
+                    response_text += f"**{i}. {title}**\n"
+                    response_text += f"{body}\n\n"
+                    
+                    # Add to sources for UI cards
+                    sources.append({
+                        "title": title,
+                        "url": href
+                    })
+                
+                return {
+                    "text": response_text,
+                    "sources": sources,
+                    "engine": "duckduckgo"
+                }
+            else:
+                return {"text": f"No search results found for '{clean_query}'.", "sources": [], "engine": "none"}
+                
+    except Exception as e:
+        print(f"[RealtimeSearch] ❌ All search methods failed: {e}")
+        return {"text": f"Search failed: {str(e)}. Please try again.", "sources": [], "engine": "error"}
 
 app = Flask(__name__)
 CORS(app)

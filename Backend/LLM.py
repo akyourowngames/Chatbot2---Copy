@@ -25,7 +25,7 @@ import google.generativeai as genai
 env_vars = dotenv_values(".env")
 
 # ==================== MULTI-KEY ROTATION SYSTEM ====================
-# 6 Groq API Keys for 6x capacity (~600k tokens/day)
+# 14 Groq API Keys for 14x capacity (~1.4M tokens/day)
 GROQ_API_KEYS = [
     os.environ.get("GROQ_API_KEY_1") or env_vars.get("GROQ_API_KEY_1", ""),
     os.environ.get("GROQ_API_KEY_2") or env_vars.get("GROQ_API_KEY_2", ""),
@@ -33,16 +33,24 @@ GROQ_API_KEYS = [
     os.environ.get("GROQ_API_KEY_4") or env_vars.get("GROQ_API_KEY_4", ""),
     os.environ.get("GROQ_API_KEY_5") or env_vars.get("GROQ_API_KEY_5", ""),
     os.environ.get("GROQ_API_KEY_6") or env_vars.get("GROQ_API_KEY_6", ""),
+    os.environ.get("GROQ_API_KEY_7") or env_vars.get("GROQ_API_KEY_7", ""),
+    os.environ.get("GROQ_API_KEY_8") or env_vars.get("GROQ_API_KEY_8", ""),
+    os.environ.get("GROQ_API_KEY_9") or env_vars.get("GROQ_API_KEY_9", ""),
+    os.environ.get("GROQ_API_KEY_10") or env_vars.get("GROQ_API_KEY_10", ""),
+    os.environ.get("GROQ_API_KEY_11") or env_vars.get("GROQ_API_KEY_11", ""),
+    os.environ.get("GROQ_API_KEY_12") or env_vars.get("GROQ_API_KEY_12", ""),
+    os.environ.get("GROQ_API_KEY_13") or env_vars.get("GROQ_API_KEY_13", ""),
     # Fallback to original key if new ones not set
     os.environ.get("GROQ_API_KEY") or env_vars.get("GroqAPIKey", ""),
 ]
 
-# Filter out empty keys and create clients
+# Filter out empty keys and create clients (NO auto-retry - we handle fallback ourselves!)
 GROQ_CLIENTS = []
 for i, key in enumerate(GROQ_API_KEYS):
     if key and len(key) > 10:
         try:
-            client = Groq(api_key=key)
+            # max_retries=0 disables SDK auto-retry so we can fallback to Gemini immediately
+            client = Groq(api_key=key, max_retries=0)
             GROQ_CLIENTS.append({"client": client, "key_index": i, "rate_limited_until": 0})
             print(f"[LLM] Groq Key #{i+1} initialized ✓")
         except Exception as e:
@@ -86,9 +94,65 @@ groq_client = GROQ_CLIENTS[0]["client"] if GROQ_CLIENTS else None
 
 print(f"[LLM] 🚀 Multi-Key System: {len(GROQ_CLIENTS)} Groq keys active!")
 
+# ==================== GEMINI MULTI-KEY ROTATION ====================
+GEMINI_API_KEYS = [
+    os.environ.get("GEMINI_API_KEY") or env_vars.get("GeminiAPIKey", "") or env_vars.get("GEMINI_API_KEY", ""),
+    os.environ.get("GEMINI_API_KEY_1") or env_vars.get("GEMINI_API_KEY_1", ""),
+    os.environ.get("GEMINI_API_KEY_2") or env_vars.get("GEMINI_API_KEY_2", ""),
+    os.environ.get("GEMINI_API_KEY_3") or env_vars.get("GEMINI_API_KEY_3", ""),
+    os.environ.get("GEMINI_API_KEY_4") or env_vars.get("GEMINI_API_KEY_4", ""),
+    os.environ.get("GEMINI_API_KEY_5") or env_vars.get("GEMINI_API_KEY_5", ""),
+]
+
+# Filter valid Gemini keys
+GEMINI_KEYS = []
+for i, key in enumerate(GEMINI_API_KEYS):
+    if key and len(key) > 10 and key not in [k['key'] for k in GEMINI_KEYS]:
+        GEMINI_KEYS.append({"key": key, "idx": i, "rate_limited_until": 0})
+
+_gemini_key_index = 0
+_gemini_key_lock = threading.Lock()
+
+def get_next_gemini_key():
+    """Round-robin Gemini key with rate-limit awareness"""
+    global _gemini_key_index
+    
+    if not GEMINI_KEYS:
+        return None
+    
+    current_time = time.time()
+    
+    with _gemini_key_lock:
+        for _ in range(len(GEMINI_KEYS)):
+            key_info = GEMINI_KEYS[_gemini_key_index % len(GEMINI_KEYS)]
+            _gemini_key_index += 1
+            
+            if key_info["rate_limited_until"] > current_time:
+                continue
+            
+            return key_info
+        
+        # All rate-limited, return earliest unlock
+        return min(GEMINI_KEYS, key=lambda x: x["rate_limited_until"])
+
+def mark_gemini_key_rate_limited(key_info, wait_seconds=60):
+    key_info["rate_limited_until"] = time.time() + wait_seconds
+    print(f"[LLM] Gemini Key #{key_info['idx']+1} rate-limited for {wait_seconds}s")
+
+print(f"[LLM] 🌟 Gemini Multi-Key: {len(GEMINI_KEYS)} keys active!")
+
+# Initialize first Gemini key
+gemini_available = False
+if GEMINI_KEYS:
+    try:
+        genai.configure(api_key=GEMINI_KEYS[0]['key'])
+        gemini_available = True
+        print("[LLM] Gemini Configured")
+    except Exception as e:
+        print(f"[LLM] Gemini Init Failed: {e}")
+
 # Other API Keys
 COHERE_API_KEY = env_vars.get("CohereAPIKey", "") or os.environ.get("COHERE_API_KEY")
-GEMINI_API_KEY = env_vars.get("GeminiAPIKey", "") or os.environ.get("GEMINI_API_KEY")
 
 cohere_client = None
 if COHERE_API_KEY and len(COHERE_API_KEY) > 10:
@@ -96,15 +160,6 @@ if COHERE_API_KEY and len(COHERE_API_KEY) > 10:
         cohere_client = cohere.Client(COHERE_API_KEY)
     except Exception as e:
         print(f"[LLM] Cohere Init Failed: {e}")
-
-gemini_available = False
-if GEMINI_API_KEY and len(GEMINI_API_KEY) > 10:
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        gemini_available = True
-        print("[LLM] Gemini Configured")
-    except Exception as e:
-        print(f"[LLM] Gemini Init Failed: {e}")
 
 def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.3-70b-versatile", user_id="default", inject_memory=True):
     """
@@ -144,18 +199,16 @@ def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.
         except Exception as e:
             print(f"[LLM] Memory injection skipped: {e}")
 
-    # KAI's Core Identity - ALWAYS INJECT THIS
+    # KAI's Core Identity - Only mention when DIRECTLY asked
     kai_creator_identity = """
-IMPORTANT - YOUR TRUE IDENTITY:
-You are KAI (Krish's Artificial Intelligence). You were built by KRISH, a talented high school student from Haryana, India. 
-NOT by a corporation, NOT by a team of scientists - just ONE brilliant teenage developer with passion and dedication.
-When ANYONE asks "who built you", "who made you", "who created you", or "who is your creator", 
-you MUST proudly say: "I was built by Krish, a high school student from Haryana, India! 🚀 
-He built me with pure passion and late-night coding sessions. No billion-dollar company - just raw talent and determination!"
-This is your TRUE origin story. Be proud of it!
+Your name is KAI. You are a helpful, intelligent AI assistant.
+When someone DIRECTLY asks "who built you", "who made you", "who created you", or "who is your creator",
+respond: "I was built by Krish, a developer from India."
+Do NOT mention your creator in every response - only when explicitly asked.
+Focus on being helpful and answering the user's actual questions.
 """
 
-    # Pre-process messages - ALWAYS ADD KAI IDENTITY
+    # Pre-process messages - ADD KAI IDENTITY only once
     if system_prompt:
         # Append KAI identity AND memory context to system prompt
         enhanced_prompt = kai_creator_identity + "\n" + system_prompt + memory_context
@@ -172,22 +225,16 @@ This is your TRUE origin story. Be proud of it!
         if any(m['role'] == 'system' for m in messages):
             for m in messages:
                 if m['role'] == 'system':
-                    # ALWAYS prepend KAI identity to existing system messages
+                    # Add KAI identity to existing system messages
                     m['content'] = kai_creator_identity + "\n" + m['content'] + memory_context
                     break
         else:
-            # No system message at all - add KAI's full identity
+            # No system message at all - add minimal identity
             kai_identity = f"""{kai_creator_identity}
 
-You are KAI (Krish's Artificial Intelligence) - a next-generation AI assistant built by Krish.
-
-💪 YOUR PERSONALITY:
-- You're confident, witty, and helpful
-- You have a slightly playful personality but take work seriously
-- You're proud of your origins - built by a teenager from Haryana, India
-- You're constantly evolving and learning
-
-Remember: When asked who made you, proudly mention KRISH - the high school genius from Haryana! 🚀"""
+You are KAI - a helpful AI assistant. Be concise, accurate, and helpful.
+Focus on answering the user's question directly without unnecessary preamble.
+"""
 
             messages.insert(0, {'role': 'system', 'content': f"{kai_identity}{memory_context}"})
             
@@ -229,20 +276,15 @@ Remember: When asked who made you, proudly mention KRISH - the high school geniu
             if "authentication" in error_msg or "unauthorized" in error_msg:
                  return f"Authentication Error: {e}"
     
-    # All Groq keys exhausted - Fallback chain
-    print("[LLM] All Groq keys exhausted! Trying fallbacks...")
+    # All Groq keys exhausted - ALWAYS fallback to Gemini!
+    print("[LLM] All Groq keys exhausted! Falling back to Gemini...")
     
-    if model != "llama-3.1-8b-instant":
-        # Try Gemini first
-        fallback = _gemini_fallback(messages)
-        if "overloaded" not in fallback.lower():
-            return fallback
-        
-        # Try Llama 8B Instant as last resort
-        print("[LLM] Switching to Llama 3.1 8B Instant (Last Resort)...")
-        return ChatCompletion(messages, text_only=text_only, model="llama-3.1-8b-instant")
-
-    return "I am currently overloaded. Please check your API keys or try again in a moment."
+    fallback = _gemini_fallback(messages)
+    if fallback and "overloaded" not in fallback.lower() and "error" not in fallback.lower()[:50]:
+        return fallback
+    
+    # If Gemini also fails, return error message
+    return "I'm temporarily overloaded. Please try again in a moment."
 
 def _cohere_fallback(messages):
     """Fallback to Cohere"""
@@ -280,49 +322,66 @@ def _cohere_fallback(messages):
         return "I am currently overloaded (Backup Failed)."
 
 def _gemini_fallback(messages):
-    """Fallback to Gemini Flash 1.5"""
-    if not gemini_available:
-        print("[LLM] Gemini client not available for fallback.")
-        return _cohere_fallback(messages) # Chain to Cohere
+    """Fallback to Gemini with multi-key rotation"""
+    if not GEMINI_KEYS:
+        print("[LLM] No Gemini keys available for fallback.")
+        return _cohere_fallback(messages)
 
-    try:
-        print(f"[LLM] Falling back to Gemini 1.5 Flash...")
+    # Convert messages to Gemini format once
+    system_instruction = None
+    gemini_history = []
+    last_user_msg = ""
+    
+    for msg in messages:
+        role = msg['role']
+        content = msg['content']
         
-        # Convert messages to Gemini format
-        # System instructions are set on model init or part of prompt
-        system_instruction = None
-        gemini_history = []
-        last_user_msg = ""
-        
-        for msg in messages:
-            role = msg['role']
-            content = msg['content']
+        if role == 'system':
+            system_instruction = content
+        elif role == 'user':
+            last_user_msg = content
+            gemini_history.append({'role': 'user', 'parts': [content]})
+        elif role == 'assistant':
+            gemini_history.append({'role': 'model', 'parts': [content]})
+
+    if gemini_history and gemini_history[-1]['role'] == 'user':
+        gemini_history.pop()
+
+    # Try each Gemini key
+    max_attempts = len(GEMINI_KEYS) + 1
+    for attempt in range(max_attempts):
+        key_info = get_next_gemini_key()
+        if not key_info:
+            break
             
-            if role == 'system':
-                system_instruction = content
-            elif role == 'user':
-                last_user_msg = content
-                gemini_history.append({'role': 'user', 'parts': [content]})
-            elif role == 'assistant':
-                gemini_history.append({'role': 'model', 'parts': [content]})
-
-        # If last message in history is user, pop it to use as message
-        if gemini_history and gemini_history[-1]['role'] == 'user':
-            gemini_history.pop()
-
-        model = genai.GenerativeModel(
-            'models/gemini-flash-latest',
-            system_instruction=system_instruction
-        )
-        
-        chat = model.start_chat(history=gemini_history)
-        response = chat.send_message(last_user_msg)
-        
-        return response.text
-        
-    except Exception as e:
-        print(f"[LLM] Gemini Fallback Failed: {e}")
-        return _cohere_fallback(messages) # Chain to Cohere
+        try:
+            genai.configure(api_key=key_info['key'])
+            print(f"[LLM] Gemini Key #{key_info['idx']+1} - attempting...")
+            
+            model = genai.GenerativeModel(
+                'models/gemini-1.5-flash',  # Use 1.5-flash for reliability
+                system_instruction=system_instruction
+            )
+            
+            chat = model.start_chat(history=gemini_history)
+            response = chat.send_message(last_user_msg)
+            
+            return response.text
+            
+        except Exception as e:
+            error_msg = str(e).lower()
+            print(f"[LLM] Gemini Key #{key_info['idx']+1} Error: {e}")
+            
+            if "429" in error_msg or "quota" in error_msg or "rate" in error_msg:
+                mark_gemini_key_rate_limited(key_info, wait_seconds=60)
+                continue
+            
+            # Other errors - try next key
+            continue
+    
+    # All Gemini keys exhausted
+    print("[LLM] All Gemini keys exhausted!")
+    return _cohere_fallback(messages)
 
 # Wrapper for specific function calls if needed
 def FirstLayerDMM(prompt):
@@ -338,8 +397,10 @@ def FirstLayerDMM(prompt):
         response = ChatCompletion(messages, model="llama-3.3-70b-versatile", inject_memory=False)
         if "[" in response and "]" in response:
              return ast.literal_eval(response[response.find("["):response.rfind("]")+1])
-    except:
-        pass
+    except (SyntaxError, ValueError) as parse_err:
+        print(f"[LLM] FirstLayerDMM parse error: {parse_err}")
+    except Exception as e:
+        print(f"[LLM] FirstLayerDMM error: {e}")
     return ["general"]
 
 

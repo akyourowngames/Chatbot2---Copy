@@ -21,31 +21,31 @@ class SmartModelRouter:
     - llama-3.1-8b-instant: Fast for simple Q&A
     """
     
-    # Model configurations
+    # Model configurations - GROQ PRIMARY (fastest!) + Gemini fallback
     MODELS = {
         "thinking": {
-            "name": "gemini-2.0-flash-thinking-exp",
+            "name": "gemini-2.0-flash-thinking-exp",  # Only Gemini has thinking mode
             "provider": "gemini",
             "max_tokens": 8192,
             "description": "Deep reasoning with visible thinking process"
         },
         "powerful": {
-            "name": "gemini-2.0-flash-exp",
-            "provider": "gemini",
+            "name": "llama-3.3-70b-versatile",  # Groq - fast + smart
+            "provider": "groq",
             "max_tokens": 4096,
-            "description": "Best overall intelligence and speed"
+            "description": "Best intelligence via Groq"
         },
         "creative": {
-            "name": "llama-3.3-70b-versatile",
+            "name": "llama-3.3-70b-versatile",  # Groq for creative
             "provider": "groq",
             "max_tokens": 2048,
             "description": "Great for creative and conversational"
         },
         "fast": {
-            "name": "llama-3.1-8b-instant",  # Fast model (3.2-3b was decommissioned)
+            "name": "llama-3.1-8b-instant",  # Groq FASTEST model - sub 0.5s!
             "provider": "groq",
             "max_tokens": 1024,
-            "description": "Ultra-fast for simple queries"
+            "description": "Ultra-fast response via Groq"
         }
     }
     

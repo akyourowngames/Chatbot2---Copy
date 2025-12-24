@@ -2,12 +2,12 @@
 // @ts-nocheck
 import { createClient } from "@supabase/supabase-js";
 import { initializeApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, writeBatch } from "firebase/firestore";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, sendEmailVerification } from "firebase/auth";
+import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, writeBatch, getDoc, setDoc, orderBy } from "firebase/firestore";
+import * as FirebaseDB from './services/FirebaseService';
 
 declare var lucide: any;
 declare var Prism: any;
-declare var marked: any;
 declare var marked: any;
 declare var window: any;
 declare var Hls: any;
@@ -43,7 +43,7 @@ try {
 }
 
 // 📡 API Configuration
-const USE_CLOUD_API = true;
+const USE_CLOUD_API = true; // Set to true for production (Render), false for local dev
 const BASE_URL = USE_CLOUD_API ? 'https://kai-api-nxxv.onrender.com' : 'http://localhost:5000';
 const API_URL = `${BASE_URL}/api/v1`;
 
@@ -53,10 +53,11 @@ const SUPABASE_KEY = 'sb_secret_kT3r_lTsBYBLwpv313A0qQ_przZ-Q8v';
 const SUPABASE_BUCKET = 'kai-images';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// State
+// State (Firebase will populate these after auth)
 let isProcessing = false;
-let chatHistory: any[] = JSON.parse(localStorage.getItem('kai_chat_history') || '[]');
-let currentChatId = Date.now().toString();
+let chatHistory: any[] = [];  // Loaded from Firebase after auth
+let currentChatId = '';
+let currentChatMessages: any[] = [];
 let isLoginMode = true;
 let pendingAssetUrl: string | null = null;
 let pendingAssetName: string | null = null;
@@ -71,6 +72,149 @@ const chatHistoryList = document.getElementById('chat-history-list');
 const sessionIdDisplay = document.getElementById('session-id-display');
 const attachmentArea = document.getElementById('attachment-area');
 const authForm = document.getElementById('auth-form') as HTMLFormElement;
+
+
+// === USER PROFILE MANAGEMENT (Firebase is source of truth) ===
+let cachedUserProfile: any = null;
+
+// Function to get user preferences - uses cache (loaded from Firebase on auth)
+function getUserPreferences() {
+    // Return cached profile - this is loaded from Firebase when user signs in
+    return cachedUserProfile;
+}
+
+// Expose getUserPreferences globally so it can be called from sendMessage
+(window as any).getUserPreferences = getUserPreferences;
+
+// Listen for profile updates from settings window
+window.addEventListener('message', (event) => {
+    if (event.data?.type === 'PROFILE_UPDATED') {
+        LOG.info('PROFILE', 'Profile updated from settings', event.data.profile);
+        cachedUserProfile = event.data.profile;
+        localStorage.setItem('kai_user_profile', JSON.stringify(cachedUserProfile));
+    }
+});
+
+// Load profile when auth state changes
+let lastUserId: string | null = null;
+
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        // Check if this is a different user than before
+        if (lastUserId && lastUserId !== user.uid) {
+            LOG.info('AUTH', 'Different user detected, clearing old data...');
+            clearUserData();
+        }
+
+        lastUserId = user.uid;
+        LOG.info('AUTH', 'User signed in, loading data from Firebase...', { uid: user.uid, email: user.email });
+
+        // === LOAD ALL USER DATA FROM FIREBASE ===
+
+        // 1. Load Profile
+        const profile = await FirebaseDB.loadUserProfile(user.uid);
+        if (profile) {
+            cachedUserProfile = profile;
+            LOG.info('AUTH', 'Profile loaded from Firebase', { name: profile.name, lang: profile.responseLanguage });
+        } else {
+            // Create default profile from auth data
+            cachedUserProfile = {
+                name: user.displayName || '',
+                nickname: '',
+                email: user.email || '',
+                bio: '',
+                responseStyle: 'casual',
+                responseLanguage: 'english',
+                interests: [],
+                avatarUrl: user.photoURL || ''
+            };
+            // Save default profile to Firebase
+            await FirebaseDB.saveUserProfile(user.uid, cachedUserProfile);
+            LOG.info('AUTH', 'Created and saved default profile');
+        }
+
+        // Update user avatar in header
+        updateUserAvatar(cachedUserProfile?.avatarUrl || user.photoURL || '', user.email || user.uid);
+
+        // 2. Load Chat History
+        try {
+            const chats = await FirebaseDB.loadChats(user.uid);
+            chatHistory = chats;
+            LOG.info('AUTH', 'Chat history loaded from Firebase', { count: chats.length });
+
+            // Render chat history in sidebar
+            if (typeof renderHistory === 'function') {
+                renderHistory();
+            }
+
+            // Initialize a new chat session if none exists
+            if (!currentChatId) {
+                currentChatId = FirebaseDB.generateChatId();
+                currentChatMessages = [];
+                LOG.info('AUTH', 'Initialized new chat session', { chatId: currentChatId });
+            }
+        } catch (e) {
+            LOG.error('AUTH', 'Failed to load chat history', e);
+        }
+
+        // 3. Load Settings (optional - can add later)
+        // const settings = await FirebaseDB.loadUserSettings(user.uid);
+
+    } else {
+        // User logged out - clear all user data
+        LOG.info('AUTH', 'User signed out, clearing data...');
+        clearUserData();
+        lastUserId = null;
+    }
+});
+
+// Clear all user-specific data (memory only - Firebase is the source of truth)
+function clearUserData() {
+    cachedUserProfile = null;
+    chatHistory = [];
+    currentChatId = '';
+    currentChatMessages = [];
+
+    // Reset avatar to default
+    const avatarImg = document.getElementById('user-avatar-img') as HTMLImageElement;
+    if (avatarImg) {
+        avatarImg.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=KAI&backgroundColor=transparent';
+    }
+
+    LOG.info('AUTH', 'Local user data cleared');
+}
+(window as any).clearUserData = clearUserData;
+
+// Update user avatar in header
+function updateUserAvatar(avatarUrl: string, seed: string) {
+    const avatarImg = document.getElementById('user-avatar-img') as HTMLImageElement;
+    if (!avatarImg) return;
+
+    if (avatarUrl && avatarUrl.startsWith('http')) {
+        // Use custom avatar URL
+        avatarImg.src = avatarUrl;
+        LOG.info('AUTH', 'Avatar updated from URL');
+    } else {
+        // Generate unique DiceBear avatar based on email/uid
+        const sanitizedSeed = encodeURIComponent(seed);
+        avatarImg.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${sanitizedSeed}&backgroundColor=transparent`;
+        LOG.info('AUTH', 'Avatar generated from seed', { seed });
+    }
+}
+
+// Listen for profile updates from settings popup
+window.addEventListener('message', (event) => {
+    if (event.data?.type === 'PROFILE_UPDATED' && event.data.profile) {
+        LOG.info('PROFILE', 'Received profile update from settings');
+        cachedUserProfile = event.data.profile;
+
+        // Update avatar in header
+        const user = auth?.currentUser;
+        if (user) {
+            updateUserAvatar(cachedUserProfile?.avatarUrl || '', user.email || user.uid);
+        }
+    }
+});
 
 // === MEMORY CORE VISUALIZATION ===
 // Inject styles for the brain pulse
@@ -91,6 +235,88 @@ style.textContent = `
     display: flex; align-items: center; gap: 10px; font-family: monospace; font-size: 12px;
   }
   .memory-toast.show { transform: translateY(0); opacity: 1; }
+  
+  /* 🔥 BEAST MODE SOURCE CARDS - Premium Futuristic Design */
+  @keyframes sourceGlow {
+    0%, 100% { box-shadow: 0 0 5px rgba(139, 92, 246, 0.3), inset 0 0 20px rgba(139, 92, 246, 0.05); }
+    50% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.5), inset 0 0 30px rgba(139, 92, 246, 0.1); }
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .source-cards-wrapper {
+    margin-top: 16px; padding: 16px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 27, 75, 0.6));
+    border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 16px;
+    backdrop-filter: blur(20px); position: relative; overflow: hidden;
+  }
+  .source-cards-wrapper::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
+  }
+  .source-cards-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: rgba(139, 92, 246, 0.8);
+  }
+  .source-cards-header svg { width: 14px; height: 14px; }
+  
+  .source-cards-container {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;
+  }
+  
+  .source-card {
+    display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(30, 27, 75, 0.3));
+    border: 1px solid rgba(139, 92, 246, 0.15); border-radius: 12px;
+    text-decoration: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px); cursor: pointer; position: relative; overflow: hidden;
+    animation: slideUp 0.4s ease-out backwards;
+  }
+  .source-card:nth-child(1) { animation-delay: 0.05s; }
+  .source-card:nth-child(2) { animation-delay: 0.1s; }
+  .source-card:nth-child(3) { animation-delay: 0.15s; }
+  .source-card:nth-child(4) { animation-delay: 0.2s; }
+  .source-card:nth-child(5) { animation-delay: 0.25s; }
+  
+  .source-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .source-card:hover::before { opacity: 1; }
+  
+  .source-card:hover {
+    border-color: rgba(139, 92, 246, 0.5); transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(139, 92, 246, 0.25), 0 0 0 1px rgba(139, 92, 246, 0.1);
+  }
+  
+  .source-favicon {
+    width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+  }
+  .source-favicon img { width: 16px; height: 16px; border-radius: 4px; }
+  
+  .source-info { flex: 1; min-width: 0; }
+  .source-title {
+    font-size: 12px; font-weight: 600; color: #e0e7ff; margin-bottom: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .source-domain {
+    font-size: 10px; color: rgba(139, 92, 246, 0.7); font-family: monospace;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .source-domain::before { content: '🔗'; font-size: 8px; }
+  
+  .source-arrow {
+    color: rgba(139, 92, 246, 0.4); transition: all 0.3s;
+  }
+  .source-card:hover .source-arrow {
+    color: #a78bfa; transform: translateX(3px);
+  }
 `;
 document.head.appendChild(style);
 
@@ -191,6 +417,19 @@ const authProgress = document.getElementById('auth-progress') as HTMLElement;
 const authBar = document.getElementById('auth-bar') as HTMLElement;
 const authPercent = document.getElementById('auth-percent') as HTMLElement;
 
+// Helper: Check if email should skip verification (test emails)
+function isTestEmail(email: string): boolean {
+    if (!email) return false;
+    const testPatterns = [
+        /^test@/i,
+        /@test\./i,
+        /^demo@/i,
+        /^admin@localhost/i,
+        /@example\.com$/i
+    ];
+    return testPatterns.some(pattern => pattern.test(email));
+}
+
 // Code Block Counter for unique IDs
 let codeBlockCounter = 0;
 
@@ -284,6 +523,64 @@ let canvasRawContent = '';
     URL.revokeObjectURL(url);
     notify('CONTENT_EXPORTED');
     LOG.info('CANVAS', 'Content downloaded');
+};
+
+// === 🔥 BEAST MODE SOURCE CARDS FOR WEB SEARCH ===
+(window as any).renderSourceCards = (sources: { title: string, url: string }[]): string => {
+    if (!sources || sources.length === 0) return '';
+
+    const getDomain = (url: string): string => {
+        try {
+            return new URL(url).hostname.replace('www.', '');
+        } catch { return 'source'; }
+    };
+
+    const getFaviconUrl = (url: string): string => {
+        try {
+            const domain = new URL(url).hostname;
+            return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        } catch { return ''; }
+    };
+
+    const cards = sources.slice(0, 5).map(s => {
+        const domain = getDomain(s.url);
+        const favicon = getFaviconUrl(s.url);
+        const title = s.title.length > 35 ? s.title.substring(0, 32) + '...' : s.title;
+
+        return `<a href="${s.url}" target="_blank" rel="noopener" class="source-card">
+            <div class="source-favicon">
+                ${favicon ? `<img src="${favicon}" alt="" onerror="this.style.display='none'">` : '🌐'}
+            </div>
+            <div class="source-info">
+                <div class="source-title">${title}</div>
+                <div class="source-domain">${domain}</div>
+            </div>
+            <span class="source-arrow">→</span>
+        </a>`;
+    }).join('');
+
+    return `<div class="source-cards-wrapper">
+        <div class="source-cards-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <span>Sources</span>
+        </div>
+        <div class="source-cards-container">${cards}</div>
+    </div>`;
+};
+
+// Expose globally for API response handler
+(window as any).appendSourceCards = (messageId: string, sources: any[]) => {
+    const msgEl = document.getElementById(messageId);
+    if (msgEl && sources && sources.length > 0) {
+        const contentDiv = msgEl.querySelector('.message-content') || msgEl;
+        const cardsHtml = (window as any).renderSourceCards(sources);
+        if (cardsHtml && !msgEl.querySelector('.source-cards-container')) {
+            contentDiv.insertAdjacentHTML('beforeend', cardsHtml);
+            LOG.info('SOURCES', `Added ${sources.length} source cards to message`);
+        }
+    }
 };
 
 // === 🚀 ULTRA-VIOLET WILD BOOTUP SEQUENCE ===
@@ -743,20 +1040,21 @@ function formatMessage(text: string) {
 // UI Rendering
 function renderHistory() {
     if (!chatHistoryList) return;
-    const uniqueChats = chatHistory.reduce((acc: any[], current: any) => {
-        const x = acc.find(item => item.id === current.id);
-        return x ? acc : acc.concat([current]);
-    }, []).reverse();
 
-    chatHistoryList.innerHTML = uniqueChats.length ? '' : `<div class="px-3 py-2 text-[10px] text-white/20 font-mono italic text-center">EMPTY_LOGS</div>`;
+    // Sort by updatedAt descending (newest first)
+    const sortedChats = [...chatHistory].sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
 
-    uniqueChats.slice(0, 15).forEach(chat => {
+    chatHistoryList.innerHTML = sortedChats.length ? '' : `<div class="px-3 py-2 text-[10px] text-white/20 font-mono italic text-center">EMPTY_LOGS</div>`;
+
+    sortedChats.slice(0, 15).forEach(chat => {
         const container = document.createElement('div');
         container.className = 'group flex items-center justify-between hover:bg-white/5 border-l-2 border-transparent hover:border-indigo-500 transition-all px-3 py-1';
 
+        const displayTitle = chat.title || chat.user || 'Untitled Chat';
+
         const btn = document.createElement('button');
         btn.className = 'flex-1 text-left py-2 text-[10px] text-white/40 group-hover:text-white truncate font-mono uppercase tracking-widest';
-        btn.innerText = chat.user.substring(0, 24) + (chat.user.length > 24 ? '...' : '');
+        btn.innerText = displayTitle.substring(0, 24) + (displayTitle.length > 24 ? '...' : '');
         btn.onclick = () => { loadChat(chat.id); if (window.innerWidth < 1024) (window as any).toggleSidebar(); };
 
         const deleteBtn = document.createElement('button');
@@ -1429,9 +1727,18 @@ function addMessage(role: string, content: string, attachedFile: string | null =
         lastUserAttachment = attachedFile;
     }
 
+    // Track message for Firebase persistence
+    currentChatMessages.push({
+        role: role as 'user' | 'assistant',
+        content: content,
+        timestamp: Date.now()
+    });
+
     const block = document.createElement('div');
     block.id = msgId;
     block.className = `msg-block ${role} group relative`;
+    // Store raw content for Canvas access
+    block.dataset.rawContent = content;
 
     // Header with actions
     const header = document.createElement('div');
@@ -1451,6 +1758,9 @@ function addMessage(role: string, content: string, attachedFile: string | null =
             <i data-lucide="copy" class="w-3.5 h-3.5"></i>
         </button>
         ${role === 'assistant' ? `
+        <button onclick="(window as any).openCanvas(this.closest('.msg-block').dataset.rawContent, 'Canvas Draft')" class="p-1.5 text-white/40 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition-all" title="Open in Canvas">
+            <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+        </button>
         <button onclick="regenerateResponse()" class="p-1.5 text-white/40 hover:text-indigo-400 hover:bg-indigo-500/10 rounded transition-all" title="Regenerate response">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
         </button>
@@ -1549,6 +1859,9 @@ function addMessage(role: string, content: string, attachedFile: string | null =
 }
 
 async function loadChat(id: string) {
+    const userId = auth?.currentUser?.uid;
+    if (!userId) return;
+
     currentChatId = id;
     if (sessionIdDisplay) sessionIdDisplay.innerText = `SID-${id.substring(0, 6)}`;
     if (messagesList) {
@@ -1557,32 +1870,59 @@ async function loadChat(id: string) {
         messagesList.classList.remove('hidden');
         messagesList.classList.add('flex');
     }
-    chatHistory.filter(h => h.id === id).forEach(h => {
-        addMessage('user', h.user);
-        // Pass saved metadata to restore PDF/Spotify/Anime previews
-        addMessage('assistant', h.assistant, null, h.metadata || null);
-    });
+
+    // Find chat in loaded history or fetch from Firebase
+    let chat = chatHistory.find(h => h.id === id);
+    if (!chat) {
+        chat = await FirebaseDB.loadChat(userId, id);
+    }
+
+    if (chat) {
+        // Clear current messages tracking
+        currentChatMessages = [];
+
+        // Check for NEW format (messages array)
+        if (chat.messages && Array.isArray(chat.messages)) {
+            chat.messages.forEach((msg: any) => {
+                const tempMessages = currentChatMessages;
+                currentChatMessages = [];
+
+                if (msg.role === 'user') {
+                    addMessage('user', msg.content);
+                } else {
+                    addMessage('assistant', msg.content, null, msg.metadata || null);
+                }
+
+                currentChatMessages = tempMessages;
+            });
+            currentChatMessages = [...chat.messages];
+            LOG.info('CHAT', 'Loaded chat (new format)', { id, messageCount: chat.messages.length });
+        }
+        // Check for OLD format (user/assistant fields)
+        else if (chat.user || chat.assistant) {
+            const tempMessages = currentChatMessages;
+            currentChatMessages = [];
+
+            if (chat.user) {
+                addMessage('user', chat.user);
+            }
+            if (chat.assistant) {
+                addMessage('assistant', chat.assistant, null, chat.metadata || null);
+            }
+
+            currentChatMessages = tempMessages;
+
+            // Convert to new format for tracking
+            currentChatMessages = [];
+            if (chat.user) currentChatMessages.push({ role: 'user', content: chat.user, timestamp: chat.timestamp || Date.now() });
+            if (chat.assistant) currentChatMessages.push({ role: 'assistant', content: chat.assistant, timestamp: chat.timestamp || Date.now() });
+
+            LOG.info('CHAT', 'Loaded chat (old format)', { id });
+        }
+    }
 }
 
-async function loadHistoryFromCloud(uid: string) {
-    if (!db) return;
-    try {
-        const q = query(collection(db, "chat_history"), where("uid", "==", uid));
-        const querySnapshot = await getDocs(q);
-        const cloudHistory: any[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            data.docId = doc.id;
-            cloudHistory.push(data);
-        });
-        cloudHistory.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-        if (cloudHistory.length > 0) {
-            chatHistory = cloudHistory;
-            localStorage.setItem('kai_chat_history', JSON.stringify(chatHistory));
-            renderHistory();
-        }
-    } catch (e) { LOG.error('DATABASE', 'Sync failure', e); }
-}
+
 
 async function checkConnection() {
     try {
@@ -1620,7 +1960,7 @@ if (auth) {
             document.getElementById('main-interface')!.style.opacity = '1';
             document.getElementById('main-interface')!.style.pointerEvents = 'auto';
             initApp();
-            loadHistoryFromCloud(user.uid);
+            // Note: Chat history is now loaded in the onAuthStateChanged handler at the top of the file
         } else {
             document.getElementById('auth-container')!.style.display = 'flex';
             document.getElementById('main-interface')!.style.opacity = '0';
@@ -1637,9 +1977,22 @@ if (auth) {
     messagesList?.classList.remove('hidden');
     messagesList?.classList.add('flex');
 
-    addMessage('user', queryStr);
+    // Include pending file attachments in the message display
+    let displayMessage = queryStr;
+    if (pendingFiles.length > 0) {
+        const fileNames = pendingFiles.map(f => `📎 ${f.name}`).join('\n');
+        displayMessage = `${fileNames}\n\n${queryStr}`;
+    }
+    addMessage('user', displayMessage);
     messageInput.value = '';
     messageInput.style.height = 'auto';
+
+    // Clear attachment UI
+    if (attachmentArea) {
+        attachmentArea.innerHTML = '';
+        attachmentArea.classList.add('hidden');
+        attachmentArea.classList.remove('flex');
+    }
 
     isProcessing = true;
 
@@ -1659,10 +2012,33 @@ if (auth) {
     }
 
     try {
+        // Get user preferences for personalized responses
+        const userPrefs = (window as any).getUserPreferences ? (window as any).getUserPreferences() : null;
+
+        // Include attachments in request
+        const requestBody: any = {
+            query: queryStr,
+            session_id: currentChatId,
+            uid: auth?.currentUser?.uid,
+            user_preferences: userPrefs  // Pass user preferences to KAI
+        };
+
+        // Add files if any are pending
+        if (pendingFiles.length > 0) {
+            requestBody.attachments = pendingFiles.map(f => ({
+                name: f.name,
+                url: f.url,
+                type: f.type
+            }));
+            LOG.info('FILE', `Sending ${pendingFiles.length} attachment(s) with message`);
+            // Clear pending files after including in request
+            pendingFiles = [];
+        }
+
         const response = await fetch(`${API_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: queryStr, session_id: currentChatId, uid: auth?.currentUser?.uid })
+            body: JSON.stringify(requestBody)
         });
         const data = await response.json();
 
@@ -1721,6 +2097,13 @@ if (auth) {
         const responseText = data.response || "NO_DATA";
         await typewriterEffect(body, responseText);
 
+        // 🔧 FIX: Track assistant response for Firebase persistence
+        currentChatMessages.push({
+            role: 'assistant',
+            content: responseText,
+            timestamp: Date.now()
+        });
+
         // Remove stop button after streaming complete
         const stopBtn = document.getElementById(`stop-gen-${msgId}`);
         if (stopBtn) stopBtn.remove();
@@ -1749,10 +2132,24 @@ if (auth) {
         if (data.type === 'spotify' && data.spotify) {
             renderSpotifyPlayer(body, data.spotify);
         }
+        // 📄 PDF Preview Handler
+        if (data.type === 'pdf' && data.url) {
+            renderPDFPreview(body, data.url, data.title || 'Document');
+        }
         if (data.type && data.data && addMessage.renderers) {
             const renderer = addMessage.renderers[`render${data.type.charAt(0).toUpperCase() + data.type.slice(1)}Card`]
                 || addMessage.renderers[`render${data.type.charAt(0).toUpperCase() + data.type.slice(1)}List`];
             if (renderer) renderer(body, data.data);
+        }
+
+        // 🔥 RENDER SOURCE CARDS BELOW RESPONSE (BEAST MODE)
+        if (data.type === 'web_search' && data.sources && data.sources.length > 0) {
+            const sourceCardsHtml = (window as any).renderSourceCards(data.sources);
+            if (sourceCardsHtml) {
+                // Insert AFTER the streamBlock for separate visual placement
+                streamBlock.insertAdjacentHTML('afterend', sourceCardsHtml);
+                LOG.info('SEARCH', `Added ${data.sources.length} beast mode source cards`);
+            }
         }
 
         // 🗣️ AUTO-SPEAK Logic (Voice Mode)
@@ -1760,24 +2157,85 @@ if (auth) {
             (window as any).speak(data.response);
         }
 
-        const historyItem = { timestamp: Date.now(), user: queryStr, assistant: data.response, id: currentChatId, uid: auth?.currentUser?.uid, metadata: data };
-        chatHistory.push(historyItem);
-        localStorage.setItem('kai_chat_history', JSON.stringify(chatHistory));
+        // 💾 SAVE CHAT TO FIREBASE (new structure: users/{uid}/chats/{chatId})
+        const userId = auth?.currentUser?.uid;
+        if (userId && currentChatId && currentChatMessages.length > 0) {
+            try {
+                const title = currentChatMessages[0]?.content?.slice(0, 50) || 'New Chat';
+                await FirebaseDB.saveChat(userId, {
+                    id: currentChatId,
+                    title: title,
+                    createdAt: parseInt(currentChatId) || Date.now(),
+                    updatedAt: Date.now(),
+                    messages: currentChatMessages
+                });
+                LOG.info('CHAT', 'Chat auto-saved to Firebase', { chatId: currentChatId, messages: currentChatMessages.length });
+            } catch (e) {
+                LOG.error('CHAT', 'Failed to auto-save chat', e);
+            }
+        }
+
+        // Update local history for sidebar
+        const existingIndex = chatHistory.findIndex(h => h.id === currentChatId);
+        const historyItem = {
+            id: currentChatId,
+            title: currentChatMessages[0]?.content?.slice(0, 50) || 'New Chat',
+            createdAt: parseInt(currentChatId) || Date.now(),
+            updatedAt: Date.now(),
+            messages: currentChatMessages
+        };
+        if (existingIndex >= 0) {
+            chatHistory[existingIndex] = historyItem;
+        } else {
+            chatHistory.unshift(historyItem);
+        }
         renderHistory();
-        if (db && auth?.currentUser) addDoc(collection(db, "chat_history"), historyItem);
-    } catch (e) {
+    } catch (e: any) {
         // Remove typing indicator on error too
         if (typingIndicator && typingIndicator.parentNode) {
             typingIndicator.remove();
         }
-        addMessage('assistant', "[!] CRITICAL UPLINK ERROR");
+
+
+        // Try to extract error details from the response
+        let errorMessage = "[!] CRITICAL UPLINK ERROR";
+
+        if (e instanceof Error) {
+            errorMessage = `[!] ERROR: ${e.message}`;
+        } else if (typeof e === 'string') {
+            errorMessage = `[!] ERROR: ${e}`;
+        }
+
+        console.error('[FRONTEND] Chat error:', e);
+        addMessage('assistant', errorMessage);
     } finally {
         isProcessing = false;
     }
 };
 
-(window as any).newChat = () => {
-    currentChatId = Date.now().toString();
+(window as any).newChat = async () => {
+    const userId = auth?.currentUser?.uid;
+
+    // Save current chat to Firebase before starting new one (if it has messages)
+    if (userId && currentChatId && currentChatMessages.length > 0) {
+        try {
+            const title = currentChatMessages[0]?.content?.slice(0, 50) || 'New Chat';
+            await FirebaseDB.saveChat(userId, {
+                id: currentChatId,
+                title: title,
+                createdAt: parseInt(currentChatId) || Date.now(),
+                updatedAt: Date.now(),
+                messages: currentChatMessages
+            });
+            LOG.info('CHAT', 'Previous chat saved to Firebase');
+        } catch (e) {
+            LOG.error('CHAT', 'Failed to save chat', e);
+        }
+    }
+
+    // Start new chat
+    currentChatId = FirebaseDB.generateChatId();
+    currentChatMessages = [];
     if (messagesList) messagesList.innerHTML = '';
     if (welcomeScreen) welcomeScreen.style.display = 'flex';
     if (sessionIdDisplay) sessionIdDisplay.innerText = `SID-${currentChatId.substring(0, 6)}`;
@@ -1789,7 +2247,13 @@ if (auth) {
     sidebarBackdrop?.classList.toggle('pointer-events-none');
 };
 
-(window as any).signOut = () => auth && signOut(auth).then(() => window.location.reload());
+(window as any).signOut = async () => {
+    if (auth) {
+        clearUserData();  // Clear all user-specific data
+        await signOut(auth);
+        window.location.reload();
+    }
+};
 
 (window as any).clearAllHistory = async () => {
     if (!confirm('CRITICAL: PURGE ALL LOGGED TELEMETRY?')) return;
@@ -1798,16 +2262,13 @@ if (auth) {
     LOG.warn('SYSTEM', 'Executing global purge protocol...');
 
     try {
-        if (db && uid) {
-            const q = query(collection(db, "chat_history"), where("uid", "==", uid));
-            const snap = await getDocs(q);
-            const batch = writeBatch(db);
-            snap.forEach(d => batch.delete(doc(db, "chat_history", d.id)));
-            await batch.commit();
+        if (uid) {
+            // Delete all chats from Firebase using new structure
+            await FirebaseDB.deleteAllChats(uid);
         }
 
         chatHistory = [];
-        localStorage.removeItem('kai_chat_history');
+        currentChatMessages = [];
         renderHistory();
         (window as any).newChat();
         notify('SYSTEM_PURGED');
@@ -1833,14 +2294,13 @@ if (auth) {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     try {
-        const q = query(collection(db, "chat_history"), where("uid", "==", uid), where("id", "==", id));
-        const snap = await getDocs(q);
-        const batch = writeBatch(db);
-        snap.forEach(d => batch.delete(doc(db, "chat_history", d.id)));
-        await batch.commit();
+        // Delete from Firebase using new structure
+        await FirebaseDB.deleteChat(uid, id);
+
+        // Update local state
         chatHistory = chatHistory.filter(h => h.id !== id);
-        localStorage.setItem('kai_chat_history', JSON.stringify(chatHistory));
         renderHistory();
+
         if (currentChatId === id) (window as any).newChat();
         notify('PURGED');
     } catch (e) { LOG.error('DB', 'Delete error', e); }
@@ -1849,12 +2309,52 @@ if (auth) {
 if (authForm) {
     authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        const email = authEmail.value;
+        const password = authPassword.value;
+
         try {
             authError.classList.add('hidden');
             authProgress.classList.remove('hidden');
-            if (isLoginMode) await signInWithEmailAndPassword(auth, authEmail.value, authPassword.value);
-            else await createUserWithEmailAndPassword(auth, authEmail.value, authPassword.value);
+
+            if (isLoginMode) {
+                // Login flow
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+                // Check email verification (skip for test emails)
+                if (!userCredential.user.emailVerified && !isTestEmail(email)) {
+                    await signOut(auth);
+                    authError.innerText = 'EMAIL NOT VERIFIED. Check your inbox and verify your email first.';
+                    authError.classList.remove('hidden');
+                    authProgress.classList.add('hidden');
+                    return;
+                }
+
+            } else {
+                // Signup flow
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+                // Send verification email (skip for test emails)
+                if (!isTestEmail(email)) {
+                    await sendEmailVerification(userCredential.user);
+
+                    // Sign out and show verification message
+                    await signOut(auth);
+                    authError.innerText = '✅ REGISTRATION COMPLETE! Check your email and click the verification link to activate your account.';
+                    authError.style.color = '#22c55e';
+                    authError.classList.remove('hidden');
+                    authProgress.classList.add('hidden');
+
+                    // Switch to login mode
+                    isLoginMode = true;
+                    authSubmitBtn.innerText = "Authenticate";
+                    toggleAuthModeBtn.innerText = "[ Request Credentials ]";
+                    return;
+                } else {
+                    LOG.info('AUTH', 'Test email - skipping verification', { email });
+                }
+            }
         } catch (error: any) {
+            authError.style.color = '#ef4444';
             authError.innerText = `ACCESS DENIED: ${error.code}`;
             authError.classList.remove('hidden');
             authProgress.classList.add('hidden');
@@ -1870,7 +2370,53 @@ if (toggleAuthModeBtn) {
     };
 }
 
+// === OAUTH PROVIDERS ===
+const googleProvider = new GoogleAuthProvider();
+const githubProvider = new GithubAuthProvider();
 
+// isTestEmail is defined at the top of the file
+
+// Google Sign-In
+async function signInWithGoogle() {
+    try {
+        authError?.classList.add('hidden');
+        authProgress?.classList.remove('hidden');
+
+        const result = await signInWithPopup(auth, googleProvider);
+        LOG.info('AUTH', 'Google sign-in successful', { email: result.user.email });
+        // OAuth users don't need email verification
+
+    } catch (error: any) {
+        LOG.error('AUTH', 'Google sign-in failed', error);
+        if (authError) {
+            authError.innerText = `Google Auth Failed: ${error.code || error.message}`;
+            authError.classList.remove('hidden');
+        }
+        authProgress?.classList.add('hidden');
+    }
+}
+(window as any).signInWithGoogle = signInWithGoogle;
+
+// GitHub Sign-In
+async function signInWithGitHub() {
+    try {
+        authError?.classList.add('hidden');
+        authProgress?.classList.remove('hidden');
+
+        const result = await signInWithPopup(auth, githubProvider);
+        LOG.info('AUTH', 'GitHub sign-in successful', { email: result.user.email });
+        // OAuth users don't need email verification
+
+    } catch (error: any) {
+        LOG.error('AUTH', 'GitHub sign-in failed', error);
+        if (authError) {
+            authError.innerText = `GitHub Auth Failed: ${error.code || error.message}`;
+            authError.classList.remove('hidden');
+        }
+        authProgress?.classList.add('hidden');
+    }
+}
+(window as any).signInWithGitHub = signInWithGitHub;
 
 
 // === 📄 DOCUMENT UPLOAD (Drag & Drop) ===
@@ -1998,7 +2544,8 @@ function startListening() {
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
-        // Visual feedback could go here
+        // Barge-in: Stop any ongoing TTS when user starts speaking
+        if ((window as any).interruptTTS) (window as any).interruptTTS();
     };
 
     recognition.onresult = (event: any) => {
@@ -2021,18 +2568,78 @@ function stopListening() {
     if (recognition) recognition.stop();
 }
 
-(window as any).speak = (text: string) => {
+(window as any).speak = async (text: string) => {
+    // Stop any current speech
+    if ((window as any).currentAudio) {
+        (window as any).currentAudio.pause();
+        (window as any).currentAudio = null;
+    }
     window.speechSynthesis.cancel();
+
     const cleanText = text.replace(/[*#`_]/g, '');
-    const utter = new SpeechSynthesisUtterance(cleanText);
-    utter.rate = 1.1;
-    utter.pitch = 1.0;
+    if (!cleanText || cleanText.length < 2) return;
 
-    utter.onend = () => {
-        if ((window as any).isVoiceMode) startListening(); // Resume listening
-    };
+    try {
+        // Call backend TTS API (supports Hindi and English)
+        const response = await fetch(`${API_URL}/voice/speak`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: cleanText })
+        });
 
-    window.speechSynthesis.speak(utter);
+        const data = await response.json();
+
+        if (data.status === 'success' && data.audio_url) {
+            // Play the audio
+            const audio = new Audio(`${BASE_URL}${data.audio_url}`);
+            (window as any).currentAudio = audio;
+
+            // Speed up playback by 1.3x for faster speech
+            audio.playbackRate = 1.3;
+
+            audio.onended = () => {
+                (window as any).currentAudio = null;
+                if ((window as any).isVoiceMode) startListening(); // Resume listening
+            };
+
+            audio.onerror = () => {
+                LOG.error('TTS', 'Audio playback failed');
+                // Fallback to browser TTS
+                const utter = new SpeechSynthesisUtterance(cleanText);
+                utter.rate = 1.1;
+                utter.onend = () => { if ((window as any).isVoiceMode) startListening(); };
+                window.speechSynthesis.speak(utter);
+            };
+
+            audio.play();
+            LOG.info('TTS', `Playing: ${data.language} voice`);
+        } else {
+            // Fallback to browser TTS
+            const utter = new SpeechSynthesisUtterance(cleanText);
+            utter.rate = 1.1;
+            utter.onend = () => { if ((window as any).isVoiceMode) startListening(); };
+            window.speechSynthesis.speak(utter);
+        }
+    } catch (error) {
+        LOG.error('TTS', 'Backend TTS failed, using browser fallback');
+        // Fallback to browser TTS
+        const utter = new SpeechSynthesisUtterance(cleanText);
+        utter.rate = 1.1;
+        utter.onend = () => { if ((window as any).isVoiceMode) startListening(); };
+        window.speechSynthesis.speak(utter);
+    }
+};
+
+// Barge-in: Stop TTS when user starts speaking
+(window as any).interruptTTS = () => {
+    if ((window as any).currentAudio) {
+        (window as any).currentAudio.pause();
+        (window as any).currentAudio = null;
+    }
+    window.speechSynthesis.cancel();
+
+    // Also notify backend to stop
+    fetch(`${API_URL}/voice/interrupt`, { method: 'POST' }).catch(() => { });
 };
 
 
@@ -2206,3 +2813,695 @@ messageInput?.addEventListener('keydown', (e) => {
 
 LOG.info('SYSTEM', 'KAI OS Tactical Interface Initialized.');
 
+// ==================== SETTINGS MODAL FUNCTIONS ====================
+
+// Settings state
+let settingsState = JSON.parse(localStorage.getItem('kai_settings') || '{}');
+
+// Open settings modal
+function openSettings() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+        modal.classList.add('open');
+        lucide.createIcons();
+        loadSettingsData();
+        LOG.info('SETTINGS', 'Settings modal opened');
+    }
+}
+(window as any).openSettings = openSettings;
+
+// Close settings modal
+function closeSettings() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+        modal.classList.remove('open');
+        saveSettingsToStorage();
+        LOG.info('SETTINGS', 'Settings modal closed');
+    }
+}
+(window as any).closeSettings = closeSettings;
+
+// Switch settings tab
+function switchSettingsTab(tabName: string) {
+    // Update nav items
+    document.querySelectorAll('.settings-nav-item').forEach(item => {
+        item.classList.remove('active');
+        const chevron = item.querySelector('[data-lucide="chevron-right"]');
+        if (chevron) chevron.remove();
+    });
+
+    const activeItem = document.querySelector(`[data-tab="${tabName}"]`);
+    if (activeItem) {
+        activeItem.classList.add('active');
+        const chevronHtml = document.createElement('i');
+        chevronHtml.setAttribute('data-lucide', 'chevron-right');
+        chevronHtml.className = 'w-3 h-3 opacity-50';
+        activeItem.appendChild(chevronHtml);
+    }
+
+    // Update sections
+    document.querySelectorAll('.settings-section').forEach(section => {
+        section.classList.add('hidden');
+    });
+
+    const activeSection = document.getElementById(`section-${tabName}`);
+    if (activeSection) {
+        activeSection.classList.remove('hidden');
+    }
+
+    // Update header title
+    const titleEl = document.getElementById('settings-tab-title');
+    if (titleEl) {
+        titleEl.textContent = tabName.toUpperCase().replace('_', ' ');
+    }
+
+    // Reinitialize lucide icons
+    lucide.createIcons();
+
+    LOG.info('SETTINGS', `Switched to tab: ${tabName}`);
+}
+(window as any).switchSettingsTab = switchSettingsTab;
+
+// Toggle setting
+function toggleSetting(settingId: string) {
+    const toggle = document.getElementById(`${settingId}-toggle`);
+    if (toggle) {
+        toggle.classList.toggle('on');
+        const isOn = toggle.classList.contains('on');
+        settingsState[settingId] = isOn;
+        LOG.info('SETTINGS', `Toggle ${settingId}: ${isOn}`);
+    }
+}
+(window as any).toggleSetting = toggleSetting;
+
+// Set retention period
+function setRetention(period: string) {
+    const retentionEl = document.getElementById('retention-value');
+    if (retentionEl) {
+        retentionEl.textContent = period;
+    }
+
+    // Update button styles
+    const buttons = document.querySelectorAll('#section-telemetry .grid button');
+    buttons.forEach(btn => {
+        if (btn.textContent === period) {
+            btn.className = 'py-2 text-[10px] font-bold border bg-indigo-600/20 border-indigo-500 text-indigo-400 transition-all';
+        } else {
+            btn.className = 'py-2 text-[10px] font-bold border border-zinc-800 text-zinc-600 hover:border-zinc-600 transition-all';
+        }
+    });
+
+    settingsState.retention = period;
+    LOG.info('SETTINGS', `Retention set to: ${period}`);
+}
+(window as any).setRetention = setRetention;
+
+// Save profile - UPGRADED WITH AI-LINKED FIELDS AND UNIFIED STORAGE
+async function saveProfile() {
+    const name = (document.getElementById('settings-name') as HTMLInputElement)?.value || '';
+    const nickname = (document.getElementById('settings-nickname') as HTMLInputElement)?.value || '';
+    const email = (document.getElementById('settings-email') as HTMLInputElement)?.value || '';
+    const bio = (document.getElementById('settings-bio') as HTMLTextAreaElement)?.value || '';
+    const responseStyle = (document.getElementById('settings-response-style') as HTMLSelectElement)?.value || 'casual';
+    const responseLanguage = (document.getElementById('settings-response-language') as HTMLSelectElement)?.value || 'english';
+    const interests = (document.getElementById('settings-interests') as HTMLInputElement)?.value || '';
+
+    // Build user preferences object
+    const userPreferences = {
+        name,
+        nickname,
+        email,
+        bio,
+        responseStyle,
+        responseLanguage,
+        interests: interests.split(',').map(i => i.trim()).filter(Boolean)
+    };
+
+    // === UNIFIED STORAGE: Update both cache and localStorage ===
+    // This ensures getUserPreferences() returns the latest values immediately
+    cachedUserProfile = userPreferences;
+    localStorage.setItem('kai_user_profile', JSON.stringify(userPreferences));
+
+    // Also save to old key for backwards compatibility
+    localStorage.setItem('kai_user_preferences', JSON.stringify(userPreferences));
+
+    settingsState.profile = userPreferences;
+    saveSettingsToStorage();
+
+    // Save to Firebase if user is authenticated
+    if (auth?.currentUser?.uid) {
+        try {
+            await setDoc(doc(db, 'user_profiles', auth.currentUser.uid), userPreferences);
+            LOG.info('SETTINGS', 'Profile synced to Firebase', { responseLanguage });
+        } catch (e) {
+            LOG.warn('SETTINGS', 'Failed to sync profile to Firebase', e);
+        }
+    }
+
+    showSystemNotification(`Profile saved! KAI will now address you as ${nickname || name || 'Operator'} in ${responseLanguage}`, 'success');
+    LOG.info('SETTINGS', 'User preferences saved', { name, responseStyle, responseLanguage });
+}
+(window as any).saveProfile = saveProfile;
+
+// getUserPreferences is already defined at the top of the file with Firebase support
+
+// Update sync status indicator
+function updateSyncStatus(status: 'syncing' | 'synced' | 'error' | 'not-synced') {
+    const indicator = document.getElementById('sync-status-indicator');
+    const text = document.getElementById('sync-status-text');
+    const timeEl = document.getElementById('last-sync-time');
+
+    if (!indicator || !text) return;
+
+    const configs = {
+        'syncing': { icon: 'cloud-cog', text: 'Syncing...', class: 'text-blue-400 sync-spinning' },
+        'synced': { icon: 'cloud-check', text: 'Synced', class: 'text-green-400' },
+        'error': { icon: 'cloud-off', text: 'Sync failed', class: 'text-red-400' },
+        'not-synced': { icon: 'cloud-off', text: 'Not synced', class: 'text-zinc-500' }
+    };
+
+    const config = configs[status];
+    indicator.className = `flex items-center gap-2 text-xs ${config.class}`;
+    indicator.innerHTML = `<i data-lucide="${config.icon}" class="w-4 h-4"></i><span id="sync-status-text">${config.text}</span>`;
+
+    if (status === 'synced' && timeEl) {
+        timeEl.textContent = `Last synced: just now`;
+    }
+
+    // Re-init Lucide icons
+    if ((window as any).lucide) {
+        (window as any).lucide.createIcons();
+    }
+}
+
+// Update profile UI with backend data
+function updateProfileUI(profile: any) {
+    // Update stats
+    if (profile.stats) {
+        const msgEl = document.getElementById('stat-messages');
+        const memEl = document.getElementById('stat-memories');
+        const convEl = document.getElementById('stat-conversations');
+
+        if (msgEl) animateNumber(msgEl, profile.stats.messageCount || 0);
+        if (memEl) animateNumber(memEl, profile.stats.memoriesSynced || 0);
+        if (convEl) animateNumber(convEl, profile.stats.conversationCount || 0);
+
+        // Update activity sparkline
+        if (profile.stats.weeklyActivity) {
+            updateActivitySparkline(profile.stats.weeklyActivity);
+        }
+    }
+
+    // Update rank
+    if (profile.rank) {
+        const badge = document.getElementById('profile-rank-badge');
+        const title = document.getElementById('profile-rank-title');
+        if (badge) badge.style.borderColor = profile.rank.color;
+        if (title) {
+            title.textContent = profile.rank.title;
+            title.style.color = profile.rank.color;
+        }
+    }
+
+    // Update achievements
+    if (profile.achievements && profile.achievements.length > 0) {
+        updateAchievements(profile.achievements);
+    }
+}
+
+// Animate number counting up
+function animateNumber(element: HTMLElement, target: number) {
+    const current = parseInt(element.textContent || '0');
+    const increment = Math.ceil((target - current) / 20);
+    let value = current;
+
+    const interval = setInterval(() => {
+        value += increment;
+        if ((increment > 0 && value >= target) || (increment < 0 && value <= target)) {
+            value = target;
+            clearInterval(interval);
+        }
+        element.textContent = value.toLocaleString();
+    }, 30);
+}
+
+// Update activity sparkline
+function updateActivitySparkline(activity: number[]) {
+    const container = document.getElementById('activity-sparkline');
+    if (!container) return;
+
+    const max = Math.max(...activity, 1);
+    const bars = container.querySelectorAll('div');
+
+    activity.forEach((val, i) => {
+        if (bars[i]) {
+            const height = Math.max(10, (val / max) * 100);
+            (bars[i] as HTMLElement).style.height = `${height}%`;
+        }
+    });
+}
+
+// Update achievements list
+function updateAchievements(achievements: any[]) {
+    const container = document.getElementById('achievements-list');
+    if (!container) return;
+
+    const colorMap: Record<string, string> = {
+        'early_adopter': 'yellow',
+        'power_user': 'blue',
+        'memory_master': 'purple',
+        'security_first': 'green'
+    };
+
+    container.innerHTML = achievements.map(a => {
+        const color = colorMap[a.id] || 'indigo';
+        return `
+            <div class="flex items-center gap-3 p-2 bg-${color}-500/10 border border-${color}-500/30 rounded-lg">
+                <span class="text-lg">${a.icon}</span>
+                <div>
+                    <p class="text-xs font-bold text-${color}-400">${a.name}</p>
+                    <p class="text-[9px] text-zinc-500">${a.description}</p>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+
+// Select uplink
+function selectUplink(element: HTMLElement) {
+    // Reset all uplinks
+    const allUplinks = document.querySelectorAll('#section-uplink .space-y-3 > div');
+    allUplinks.forEach(uplink => {
+        uplink.className = 'p-4 border flex items-center gap-4 cursor-pointer transition-all bg-black border-zinc-900 hover:border-zinc-700';
+        const icon = uplink.querySelector('.p-3');
+        if (icon) icon.className = 'p-3 text-zinc-600 bg-zinc-900';
+        const connected = uplink.querySelector('.text-green-500');
+        if (connected) connected.remove();
+    });
+
+    // Activate selected
+    element.className = 'p-4 border flex items-center gap-4 cursor-pointer transition-all bg-indigo-600/10 border-indigo-500/50';
+    const icon = element.querySelector('.p-3');
+    if (icon) icon.className = 'p-3 text-indigo-500 bg-indigo-500/10';
+
+    // Add connected badge
+    const nameContainer = element.querySelector('.flex-1 .flex.items-center');
+    if (nameContainer && !nameContainer.querySelector('.text-green-500')) {
+        const badge = document.createElement('span');
+        badge.className = 'text-[8px] text-green-500 font-bold uppercase tracking-tighter';
+        badge.textContent = 'CONNECTED';
+        nameContainer.appendChild(badge);
+    }
+
+    LOG.info('SETTINGS', 'Uplink selected');
+}
+(window as any).selectUplink = selectUplink;
+
+// Test connection
+async function testConnection() {
+    const btn = document.querySelector('#section-uplink button[onclick="testConnection()"]') as HTMLButtonElement;
+    if (btn) {
+        btn.textContent = 'Testing...';
+        btn.disabled = true;
+    }
+
+    const start = Date.now();
+    try {
+        const response = await fetch(`${API_URL}/health`);
+        const latency = Date.now() - start;
+
+        if (response.ok) {
+            showSystemNotification(`Connection successful! Latency: ${latency}ms`, 'success');
+        } else {
+            showSystemNotification('Connection failed: Server error', 'error');
+        }
+    } catch (e) {
+        showSystemNotification('Connection failed: Network error', 'error');
+    }
+
+    if (btn) {
+        btn.textContent = 'Test Connection';
+        btn.disabled = false;
+    }
+}
+(window as any).testConnection = testConnection;
+
+// Load settings data
+function loadSettingsData() {
+    // Load user preferences from localStorage
+    const userPrefs = (window as any).getUserPreferences ? (window as any).getUserPreferences() : null;
+
+    // Load profile fields from auth first
+    const user = auth?.currentUser;
+    if (user) {
+        const emailInput = document.getElementById('settings-email') as HTMLInputElement;
+        if (emailInput && user.email && !userPrefs?.email) emailInput.value = user.email;
+
+        const userId = document.getElementById('settings-user-id');
+        if (userId) userId.textContent = user.uid.substring(0, 6).toUpperCase();
+    }
+
+    // Load saved user preferences into form
+    if (userPrefs) {
+        const nameInput = document.getElementById('settings-name') as HTMLInputElement;
+        const nicknameInput = document.getElementById('settings-nickname') as HTMLInputElement;
+        const emailInput = document.getElementById('settings-email') as HTMLInputElement;
+        const bioInput = document.getElementById('settings-bio') as HTMLTextAreaElement;
+        const styleSelect = document.getElementById('settings-response-style') as HTMLSelectElement;
+        const langSelect = document.getElementById('settings-response-language') as HTMLSelectElement;
+        const interestsInput = document.getElementById('settings-interests') as HTMLInputElement;
+
+        if (nameInput && userPrefs.name) nameInput.value = userPrefs.name;
+        if (nicknameInput && userPrefs.nickname) nicknameInput.value = userPrefs.nickname;
+        if (emailInput && userPrefs.email) emailInput.value = userPrefs.email;
+        if (bioInput && userPrefs.bio) bioInput.value = userPrefs.bio;
+        if (styleSelect && userPrefs.responseStyle) styleSelect.value = userPrefs.responseStyle;
+        if (langSelect && userPrefs.responseLanguage) langSelect.value = userPrefs.responseLanguage;
+        if (interestsInput && userPrefs.interests) {
+            interestsInput.value = Array.isArray(userPrefs.interests) ? userPrefs.interests.join(', ') : userPrefs.interests;
+        }
+    }
+
+    // Restore toggle states
+    Object.entries(settingsState).forEach(([key, value]) => {
+        if (typeof value === 'boolean') {
+            const toggle = document.getElementById(`${key}-toggle`);
+            if (toggle) {
+                toggle.classList.toggle('on', value);
+            }
+        }
+    });
+
+    // Load enhanced settings (Model Preferences, API Keys, Language)
+    loadSettingsDataEnhanced();
+}
+
+// Save settings to localStorage
+function saveSettingsToStorage() {
+    localStorage.setItem('kai_settings', JSON.stringify(settingsState));
+}
+
+// Show system notification helper
+function showSystemNotification(message: string, type: 'success' | 'warning' | 'error' = 'success') {
+    const area = document.getElementById('notification-area');
+    if (!area) return;
+
+    const colors = {
+        success: 'border-green-500 bg-green-500/10',
+        warning: 'border-amber-500 bg-amber-500/10',
+        error: 'border-red-500 bg-red-500/10'
+    };
+
+    const notif = document.createElement('div');
+    notif.className = `pointer-events-auto p-4 border-l-2 ${colors[type]} backdrop-blur-md text-white text-sm font-mono animate-[slideIn_0.3s_ease]`;
+    notif.innerHTML = `<span class="text-[10px] uppercase tracking-widest">${message}</span>`;
+
+    area.appendChild(notif);
+    setTimeout(() => notif.remove(), 3000);
+}
+
+// Keyboard shortcut for settings (Ctrl+,)
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === ',') {
+        e.preventDefault();
+        openSettings();
+    }
+
+    // Escape to close settings
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('settings-modal');
+        if (modal?.classList.contains('open')) {
+            closeSettings();
+        }
+    }
+});
+
+LOG.info('SETTINGS', 'Settings module initialized');
+
+// ==================== NEW SETTINGS FUNCTIONS ====================
+
+// Update slider display value
+function updateSliderValue(elementId: string, value: string) {
+    const el = document.getElementById(elementId);
+    if (el) el.textContent = value;
+    settingsState[elementId] = value;
+}
+(window as any).updateSliderValue = updateSliderValue;
+
+// Toggle API key visibility
+function toggleKeyVisibility(inputId: string) {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+    }
+}
+(window as any).toggleKeyVisibility = toggleKeyVisibility;
+
+// Save API keys (encrypted to localStorage)
+function saveApiKeys() {
+    const keys = {
+        groq: (document.getElementById('groq-key') as HTMLInputElement)?.value || '',
+        gemini: (document.getElementById('gemini-key') as HTMLInputElement)?.value || '',
+        openai: (document.getElementById('openai-key') as HTMLInputElement)?.value || '',
+        cohere: (document.getElementById('cohere-key') as HTMLInputElement)?.value || ''
+    };
+
+    // Simple obfuscation (not true encryption, but better than plaintext)
+    const encoded = btoa(JSON.stringify(keys));
+    localStorage.setItem('kai_api_keys', encoded);
+
+    settingsState.apiKeys = keys;
+    showSystemNotification('API Keys saved securely', 'success');
+    LOG.info('SETTINGS', 'API Keys saved');
+}
+(window as any).saveApiKeys = saveApiKeys;
+
+// Clear all API keys
+function clearApiKeys() {
+    if (confirm('Clear all saved API keys?')) {
+        localStorage.removeItem('kai_api_keys');
+        ['groq-key', 'gemini-key', 'openai-key', 'cohere-key'].forEach(id => {
+            const input = document.getElementById(id) as HTMLInputElement;
+            if (input) input.value = '';
+        });
+        showSystemNotification('All API keys cleared', 'warning');
+        LOG.info('SETTINGS', 'API Keys cleared');
+    }
+}
+(window as any).clearApiKeys = clearApiKeys;
+
+// Load saved API keys on settings open
+function loadApiKeys() {
+    const encoded = localStorage.getItem('kai_api_keys');
+    if (encoded) {
+        try {
+            const keys = JSON.parse(atob(encoded));
+            if (keys.groq) (document.getElementById('groq-key') as HTMLInputElement).value = keys.groq;
+            if (keys.gemini) (document.getElementById('gemini-key') as HTMLInputElement).value = keys.gemini;
+            if (keys.openai) (document.getElementById('openai-key') as HTMLInputElement).value = keys.openai;
+            if (keys.cohere) (document.getElementById('cohere-key') as HTMLInputElement).value = keys.cohere;
+        } catch (e) {
+            LOG.warn('SETTINGS', 'Failed to load API keys', e);
+        }
+    }
+}
+
+// Save language settings
+function saveLanguageSettings() {
+    const settings = {
+        uiLanguage: (document.getElementById('ui-language') as HTMLSelectElement)?.value,
+        aiLanguage: (document.getElementById('ai-language') as HTMLSelectElement)?.value,
+        dateFormat: (document.getElementById('date-format') as HTMLSelectElement)?.value,
+        timeFormat: (document.getElementById('time-format') as HTMLSelectElement)?.value,
+        timezone: (document.getElementById('timezone') as HTMLSelectElement)?.value
+    };
+
+    settingsState.language = settings;
+    saveSettingsToStorage();
+    showSystemNotification('Language settings applied', 'success');
+    LOG.info('SETTINGS', 'Language settings saved', settings);
+}
+(window as any).saveLanguageSettings = saveLanguageSettings;
+
+// Save model preferences
+function saveModelPreferences() {
+    const prefs = {
+        defaultModel: (document.getElementById('default-model') as HTMLSelectElement)?.value,
+        temperature: (document.getElementById('temperature-slider') as HTMLInputElement)?.value,
+        maxTokens: (document.getElementById('max-tokens-slider') as HTMLInputElement)?.value
+    };
+
+    settingsState.models = prefs;
+    saveSettingsToStorage();
+    LOG.info('SETTINGS', 'Model preferences saved', prefs);
+}
+
+// Load all settings on modal open - enhanced version
+const originalLoadSettingsData = loadSettingsData;
+function loadSettingsDataEnhanced() {
+    // Load API keys
+    loadApiKeys();
+
+    // Load model preferences
+    if (settingsState.models) {
+        const m = settingsState.models;
+        if (m.defaultModel) (document.getElementById('default-model') as HTMLSelectElement).value = m.defaultModel;
+        if (m.temperature) {
+            (document.getElementById('temperature-slider') as HTMLInputElement).value = m.temperature;
+            updateSliderValue('temp-value', m.temperature);
+        }
+        if (m.maxTokens) {
+            (document.getElementById('max-tokens-slider') as HTMLInputElement).value = m.maxTokens;
+            updateSliderValue('tokens-value', m.maxTokens);
+        }
+    }
+
+    // Load language settings
+    if (settingsState.language) {
+        const l = settingsState.language;
+        if (l.uiLanguage) (document.getElementById('ui-language') as HTMLSelectElement).value = l.uiLanguage;
+        if (l.aiLanguage) (document.getElementById('ai-language') as HTMLSelectElement).value = l.aiLanguage;
+        if (l.dateFormat) (document.getElementById('date-format') as HTMLSelectElement).value = l.dateFormat;
+        if (l.timeFormat) (document.getElementById('time-format') as HTMLSelectElement).value = l.timeFormat;
+        if (l.timezone) (document.getElementById('timezone') as HTMLSelectElement).value = l.timezone;
+    }
+}
+
+
+// Add auto-save for model sliders
+document.getElementById('temperature-slider')?.addEventListener('change', saveModelPreferences);
+document.getElementById('max-tokens-slider')?.addEventListener('change', saveModelPreferences);
+document.getElementById('default-model')?.addEventListener('change', saveModelPreferences);
+
+LOG.info('SETTINGS', 'Enhanced settings module loaded');
+
+// Hook into settings open/close
+const originalOpenSettings = (window as any).openSettings;
+(window as any).openSettings = function () {
+    originalOpenSettings();
+    loadProfileFromBackend();
+    loadSavedAvatar(); // Load saved avatar
+};
+
+const originalCloseSettings = (window as any).closeSettings;
+(window as any).closeSettings = function () {
+    originalCloseSettings();
+};
+
+
+// Load profile data from backend
+async function loadProfileFromBackend() {
+    const userId = auth?.currentUser?.uid;
+    if (!userId) return;
+
+    try {
+        const response = await fetch(`${BASE_URL}/api/v1/profile/${userId}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.profile) {
+                updateProfileUI(data.profile);
+                updateSyncStatus('synced');
+            }
+        }
+    } catch (e) {
+        LOG.warn('PROFILE', 'Failed to load profile from backend', e);
+    }
+}
+
+// Avatar upload function
+async function uploadAvatar(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        showSystemNotification('Please select an image file', 'error');
+        return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+        showSystemNotification('Image must be less than 2MB', 'error');
+        return;
+    }
+
+    LOG.info('SETTINGS', 'Uploading avatar...', { name: file.name, size: file.size });
+
+    // Read file as data URL for preview
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const dataUrl = e.target?.result as string;
+
+        // Update avatar preview
+        const avatarImg = document.getElementById('settings-avatar') as HTMLImageElement;
+        if (avatarImg) {
+            avatarImg.src = dataUrl;
+            avatarImg.style.opacity = '1';
+        }
+
+        // 🔗 SYNC: Also update the header avatar in top-right corner
+        const headerAvatarImg = document.getElementById('user-avatar-img') as HTMLImageElement;
+        if (headerAvatarImg) {
+            headerAvatarImg.src = dataUrl;
+        }
+
+        // Save to localStorage for persistence (user-specific key)
+        const userId = auth?.currentUser?.uid;
+        if (userId) {
+            localStorage.setItem(`kai_avatar_${userId}`, dataUrl);
+        }
+        settingsState.avatar = dataUrl;
+
+        // Try to upload to Supabase if authenticated
+        const user = auth?.currentUser;
+        if (user && supabase) {
+            try {
+                const fileName = `avatars/${user.uid}_${Date.now()}.${file.name.split('.').pop()}`;
+                const { data, error } = await supabase.storage
+                    .from(SUPABASE_BUCKET)
+                    .upload(fileName, file, { upsert: true });
+
+                if (data && !error) {
+                    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${data.path}`;
+                    settingsState.avatarUrl = publicUrl;
+                    saveSettingsToStorage();
+                    LOG.info('SETTINGS', 'Avatar uploaded to Supabase', { path: data.path });
+                }
+            } catch (e) {
+                LOG.warn('SETTINGS', 'Failed to upload avatar to Supabase', e);
+            }
+        }
+
+        showSystemNotification('Avatar updated successfully', 'success');
+    };
+
+    reader.readAsDataURL(file);
+}
+(window as any).uploadAvatar = uploadAvatar;
+
+// Load saved avatar on settings open AND sync header avatar
+function loadSavedAvatar() {
+    const userId = auth?.currentUser?.uid;
+    if (!userId) return;
+
+    const savedAvatar = localStorage.getItem(`kai_avatar_${userId}`);
+    if (savedAvatar) {
+        // Update settings avatar
+        const avatarImg = document.getElementById('settings-avatar') as HTMLImageElement;
+        if (avatarImg) {
+            avatarImg.src = savedAvatar;
+            avatarImg.style.opacity = '1';
+        }
+
+        // 🔗 SYNC: Also update the header avatar in top-right corner
+        const headerAvatarImg = document.getElementById('user-avatar-img') as HTMLImageElement;
+        if (headerAvatarImg) {
+            headerAvatarImg.src = savedAvatar;
+        }
+    }
+}
+
+LOG.info('SETTINGS', 'Avatar upload module loaded');

@@ -11,12 +11,39 @@ Features:
 
 from Backend.LLM import ChatCompletion
 from json import load, dump
+import json  # For JSONDecodeError
 import time
 import datetime
 from dotenv import dotenv_values
 import os
 import sys
 import re  # For knowledge grounding patterns
+import threading
+import google.generativeai as genai
+
+# ==================== SPEED OPTIMIZATIONS ====================
+FAST_MODE = True  # Enable for < 0.6s responses (skips some features)
+GEMINI_CONFIGURED = False  # Cache API config
+
+def _init_gemini():
+    """Initialize Gemini once at module load (saves ~100ms per call)"""
+    global GEMINI_CONFIGURED
+    if GEMINI_CONFIGURED:
+        return True
+    try:
+        env_vars = dotenv_values(".env")
+        api_key = env_vars.get("GeminiAPIKey", "") or os.environ.get("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+            GEMINI_CONFIGURED = True
+            print("[GEMINI] Pre-configured for speed")
+            return True
+    except Exception as e:
+        print(f"[GEMINI] Config error: {e}")
+    return False
+
+# Initialize on import
+_init_gemini()
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -253,24 +280,43 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
                     if last_action.action_type == "image_gen":
                         from Backend.EnhancedImageGen import enhanced_image_gen
                         p = last_action.params
-                        # Return direct result or construct a text response
+                        # Generate images with same params
                         imgs = enhanced_image_gen.generate_pollinations(
-                            p["prompt"], p.get("num_images",1), p.get("width",1024), p.get("height",1024)
+                            p["prompt"], 
+                            p.get("num_images", 1), 
+                            p.get("width", 1024), 
+                            p.get("height", 1024),
+                            p.get("model", "flux")
                         )
-                        return {
-                            "response": f"I've retried generating that image for you!\n{imgs[0] if imgs else 'Failed again, sorry.'}",
-                            "metadata": {"tool": "retry", "original_action": "image_gen"}
-                        }
+                        
+                        if imgs:
+                            img_links = "\n".join(imgs)
+                            return {
+                                "response": f"I've retried generating that image for you!\n\n{img_links}",
+                                "metadata": {"tool": "retry", "original_action": "image_gen", "images": imgs}
+                            }
+                        else:
+                            return {
+                                "response": "Sorry, the retry failed. The image generation didn't work this time either.",
+                                "metadata": {"tool": "retry", "original_action": "image_gen", "error": "generation_failed"}
+                            }
                     
                     elif last_action.action_type == "smart_image_gen":
                         from Backend.EnhancedImageGen import enhanced_image_gen
                         p = last_action.params
-                        res = enhanced_image_gen.smart_generate(p["prompt"], p.get("num_images",1))
+                        res = enhanced_image_gen.smart_generate(p["prompt"], p.get("num_images", 1))
+                        
                         # Format response from dict result
-                        if res['images']:
+                        if res.get('status') == 'success' and res.get('images'):
+                            img_links = "\n".join(res['images'])
                             return {
-                                "response": f"Retrying smart generation... Done! Here is the {res['style']} image:\n{res['images'][0]}",
-                                "metadata": {"tool": "retry", "original_action": "smart_image_gen"}
+                                "response": f"Retrying smart generation... Done! Here is the {res['style']} image:\n\n{img_links}",
+                                "metadata": {"tool": "retry", "original_action": "smart_image_gen", "style": res['style'], "images": res['images']}
+                            }
+                        else:
+                            return {
+                                "response": "Sorry, the retry failed. Smart image generation didn't work this time.",
+                                "metadata": {"tool": "retry", "original_action": "smart_image_gen", "error": "generation_failed"}
                             }
                     
                     elif last_action.action_type == "web_search":
@@ -292,7 +338,7 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
         try:
             with open(chatlog_path, "r") as f:
                 messages = load(f)
-        except:
+        except (FileNotFoundError, json.JSONDecodeError):
             messages = []
         
         # Keep only recent context (last 12 exchanges)
@@ -340,12 +386,13 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
                 text_only=True
             )
         
-        # ===== 7. RESPONSE ENHANCEMENT =====
-        try:
-            from Backend.ResponseEnhancer import enhance_response
-            Answer = enhance_response(Answer, Query)
-        except ImportError:
-            pass  # Use raw response if enhancer not available
+        # ===== 7. RESPONSE ENHANCEMENT (DISABLED IN FAST_MODE) =====
+        if not FAST_MODE:
+            try:
+                from Backend.ResponseEnhancer import enhance_response
+                Answer = enhance_response(Answer, Query)
+            except ImportError:
+                pass  # Use raw response if enhancer not available
         
         # ===== 8. SAVE TO HISTORY =====
         messages.append({"role": "user", "content": Query})
@@ -354,11 +401,17 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
         with open(chatlog_path, "w") as f:
             dump(messages, f, indent=4)
         
-        # Save to contextual memory
-        try:
-            contextual_memory.add_conversation(Query, Answer)
-        except:
-            pass
+        # Save to contextual memory (non-blocking in FAST_MODE)
+        def _async_save():
+            try:
+                contextual_memory.add_conversation(Query, Answer)
+            except:
+                pass
+        
+        if FAST_MODE:
+            threading.Thread(target=_async_save, daemon=True).start()
+        else:
+            _async_save()
         
         # Cache the response
         generation_time = time.time() - start_time
@@ -392,20 +445,18 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
 def _call_gemini(messages: list, model_name: str = "gemini-2.0-flash-exp") -> str:
     """
     Call Gemini API directly for best performance.
-    Handles thinking mode models specially.
+    Uses pre-configured API (from module init) for speed.
     """
-    import google.generativeai as genai
-    from dotenv import dotenv_values
+    global GEMINI_CONFIGURED
     
-    env_vars = dotenv_values(".env")
-    api_key = env_vars.get("GeminiAPIKey", "") or os.environ.get("GEMINI_API_KEY")
-    
-    if not api_key:
-        # Fallback to Groq
-        return ChatCompletion(messages, model="llama-3.3-70b-versatile", text_only=True)
+    # Use cached config, fallback if needed
+    if not GEMINI_CONFIGURED:
+        if not _init_gemini():
+            # Fallback to Groq
+            return ChatCompletion(messages, model="llama-3.3-70b-versatile", text_only=True)
     
     try:
-        genai.configure(api_key=api_key)
+        # API already configured at module load - skip reconfiguration for speed
         
         # Extract system instruction and conversation
         system_instruction = None

@@ -57,7 +57,7 @@ def get_music_response(query: str) -> dict:
     Process a music play request and return data for frontend embedding.
     """
     # Clean up query
-    play_keywords = ["play", "play music", "play song", "play video", "listen to"]
+    play_keywords = ["play", "play music", "play song", "play video", "listen to", "baja", "bajao", "sunao"]
     clean_query = query.lower()
     for keyword in play_keywords:
         clean_query = clean_query.replace(keyword, "").strip()
@@ -65,11 +65,44 @@ def get_music_response(query: str) -> dict:
     if not clean_query:
         clean_query = "lofi hip hop beats"  # Default music
     
-    # Add "music" or "song" to improve search for vague queries
-    if len(clean_query.split()) <= 2 and "music" not in clean_query:
-        clean_query += " music"
+    # === HINDI/BOLLYWOOD SONG DETECTION ===
+    # Common Hindi words in song titles
+    hindi_indicators = [
+        "dil", "pyar", "ishq", "tum", "mujhe", "tera", "mera", "hum", "tujhe", "aashiq",
+        "mohabbat", "bewafa", "deewana", "pagal", "duniya", "zindagi", "khuda", "rab",
+        "pal", "lamha", "raat", "sham", "subah", "chandni", "chand", "sitara", "sapna",
+        "aankh", "dard", "gham", "khushi", "milan", "judaai", "alvida", "wafa",
+        "haseen", "haseena", "laila", "majnu", "romeo", "juliet", "sajna", "sajni",
+        "mehboob", "janam", "zara", "kabhi", "kabhie", "maine", "hamari", "tumhari",
+        "chaand", "taare", "aasman", "badal", "baarish", "pani", "hawaa", "aag",
+        "rang", "holi", "diwali", "eid", "shaadi", "dulhan", "dulha", "mehndi",
+        "nachle", "gaana", "geet", "sur", "taal", "raag", "arijit", "atif", "neha",
+        "shreya", "kumar sanu", "udit", "lata", "asha", "kishore", "rafi", "mukesh"
+    ]
     
-    results = search_youtube(clean_query, max_results=1)
+    # Check if query contains Hindi words
+    query_words = clean_query.lower().split()
+    is_hindi_song = any(word in hindi_indicators for word in query_words)
+    
+    # Also check for partial matches
+    if not is_hindi_song:
+        for indicator in hindi_indicators:
+            if indicator in clean_query.lower():
+                is_hindi_song = True
+                break
+    
+    # Build the search query
+    if is_hindi_song:
+        # Add Hindi/Bollywood keywords for Indian songs
+        search_query = f"{clean_query} hindi song full audio"
+        print(f"[WebMusicPlayer] 🎵 Detected Hindi song: {clean_query} -> {search_query}")
+    elif len(clean_query.split()) <= 2 and "music" not in clean_query:
+        # For short English queries, add "music"
+        search_query = f"{clean_query} music"
+    else:
+        search_query = clean_query
+    
+    results = search_youtube(search_query, max_results=1)
     
     if results:
         video = results[0]

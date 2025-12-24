@@ -141,23 +141,23 @@ class VisionService:
 
     # --- Convenience Methods ---
     def describe(self, img): 
-        res = self.analyze(img, "Describe this image in detail.")
+        res = self.analyze(img, "Describe this image in detail using structured Markdown. Use Bold Headers and Bullet Points.")
         return res.get("description", res.get("error"))
 
     def generate_caption(self, img): 
-        res = self.analyze(img, "Write a short social media caption.")
+        res = self.analyze(img, "Write a short, engaging social media caption with hashtags.")
         return res.get("description", res.get("error"))
 
     def extract_text(self, img): 
-        res = self.analyze(img, "Extract all text from this image exactly as it appears.")
+        res = self.analyze(img, "Extract all text from this image exactly as it appears. Preserve layout if possible.")
         return res.get("description", res.get("error"))
 
     def answer_question(self, img, q): 
-        res = self.analyze(img, q)
+        res = self.analyze(img, f"{q} (Provide a structured answer with clear points)")
         return res.get("description", res.get("error"))
 
     def get_mood(self, img): 
-        res = self.analyze(img, "What is the mood/atmosphere?")
+        res = self.analyze(img, "What is the mood/atmosphere? Use descriptive adjectives.")
         return res.get("description", res.get("error"))
 
 vision_service = VisionService()
