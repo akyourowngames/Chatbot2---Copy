@@ -43,7 +43,7 @@ try {
 }
 
 // 📡 API Configuration
-const USE_CLOUD_API = true; // Set to true for production (Render), false for local dev
+const USE_CLOUD_API = false; // Set to true for production (Render), false for local dev
 const BASE_URL = USE_CLOUD_API ? 'https://kai-api-nxxv.onrender.com' : 'http://localhost:5000';
 const API_URL = `${BASE_URL}/api/v1`;
 
@@ -2240,12 +2240,26 @@ if (auth) {
         const responseText = data.response || "NO_DATA";
         await typewriterEffect(body, responseText);
 
-        // 🔧 FIX: Track assistant response for Firebase persistence
-        currentChatMessages.push({
+        // 🔧 FIX: Track assistant response for Firebase persistence WITH METADATA
+        const assistantMessage: any = {
             role: 'assistant',
             content: responseText,
             timestamp: Date.now()
-        });
+        };
+
+        // Include metadata for rich media persistence (Spotify, PDF, etc.)
+        if (data.type || data.spotify || data.url || data.anime || data.sources) {
+            assistantMessage.metadata = {
+                type: data.type,
+                spotify: data.spotify,
+                anime: data.anime,
+                url: data.url,
+                title: data.title,
+                sources: data.sources,
+                data: data.data
+            };
+        }
+        currentChatMessages.push(assistantMessage);
 
         // Remove stop button after streaming complete
         const stopBtn = document.getElementById(`stop-gen-${msgId}`);
