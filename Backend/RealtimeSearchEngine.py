@@ -253,20 +253,36 @@ def RealtimeSearchEngine(prompt):
     try:
         import google.generativeai as genai
         
-        # Get Gemini API key
-        gemini_key = os.getenv("GEMINI_API_KEY") or env_vars.get("GEMINI_API_KEY")
+        # Get Gemini API keys with rotation
+        gemini_keys = []
+        for i in range(1, 6):  # Try GEMINI_API_KEY_1 through GEMINI_API_KEY_5
+            key = os.getenv(f"GEMINI_API_KEY_{i}") or env_vars.get(f"GEMINI_API_KEY_{i}")
+            if key:
+                gemini_keys.append(key)
         
-        if gemini_key:
-            genai.configure(api_key=gemini_key)
-            
-            # Use Gemini 2.0 Flash with dynamic retrieval (Google Search grounding)
-            model = genai.GenerativeModel(
-                model_name="gemini-2.0-flash-exp",
-                tools="google_search_retrieval"  # Correct syntax for grounding
-            )
-            
-            # Create the search prompt
-            search_prompt = f"""Search the web for the latest information about: {clean_query}
+        # Also add the main key
+        main_key = os.getenv("GEMINI_API_KEY") or env_vars.get("GEMINI_API_KEY")
+        if main_key and main_key not in gemini_keys:
+            gemini_keys.insert(0, main_key)
+        
+        if not gemini_keys:
+            print(f"[RealtimeSearch] ⚠️ No Gemini keys found, skipping to DuckDuckGo")
+            raise Exception("No Gemini API keys available")
+        
+        # Try each key until one works
+        last_error = None
+        for idx, gemini_key in enumerate(gemini_keys):
+            try:
+                genai.configure(api_key=gemini_key)
+                
+                # Use Gemini 2.0 Flash with dynamic retrieval (Google Search grounding)
+                model = genai.GenerativeModel(
+                    model_name="gemini-2.0-flash-exp",
+                    tools="google_search_retrieval"  # Correct syntax for grounding
+                )
+                
+                # Create the search prompt
+                search_prompt = f"""Search the web for the latest information about: {clean_query}
 
 Provide a comprehensive, well-structured answer with:
 - Current facts and data
@@ -275,47 +291,66 @@ Provide a comprehensive, well-structured answer with:
 
 Be direct and informative. Use markdown formatting."""
 
-            print(f"[RealtimeSearch] 🌐 Using Gemini with Google Search Grounding...")
-            
-            response = model.generate_content(search_prompt)
-            
-            if response and response.text:
-                result_text = response.text
+                print(f"[RealtimeSearch] 🌐 Using Gemini key {idx+1}/{len(gemini_keys)} with Google Search Grounding...")
                 
-                # Extract grounding sources if available
-                try:
-                    if hasattr(response, 'candidates') and response.candidates:
-                        candidate = response.candidates[0]
-                        if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
-                            gm = candidate.grounding_metadata
-                            # Get grounding chunks (sources)
-                            if hasattr(gm, 'grounding_chunks'):
-                                for chunk in gm.grounding_chunks[:5]:  # Top 5 sources
-                                    if hasattr(chunk, 'web') and chunk.web:
-                                        sources.append({
-                                            "title": getattr(chunk.web, 'title', 'Source'),
-                                            "url": getattr(chunk.web, 'uri', '')
-                                        })
-                except Exception as src_err:
-                    print(f"[RealtimeSearch] ⚠️ Source extraction error: {src_err}")
+                response = model.generate_content(search_prompt)
                 
-                print(f"[RealtimeSearch] ✅ Gemini grounding response with {len(sources)} sources")
-                
-                # Return structured response with sources
-                return {
-                    "text": f"🔍 **{clean_query}**\n\n{result_text}",
-                    "sources": sources,
-                    "engine": "gemini"
-                }
-            else:
-                print(f"[RealtimeSearch] ⚠️ Empty Gemini response, falling back to DDG")
+                if response and response.text:
+                    result_text = response.text
+                    
+                    # Extract grounding sources if available
+                    try:
+                        if hasattr(response, 'candidates') and response.candidates:
+                            candidate = response.candidates[0]
+                            if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
+                                gm = candidate.grounding_metadata
+                                # Get grounding chunks (sources)
+                                if hasattr(gm, 'grounding_chunks'):
+                                    for chunk in gm.grounding_chunks[:5]:  # Top 5 sources
+                                        if hasattr(chunk, 'web') and chunk.web:
+                                            sources.append({
+                                                "title": getattr(chunk.web, 'title', 'Source'),
+                                                "url": getattr(chunk.web, 'uri', '')
+                                            })
+                    except Exception as src_err:
+                        print(f"[RealtimeSearch] ⚠️ Source extraction error: {src_err}")
+                    
+                    print(f"[RealtimeSearch] ✅ Gemini grounding response with {len(sources)} sources")
+                    
+                    # Return structured response with sources
+                    return {
+                        "text": f"🔍 **{clean_query}**\n\n{result_text}",
+                        "sources": sources,
+                        "engine": "gemini"
+                    }
+                else:
+                    print(f"[RealtimeSearch] ⚠️ Empty Gemini response with key {idx+1}")
+                    
+            except Exception as e:
+                last_error = str(e)
+                if "quota" in str(e).lower() or "429" in str(e):
+                    print(f"[RealtimeSearch] ⚠️ Gemini key {idx+1} quota exceeded, trying next...")
+                    continue
+                else:
+                    print(f"[RealtimeSearch] ⚠️ Gemini key {idx+1} error: {e}")
+                    break
+        
+        # All keys failed
+        print(f"[RealtimeSearch] ⚠️ All Gemini keys failed: {last_error}, falling back to DuckDuckGo")
                 
     except Exception as e:
         print(f"[RealtimeSearch] ⚠️ Gemini grounding error: {e}, falling back to DuckDuckGo")
     
     # === FALLBACK: DuckDuckGo Direct Search ===
     try:
-        from duckduckgo_search import DDGS
+        # Try new package first, then old package
+        try:
+            from ddgs import DDGS
+            print(f"[RealtimeSearch] Using new ddgs package")
+        except ImportError:
+            from duckduckgo_search import DDGS
+            print(f"[RealtimeSearch] Using old duckduckgo_search package")
+            
         with DDGS() as ddgs:
             results = list(ddgs.text(clean_query, max_results=5))
             
