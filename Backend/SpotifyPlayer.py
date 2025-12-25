@@ -289,7 +289,7 @@ Examples:
     
     def play(self, query: str):
         """
-        🚀 ENHANCED play - intelligently determines what to search for
+        🚀 DIRECT play - sends query as-is to Spotify for accurate results
         
         Args:
             query: What to play (song name, artist, genre, mood, etc)
@@ -300,17 +300,25 @@ Examples:
         query_lower = query.lower().strip()
         search_type = "track"  # Default to track search
         
-        # === LLM-POWERED QUERY CLEANING ===
-        # Use AI to fix spelling mistakes and extract song/artist
-        llm_result = self._clean_music_query(query_lower)
-        song_name = llm_result.get("song", query_lower)
-        parsed_artist = llm_result.get("artist")
+        # === SIMPLE CLEANING (NO AI) ===
+        # Just remove noise words, keep the actual search terms intact
+        clean_query = query_lower
+        noise_phrases = [
+            "play ", "play the ", "play me ", "play some ",
+            "on spotify", "in spotify", "from spotify",
+            "can you play", "please play", "i want to hear",
+            "put on ", "listen to ", "start playing "
+        ]
+        for phrase in noise_phrases:
+            clean_query = clean_query.replace(phrase, "")
+        clean_query = clean_query.strip()
         
-        # Build clean search query
-        if parsed_artist:
-            clean_query = f"{song_name} {parsed_artist}"
-        else:
-            clean_query = song_name
+        # Extract artist if "by" is in query
+        parsed_artist = None
+        if " by " in clean_query:
+            parts = clean_query.split(" by ", 1)
+            clean_query = parts[0].strip()
+            parsed_artist = parts[1].strip() if len(parts) > 1 else None
         
         # === SMART TYPE DETECTION ===
         # Only check for explicit playlist/album keywords (not in song titles)
@@ -343,14 +351,14 @@ Examples:
         # === FALLBACK: If no track found, try simpler search ===
         if results.get("status") != "success" or not results.get("results"):
             if search_type == "track" and parsed_artist:
-                # Try with just song name
+                # Try with just song name (without artist)
                 print(f"[Spotify] Fallback: searching just song name...")
-                results = self.search(song_name, "track", limit=5)
+                results = self.search(clean_query, "track", limit=5)
             
             if results.get("status") != "success" or not results.get("results"):
                 # Try as artist
                 print(f"[Spotify] Fallback: trying as artist...")
-                results = self.search(song_name if not parsed_artist else parsed_artist, "artist", limit=3)
+                results = self.search(clean_query if not parsed_artist else parsed_artist, "artist", limit=3)
         
         if results.get("status") == "success" and results.get("results"):
             # Use actual search type from results (may have changed)
