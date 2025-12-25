@@ -1858,12 +1858,19 @@ function addMessage(role: string, content: string, attachedFile: string | null =
         lastUserAttachment = attachedFile;
     }
 
-    // Track message for Firebase persistence
-    currentChatMessages.push({
+    // Track message for Firebase persistence (with metadata)
+    const messageObj: any = {
         role: role as 'user' | 'assistant',
         content: content,
         timestamp: Date.now()
-    });
+    };
+
+    // Include metadata if provided (for rich media persistence)
+    if (metadata) {
+        messageObj.metadata = metadata;
+    }
+
+    currentChatMessages.push(messageObj);
 
     const block = document.createElement('div');
     block.id = msgId;
