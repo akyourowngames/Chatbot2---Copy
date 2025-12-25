@@ -15,19 +15,19 @@ class SmartModelRouter:
     Intelligent model selection based on query analysis.
     
     Models Available:
-    - gemini-3-flash-preview: Best for complex reasoning, coding, analysis (DEFAULT)
-    - gemini-3-pro-preview: For deep thinking/multi-step problems (1M context!)
+    - gemini-2.0-flash-exp: Best for complex reasoning, coding, analysis (DEFAULT)
+    - gemini-2.0-flash-thinking-exp: For deep thinking/multi-step problems
     - llama-3.3-70b-versatile: Good for creative, conversational
     - llama-3.1-8b-instant: Fast for simple Q&A
     """
     
-    # Model configurations - GEMINI 3 PRIMARY + GROQ for speed
+    # Model configurations - GROQ PRIMARY (fastest!) + Gemini fallback
     MODELS = {
         "thinking": {
-            "name": "gemini-3-pro-preview",  # Gemini 3 Pro with 1M token context
+            "name": "gemini-2.0-flash-thinking-exp",  # Only Gemini has thinking mode
             "provider": "gemini",
             "max_tokens": 8192,
-            "description": "Deep reasoning with 1M context window"
+            "description": "Deep reasoning with visible thinking process"
         },
         "powerful": {
             "name": "llama-3.3-70b-versatile",  # Groq - fast + smart

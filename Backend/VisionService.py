@@ -19,15 +19,7 @@ env_vars = dotenv_values(env_path)
 
 class VisionService:
     def __init__(self):
-        # Prioritize Gemini 3 models for better vision capabilities
-        self.models = [
-            "models/gemini-3-pro-preview",  # Gemini 3 Pro - best quality
-            "models/gemini-3-flash-preview", # Gemini 3 Flash - fast
-            "models/gemini-2.5-flash",  # Fallback to 2.5
-            "models/gemini-2.0-flash",  # Fallback to 2.0
-            "models/gemini-flash-latest", 
-            "models/gemini-pro-latest"
-        ]
+        self.models = ["models/gemini-2.5-flash", "models/gemini-2.0-flash", "models/gemini-flash-latest", "models/gemini-pro-latest"]
         self.api_keys = self._load_api_keys()
         self.current_key_idx = 0
         

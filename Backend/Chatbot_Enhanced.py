@@ -213,7 +213,7 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
     """
     Enhanced ChatBot with:
     - Smart Model Routing (best model per query)
-    - Gemini 3 Flash as default
+    - Gemini 2.0 Flash as default
     - Response Enhancement (quality post-processing)
     - Auto Knowledge Grounding (web search for factual Qs)
     """
@@ -258,7 +258,7 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
             is_thinking_mode = should_think(Query)
             print(f"[CHAT] Routing to {model_name} (thinking={is_thinking_mode})")
         except ImportError:
-            model_name = "gemini-3-flash-preview"  # Default to Gemini 3
+            model_name = "gemini-2.0-flash-exp"  # Default to best model
             provider = "gemini"
             is_thinking_mode = False
             routing_analysis = {}
@@ -442,7 +442,7 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
         }
 
 
-def _call_gemini(messages: list, model_name: str = "gemini-3-flash-preview") -> str:
+def _call_gemini(messages: list, model_name: str = "gemini-2.0-flash-exp") -> str:
     """
     Call Gemini API directly for best performance.
     Uses pre-configured API (from module init) for speed.
