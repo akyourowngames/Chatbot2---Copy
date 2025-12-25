@@ -275,9 +275,9 @@ def RealtimeSearchEngine(prompt):
             try:
                 genai.configure(api_key=gemini_key)
                 
-                # Use Gemini 2.0 Flash with dynamic retrieval (Google Search grounding)
+                # Use Gemini 3 Pro with dynamic retrieval (Google Search grounding)
                 model = genai.GenerativeModel(
-                    model_name="gemini-2.0-flash-exp",
+                    model_name="gemini-3-pro-preview",
                     tools="google_search_retrieval"  # Correct syntax for grounding
                 )
                 
