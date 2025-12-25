@@ -475,6 +475,18 @@ def health_check():
         }
     })
 
+# ==================== STATIC FILE SERVING ====================
+
+@app.route('/data/<path:filename>')
+def serve_data_files(filename):
+    """Serve static files from Data directory (images, PDFs, etc.)"""
+    try:
+        data_dir = os.path.join(os.path.dirname(__file__), 'Data')
+        return send_from_directory(data_dir, filename)
+    except Exception as e:
+        print(f"[ERROR] 404 GET /data/{filename} from {request.remote_addr}")
+        return jsonify({"error": "File not found"}), 404
+
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
 @app.route('/api/v1/auth/signup', methods=['POST'])
