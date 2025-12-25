@@ -22,7 +22,9 @@ class AIJobInterviewer:
     def __init__(self):
         self._llm = None
         self.sessions = {}  # Active interview sessions
-        logger.info("[INTERVIEW] AI Job Interviewer initialized")
+        self.user_history = {}  # Performance history per user
+        self.industry_templates = self._load_industry_templates()
+        logger.info("[INTERVIEW] AI Job Interviewer initialized with templates")
     
     @property
     def llm(self):
@@ -36,7 +38,8 @@ class AIJobInterviewer:
         return self._llm
     
     def start_interview(self, job_role: str, company: str = "a top tech company",
-                       experience_level: str = "mid", user_id: str = "default") -> Dict[str, Any]:
+                       experience_level: str = "mid", difficulty: str = "medium",
+                       industry: str = None, user_id: str = "default") -> Dict[str, Any]:
         """
         Start a new interview session.
         
@@ -44,6 +47,8 @@ class AIJobInterviewer:
             job_role: The job you're interviewing for
             company: Company name (for context)
             experience_level: junior/mid/senior
+            difficulty: easy/medium/hard/expert
+            industry: Optional industry template (tech/finance/healthcare/etc.)
             user_id: Session identifier
             
         Returns:
@@ -54,18 +59,27 @@ class AIJobInterviewer:
         
         logger.info(f"[INTERVIEW] Starting interview for {job_role} at {company}")
         
+        # Load template if industry specified
+        template_questions = []
+        if industry and industry in self.industry_templates:
+            template_questions = self.industry_templates[industry].get("questions", [])
+            logger.info(f"[INTERVIEW] Loaded {industry} template")
+        
         # Generate interview questions for this role
-        questions = self._generate_questions(job_role, experience_level)
+        questions = template_questions if template_questions else self._generate_questions(job_role, experience_level, difficulty)
         
         # Create session
         session = {
             "job_role": job_role,
             "company": company,
             "experience_level": experience_level,
+            "difficulty": difficulty,
+            "industry": industry,
             "questions": questions,
             "current_question": 0,
             "answers": [],
             "scores": [],
+            "hints_used": 0,
             "started_at": datetime.now().isoformat(),
             "status": "in_progress"
         }
@@ -84,9 +98,17 @@ class AIJobInterviewer:
             "tip": "Answer as if you're in a real interview. Be specific and give examples!"
         }
     
-    def _generate_questions(self, job_role: str, level: str) -> List[str]:
+    def _generate_questions(self, job_role: str, level: str, difficulty: str = "medium") -> List[str]:
         """Generate interview questions for the role."""
-        prompt = f"""Generate 5 interview questions for a {level}-level {job_role} position.
+        
+        difficulty_context = {
+            "easy": "straightforward, common",
+            "medium": "moderately challenging",
+            "hard": "challenging, in-depth",
+            "expert": "extremely difficult, expert-level"
+        }.get(difficulty, "moderately challenging")
+        
+        prompt = f"""Generate 5 {difficulty_context} interview questions for a {level}-level {job_role} position.
 Mix of:
 - 1 behavioral question (tell me about a time...)
 - 2 technical/skill questions specific to {job_role}
@@ -323,6 +345,119 @@ Write 3-4 sentences summarizing their performance, strengths, and areas to impro
             "question": question,
             "tip": "Practice answering out loud for best results!"
         }
+    
+    def _load_industry_templates(self) -> Dict[str, Dict]:
+        """Load industry-specific question templates."""
+        return {
+            "tech": {
+                "name": "Technology",
+                "questions": [
+                    "Describe your experience with agile development methodologies.",
+                    "How do you approach debugging a complex system?",
+                    "Tell me about a time you optimized system performance.",
+                    "How do you stay updated with new technologies?",
+                    "Explain a situation where you had to make a trade-off between code quality and delivery speed."
+                ]
+            },
+            "finance": {
+                "name": "Finance",
+                "questions": [
+                    "How do you assess financial risk in investment decisions?",
+                    "Describe your experience with financial modeling.",
+                    "How would you explain a complex financial concept to a non-finance stakeholder?",
+                    "Tell me about a time you identified a critical error in financial data.",
+                    "How do you prioritize competing deadlines during quarter-end close?"
+                ]
+            },
+            "healthcare": {
+                "name": "Healthcare",
+                "questions": [
+                    "How do you handle patient confidentiality in your work?",
+                    "Describe a difficult situation with a patient or family member.",
+                    "How do you stay current with medical best practices?",
+                    "Tell me about a time you had to make a critical decision under pressure.",
+                    "How do you approach interdisciplinary collaboration?"
+                ]
+            },
+            "marketing": {
+                "name": "Marketing",
+                "questions": [
+                    "How do you measure the success of a marketing campaign?",
+                    "Describe your approach to understanding target audiences.",
+                    "Tell me about a campaign that didn't perform well and what you learned.",
+                    "How do you balance creativity with data-driven decision making?",
+                    "What's your experience with digital marketing tools and platforms?"
+                ]
+            }
+        }
+    
+    def load_custom_questions(self, questions: List[str], user_id: str = "default"):
+        """Load custom questions for current session."""
+        if user_id in self.sessions:
+            self.sessions[user_id]["questions"] = questions
+            self.sessions[user_id]["current_question"] = 0
+            logger.info(f"[INTERVIEW] Loaded {len(questions)} custom questions")
+    
+    def get_hint(self, user_id: str = "default") -> Dict[str, Any]:
+        """Provide a hint for the current question."""
+        if user_id not in self.sessions:
+            return {"status": "error", "message": "No active interview"}
+        
+        session = self.sessions[user_id]
+        current_q = session["current_question"]
+        question = session["questions"][current_q]
+        
+        if not self.llm:
+            return {"status": "error", "message": "LLM not available"}
+        
+        prompt = f"""Provide a helpful hint for answering this interview question.
+Don't give the full answer, just guide them in the right direction.
+
+QUESTION: {question}
+
+Hint (2-3 sentences):"""
+        
+        hint = self.llm(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.1-8b-instant",
+            inject_memory=False
+        )
+        
+        session["hints_used"] += 1
+        
+        return {
+            "status": "success",
+            "hint": hint.strip(),
+            "hints_used_total": session["hints_used"]
+        }
+    
+    def get_analytics(self, user_id: str = "default") -> Dict[str, Any]:
+        """Get performance analytics for a user."""
+        if user_id not in self.user_history:
+            return {"status": "error", "message": "No interview history found"}
+        
+        history = self.user_history[user_id]
+        
+        scores = [s["average_score"] for s in history]
+        avg_overall = sum(scores) / len(scores) if scores else 0
+        
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "total_interviews": len(history),
+            "average_score": round(avg_overall, 1),
+            "highest_score": max(scores) if scores else 0,
+            "lowest_score": min(scores) if scores else 0,
+            "improvement_trend": "improving" if len(scores) > 1 and scores[-1] > scores[0] else "stable",
+            "recent_interviews": history[-3:]
+        }
+    
+    def get_industry_templates(self) -> List[Dict[str, str]]:
+        """Get list of available industry templates."""
+        return [
+            {"id": key, "name": val["name"], "question_count": len(val["questions"])}
+            for key, val in self.industry_templates.items()
+        ]
 
 
 # Global instance

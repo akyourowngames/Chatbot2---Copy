@@ -810,7 +810,292 @@ def delete_user_account():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/v1/users/profile', methods=['GET', 'OPTIONS'])
+def get_autofill_profile():
+    """Get user profile data for form autofill"""
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
+    
+    try:
+        # Get user_id from query parameter
+        user_id = request.args.get('user_id')
+        
+        if not user_id or user_id == 'default':
+            print('[PROFILE] ⚠️ No user_id provided, returning empty')
+            response = jsonify({"success": True, "profile": {}})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
+        
+        print(f'[PROFILE] Fetching profile for user: {user_id}')
+        
+        # Load from Firestore using REST API (no credentials file needed!)
+        try:
+            import requests
+            
+            # Firestore REST API endpoint
+            project_id = "kai-g-80f9c"
+            api_key = "AIzaSyAVv4EhUiVZSf54iZlB-ud05pxIlO8zBWk"
+            
+            # Path: users/{userId}/data/profile
+            url = f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/users/{user_id}/data/profile?key={api_key}"
+            
+            response = requests.get(url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Parse Firestore document format
+                # Fields are in format: {"fieldName": {"stringValue": "value"}}
+                fields = data.get('fields', {})
+                
+                def get_field(field_name):
+                    """Extract value from Firestore field"""
+                    field = fields.get(field_name, {})
+                    # Handle string values
+                    if 'stringValue' in field:
+                        return field['stringValue']
+                    # Handle integers
+                    if 'integerValue' in field:
+                        return field['integerValue']
+                    # Handle arrays
+                    if 'arrayValue' in field:
+                        arr = field['arrayValue'].get('values', [])
+                        return [item.get('stringValue', '') for item in arr]
+                    return ''
+                
+                user_profile = {
+                    'name': get_field('name'),
+                    'email': get_field('email'),
+                    'nickname': get_field('nickname'),
+                    'bio': get_field('bio'),
+                    'phone': get_field('phone'),
+                    'address': get_field('address'),
+                    'city': get_field('city'),
+                    'state': get_field('state'),
+                    'zip': get_field('zip') or get_field('zipCode'),
+                    'country': get_field('country'),
+                    'avatarUrl': get_field('avatarUrl'),
+                    'responseStyle': get_field('responseStyle'),
+                    'responseLanguage': get_field('responseLanguage'),
+                    'interests': get_field('interests')  # Array field
+                }
+                
+                print(f'[PROFILE] ✅ Loaded from Firestore REST API:', user_profile.get('name'))
+                
+                # Map to autofill format
+                profile = {
+                    "success": True,
+                    "profile": {
+                        "name": user_profile['name'],
+                        "firstName": user_profile['name'].split()[0] if user_profile['name'] else '',
+                        "lastName": user_profile['name'].split()[-1] if user_profile['name'] and len(user_profile['name'].split()) > 1 else '',
+                        "email": user_profile['email'],
+                        "phone": user_profile['phone'],
+                        "address": user_profile['address'],
+                        "city": user_profile['city'],
+                        "state": user_profile['state'],
+                        "zip": user_profile['zip'],
+                        "country": user_profile['country']
+                    }
+                }
+                
+                response = jsonify(profile)
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                return response
+            
+            elif response.status_code == 404:
+                print('[PROFILE] ⚠️ No profile document found in Firestore')
+            else:
+                print(f'[PROFILE] Firestore API error: {response.status_code} - {response.text}')
+                
+        except Exception as e:
+            print(f'[PROFILE] Firestore REST API error: {e}')
+            import traceback
+            traceback.print_exc()
+        
+        # Fallback to empty profile
+        print('[PROFILE] ⚠️ Using empty fallback')
+        profile = {
+            "success": True,
+            "profile": {
+                "name": "",
+                "firstName": "",
+                "lastName": "",
+                "email": "",
+                "phone": "",
+                "address": "",
+                "city": "",
+                "state": "",
+                "zip": "",
+                "country": ""
+            }
+        }
+        
+        response = jsonify(profile)
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+    except Exception as e:
+        print(f'[PROFILE] Error: {e}')
+        import traceback
+        traceback.print_exc()
+        response = jsonify({"error": str(e), "success": False})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
+
 # NOTE: Data serving routes already defined above (serve_files function handles /data/<path:filename> and /Data/<path:filename>)
+
+# ==================== BROWSER AUTOMATION ENDPOINTS ====================
+
+@app.route('/api/v1/automation/analyze-page', methods=['POST', 'OPTIONS'])
+def automation_analyze_page():
+    """Analyze webpage content and structure"""
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
+    try:
+        data = request.json
+        url = data.get('url', '')
+        forms = data.get('forms', [])
+        text = data.get('text', '')[:500]
+        
+        from Backend.LLM import ChatCompletion
+        prompt = f'Analyze this page briefly:\nURL: {url}\nForms: {len(forms)}\nText: {text}\n\nQuick analysis:'
+        
+        analysis = ChatCompletion(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            text_only=True
+        )
+        
+        response = jsonify({"success": True, "analysis": analysis, "forms_detected": len(forms)})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+    except Exception as e:
+        print(f'[AUTOMATION] Analyze error: {e}')
+        response = jsonify({"error": str(e)})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
+
+
+@app.route('/api/v1/automation/fill-form-smart', methods=['POST', 'OPTIONS'])
+def automation_fill_form():
+    """Fill form intelligently using AI"""
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
+    try:
+        forms = request.json.get('forms', [])
+        if not forms:
+            response = jsonify({"error": "No forms detected"})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
+        
+        # Get user data (TODO: Load from Firebase user profile)
+        user_data = {
+            "firstName": "John",
+            "lastName": "Doe", 
+            "fullName": "John Doe",
+            "email": "john@example.com",
+            "phone": "+1234567890",
+            "address": "123 Main St",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94102",
+            "country": "USA"
+        }
+        
+        # Use AI to intelligently map fields
+        form = forms[0]
+        fields = form.get('fields', [])
+        
+        from Backend.LLM import ChatCompletion
+        
+        # Create field descriptions for AI
+        field_list = "\n".join([
+            f"- Field: name='{f.get('name')}', type='{f.get('type')}', label='{f.get('label')}'"
+            for f in fields
+        ])
+        
+        prompt = f"""Map user data to form fields. Return ONLY valid JSON.
+
+Form Fields:
+{field_list}
+
+User Data:
+{json.dumps(user_data)}
+
+Return JSON mapping field names to values. Use exact field names from above.
+Example: {{"firstName": "John", "email": "john@example.com"}}
+"""
+        
+        try:
+            mapping_text = ChatCompletion(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.3-70b-versatile",
+                text_only=True
+            )
+            
+            # Extract JSON
+            if "```json" in mapping_text:
+                mapping_text = mapping_text.split("```json")[1].split("```")[0]
+            elif "```" in mapping_text:
+                mapping_text = mapping_text.split("```")[1].split("```")[0]
+            
+            mappings = json.loads(mapping_text.strip())
+            
+        except:
+            # Fallback: rule-based mapping
+            mappings = {}
+            for field in fields:
+                name = field.get('name', '').lower()
+                label = field.get('label', '').lower()
+                
+                # Smart matching
+                if 'email' in name or 'email' in label:
+                    mappings[field.get('name')] = user_data['email']
+                elif ('first' in name or 'first' in label) and 'name' in (name + label):
+                    mappings[field.get('name')] = user_data['firstName']
+                elif ('last' in name or 'last' in label) and 'name' in (name + label):
+                    mappings[field.get('name')] = user_data['lastName']
+                elif 'name' in name or 'name' in label:
+                    mappings[field.get('name')] = user_data['fullName']
+                elif 'phone' in name or 'phone' in label:
+                    mappings[field.get('name')] = user_data['phone']
+                elif 'address' in name or 'address' in label:
+                    mappings[field.get('name')] = user_data['address']
+                elif 'city' in name or 'city' in label:
+                    mappings[field.get('name')] = user_data['city']
+                elif 'state' in name or 'state' in label:
+                    mappings[field.get('name')] = user_data['state']
+                elif 'zip' in name or 'zip' in label or 'postal' in name:
+                    mappings[field.get('name')] = user_data['zip']
+        
+        response = jsonify({
+            "success": True,
+            "mappings": mappings,
+            "fields_filled": len(mappings)
+        })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
+    except Exception as e:
+        print(f'[AUTOMATION] Fill error: {e}')
+        import traceback
+        traceback.print_exc()
+        response = jsonify({"error": str(e)})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
 # ==================== MEMORY ENDPOINTS ====================
 
@@ -6521,13 +6806,785 @@ def analytics():
             events = db.get_analytics(event_type, days)
             return jsonify({"status": "success", "events": events})
         else:
-            summary = db.get_analytics_summary(days)
-            return jsonify({"status": "success", "summary": summary})
-    
+            voices = voice_service.list_voices()
+        return jsonify({"status": "success", "voices": voices}), 200
+    except Exception as e:
+        return jsonify({" error": str(e)}), 500
+
+
+# ==================== ADVANCED AGENT ENDPOINTS ====================
+
+@app.route('/api/v1/agents/tool-use', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def agent_tool_use():
+    """Execute Tool-Using Agent for API calling and function execution."""
+    try:
+        data = request.json
+        task = data.get('task')
+        
+        if not task:
+            return jsonify({"error": "Task is required"}), 400
+        
+        from Backend.Agents.ToolUsingAgent import tool_using_agent
+        result = tool_using_agent.execute(task, data.get('context'))
+        
+        return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ==================== WHATSAPP AUTOMATION ====================
+
+@app.route('/api/v1/agents/browse', methods=['POST'])
+@require_auth
+@rate_limit("heavy")
+def agent_web_browse():
+    """Execute Web Browsing Agent for browser automation."""
+    try:
+        data = request.json
+        task = data.get('task')
+        
+        if not task:
+            return jsonify({"error": "Task is required"}), 400
+        
+        from Backend.Agents.WebBrowsingAgent import web_browsing_agent
+        result = web_browsing_agent.execute(task, data.get('context'))
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/agents/analyze-doc', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def agent_analyze_document():
+    """Execute Document Analysis Agent for PDF/DOCX analysis."""
+    try:
+        data = request.json
+        task = data.get('task')
+        file_path = data.get('file_path')
+        analysis_type = data.get('analysis_type', 'full')
+        
+        if not task and not file_path:
+            return jsonify({"error": "Task or file_path is required"}), 400
+        
+        from Backend.Agents.DocumentAnalysisAgent import document_analysis_agent
+        
+        context = {
+            "file_path": file_path,
+            "analysis_type": analysis_type
+        }
+        if data.get('question'):
+            context['question'] = data['question']
+        if data.get('file_path2'):
+            context['file_path2'] = data['file_path2']
+        
+        result = document_analysis_agent.execute(task or f"Analyze {file_path}", context)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/agents/multimodal', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def agent_multimodal():
+    """Execute Multi-modal Agent for image + text reasoning."""
+    try:
+        data = request.json
+        task = data.get('task')
+        images = data.get('images', [])
+        
+        if not task:
+            return jsonify({"error": "Task is required"}), 400
+        if not images:
+            return jsonify({"error": "At least one image is required"}), 400
+        
+        from Backend.Agents.MultiModalAgent import multimodal_agent
+        
+        context = {"images": images}
+        result = multimodal_agent.execute(task, context)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== ENHANCED DEBATE ARENA ENDPOINTS ====================
+
+@app.route('/api/v1/debate/start', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def debate_start():
+    """Start a new AI debate."""
+    try:
+        data = request.json
+        topic = data.get('topic')
+        rounds = data.get('rounds', 3)
+        debate_format = data.get('format', 'standard')
+        participants = data.get('participants')
+        
+        if not topic:
+            return jsonify({"error": "Topic is required"}), 400
+        
+        from Backend.DebateArena import debate_arena
+        
+        # Set format if specified
+        if debate_format:
+            debate_arena.set_debate_format(debate_format)
+        
+        # Multi-participant or standard debate
+        if participants and len(participants) >= 3:
+            result = debate_arena.multi_participant_debate(topic, participants, rounds)
+        else:
+            result = debate_arena.start_debate(topic, rounds, participants)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/debate/formats', methods=['GET'])
+def debate_formats():
+    """Get available debate formats."""
+    try:
+        from Backend.DebateArena import AIDebateArena
+        formats = list(AIDebateArena.DEBATE_FORMATS.keys())
+        
+        return jsonify({
+            "status": "success",
+            "formats": formats,
+            "details": AIDebateArena.DEBATE_FORMATS
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/debate/templates', methods=['GET'])
+def debate_templates():
+    """Get debate topic templates."""
+    try:
+        from Backend.DebateArena import debate_arena
+        templates = debate_arena.get_debate_templates()
+        
+        return jsonify({
+            "status": "success",
+            "templates": templates
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== ENHANCED PERSONALITY CLONE ENDPOINTS ====================
+
+@app.route('/api/v1/personality-clone/create', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def personality_clone_create():
+    """Create a personality clone from messages."""
+    try:
+        user = get_current_user()
+        data = request.json
+        messages = data.get('messages', [])
+        user_id = data.get('clone_user_id', user['user_id'])
+        
+        if not messages:
+            return jsonify({"error": "Messages array is required"}), 400
+        
+        from Backend.PersonalityClone import personality_clone
+        result = personality_clone.analyze_messages(messages, user_id)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/personality-clone/upload-file', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def personality_clone_upload():
+    """Create a personality clone from uploaded file."""
+    try:
+        user = get_current_user()
+        
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        if not file.filename:
+            return jsonify({"error": "Empty filename"}), 400
+        
+        # Save temporarily
+        temp_dir = os.path.join(current_dir, 'temp_uploads')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, f"{int(time.time())}_{file.filename}")
+        file.save(temp_path)
+        
+        # Analyze file
+        from Backend.PersonalityClone import personality_clone
+        user_id = request.form.get('clone_user_id', user['user_id'])
+        format_type = request.form.get('format_type', 'auto')
+        
+        result = personality_clone.analyze_file(temp_path, format_type, user_id)
+        
+        # Cleanup
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/personality-clone/chat', methods=['POST'])
+@require_auth
+@rate_limit("chat")
+def personality_clone_chat():
+    """Chat with a personality clone."""
+    try:
+        data = request.json
+        user_id = data.get('clone_user_id')
+        message = data.get('message')
+        
+        if not user_id or not message:
+            return jsonify({"error": "clone_user_id and message are required"}), 400
+        
+        from Backend.PersonalityClone import personality_clone
+        response = personality_clone.chat_as_clone(user_id, message)
+        
+        return jsonify({
+            "status": "success",
+            "response": response
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/personality-clone/style-transfer', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def personality_clone_style_transfer():
+    """Rewrite text in a user's style."""
+    try:
+        data = request.json
+        user_id = data.get('clone_user_id')
+        text = data.get('text')
+        
+        if not user_id or not text:
+            return jsonify({"error": "clone_user_id and text are required"}), 400
+        
+        from Backend.PersonalityClone import personality_clone
+        result = personality_clone.style_transfer(text, user_id)
+        
+        return jsonify({
+            "status": "success",
+            "original": text,
+            "styled": result
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/personality-clone/insights', methods=['GET'])
+@require_auth
+@rate_limit("default")
+def personality_clone_insights():
+    """Get writing insights for a clone."""
+    try:
+        user_id = request.args.get('clone_user_id')
+        
+        if not user_id:
+            return jsonify({"error": "clone_user_id parameter is required"}), 400
+        
+        from Backend.PersonalityClone import personality_clone
+        result = personality_clone.get_writing_insights(user_id)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== ENHANCED JOB INTERVIEWER ENDPOINTS ====================
+
+@app.route('/api/v1/interview/start', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def interview_start():
+    """Start a job interview session."""
+    try:
+        user = get_current_user()
+        data = request.json
+        job_role = data.get('job_role')
+        company = data.get('company', 'a top company')
+        experience_level = data.get('experience_level', 'mid')
+        difficulty = data.get('difficulty', 'medium')
+        industry = data.get('industry')
+        
+        if not job_role:
+            return jsonify({"error": "job_role is required"}), 400
+        
+        from Backend.JobInterviewer import job_interviewer
+        result = job_interviewer.start_interview(
+            job_role, company, experience_level, difficulty, industry, user['user_id']
+        )
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/interview/answer', methods=['POST'])
+@require_auth
+@rate_limit("default")
+def interview_answer():
+    """Submit an answer to the current interview question."""
+    try:
+        user = get_current_user()
+        data = request.json
+        answer = data.get('answer')
+        
+        if not answer:
+            return jsonify({"error": "answer is required"}), 400
+        
+        from Backend.JobInterviewer import job_interviewer
+        result = job_interviewer.answer_question(answer, user['user_id'])
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/interview/hint', methods=['GET'])
+@require_auth
+@rate_limit("default")
+def interview_hint():
+    """Get a hint for the current question."""
+    try:
+        user = get_current_user()
+        
+        from Backend.JobInterviewer import job_interviewer
+        result = job_interviewer.get_hint(user['user_id'])
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/interview/templates', methods=['GET'])
+def interview_templates():
+    """Get industry-specific interview templates."""
+    try:
+        from Backend.JobInterviewer import job_interviewer
+        templates = job_interviewer.get_industry_templates()
+        
+        return jsonify({
+            "status": "success",
+            "templates": templates
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/interview/analytics', methods=['GET'])
+@require_auth
+@rate_limit("default")
+def interview_analytics():
+    """Get performance analytics for a user."""
+    try:
+        user = get_current_user()
+        
+        from Backend.JobInterviewer import job_interviewer
+        result = job_interviewer.get_analytics(user['user_id'])
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== UNIFIED AGENT CHAT ENDPOINT ====================
+# Smart routing to advanced agents based on message content
+
+@app.route('/api/v1/agent-chat', methods=['POST'])
+@require_auth
+@rate_limit("chat")
+def agent_chat():
+    """
+    Unified chat endpoint that intelligently routes to advanced agents.
+    NOW INCLUDES: @command detection for quick actions (@news, @weather, @crypto, @github)!
+    """
+    try:
+        data = request.json
+        message = data.get('message', '').lower()
+        original_message = data.get('message', '')
+        
+        if not original_message:
+            return jsonify({"error": "Message is required"}), 400
+        
+        user = get_current_user()
+        
+        # ===== FIRST: Check for quick action commands =====
+        # This prevents LLM from handling @news, @weather, @crypto, @github
+        try:
+            from Backend.QuickActionsHandler import quick_actions_handler
+            quick_result = quick_actions_handler.process_message(original_message)
+            
+            if quick_result:
+                # Quick action was successfully handled!
+                return jsonify(quick_result), 200
+        except Exception as e:
+            logger.error(f"[AGENT-CHAT] Quick actions handler error: {e}")
+            import traceback
+            traceback.print_exc()
+        # =================================================
+        
+        # If no quick action detected, proceed with regular agent detection
+        
+        # Detection keywords
+        calc_keywords = ['calculate', 'compute', '×', '*', '+', '-', '/', 'math', 'multiply']
+        browse_keywords = ['browse', 'navigate', 'go to', 'visit', 'screenshot', 'extract from']
+        doc_keywords = ['analyze document', 'analyze this pdf', 'analyze this docx', 'read document', 'summarize pdf']
+        image_keywords = ['analyze image', 'what\\'s in this image', 'describe image', 'compare images']
+        debate_keywords = ['start a debate', 'debate:', 'create debate', 'debate about', 'debate on']
+        interview_keywords = ['start interview', 'mock interview', 'job interview', 'interview for']
+        clone_keywords = ['personality clone', 'create clone', 'chat as clone', 'my writing style']
+        
+        # Route to appropriate agent
+        
+        # 1. Calculator/Tool Use
+        if any(kw in message for kw in calc_keywords):
+            from Backend.Agents.ToolUsingAgent import tool_using_agent
+            result = tool_using_agent.execute(original_message, {})
+            
+            # Format calculator output nicely
+            if isinstance(result, dict):
+                if 'result' in result and 'formatted' in result:
+                    response = f"**🔢 Calculation Result**\n\n```\n{result['formatted']}\n```\n\n**Answer:** `{result['result']}`"
+                elif result.get('status') == 'success':
+                    response = f"**✅ Result:** {result.get('output', result.get('result', str(result)))}"
+                else:
+                    response = result.get('output', result.get('result', str(result)))
+            else:
+                response = str(result)
+            
+            return jsonify({
+                "status": "success",
+                "agent": "tool_using",
+                "response": response
+            }), 200
+        
+        # 2. Web Browsing
+        elif any(kw in message for kw in browse_keywords):
+            from Backend.Agents.WebBrowsingAgent import web_browsing_agent
+            result = web_browsing_agent.execute(original_message, {})
+            return jsonify({
+                "status": "success",
+                "agent": "web_browsing",
+                "response": result.get('output', result.get('result', str(result)))
+            }), 200
+        
+        # 3. Document Analysis
+        elif any(kw in message for kw in doc_keywords) or '.pdf' in message or '.docx' in message:
+            from Backend.Agents.DocumentAnalysisAgent import document_analysis_agent
+            
+            # Try to extract file path
+            import re
+            file_match = re.search(r'[C-Z]:[\\\/][^\s]+\.(?:pdf|docx)', original_message, re.IGNORECASE)
+            file_path = file_match.group(0) if file_match else None
+            
+            if not file_path:
+                return jsonify({
+                    "status": "error",
+                    "message": "Please provide a file path (e.g., C:/path/to/document.pdf)"
+                }), 400
+            
+            context = {"file_path": file_path, "analysis_type": "full"}
+            result = document_analysis_agent.execute(original_message, context)
+            return jsonify({
+                "status": "success",
+                "agent": "doc_analysis",
+                "response": result.get('output', result.get('result', str(result)))
+            }), 200
+        
+        # 4. Multi-modal (Image Analysis)
+        elif any(kw in message for kw in image_keywords) or '.png' in message or '.jpg' in message:
+            from Backend.Agents.MultiModalAgent import multimodal_agent
+            
+            # Extract image paths
+            import re
+            image_matches = re.findall(r'[C-Z]:[\\\/][^\s]+\.(?:png|jpg|jpeg|gif|bmp)', original_message, re.IGNORECASE)
+            
+            if not image_matches:
+                return jsonify({
+                    "status": "error",
+                    "message": "Please provide image path(s) (e.g., C:/path/to/image.png)"
+                }), 400
+            
+            context = {"images": image_matches}
+            result = multimodal_agent.execute(original_message, context)
+            return jsonify({
+                "status": "success",
+                "agent": "multimodal",
+                "response": result.get('output', result.get('result', str(result)))
+            }), 200
+        
+        # 5. Debate Arena
+        elif any(kw in message for kw in debate_keywords):
+            from Backend.DebateArena import debate_arena
+            
+            # Extract topic
+            topic = original_message
+            for kw in debate_keywords:
+                topic = topic.replace(kw, '').strip()
+            topic = topic.lstrip(':').strip()
+            
+            result = debate_arena.start_debate(topic, rounds=2)
+            
+            if result.get('status') == 'success':
+                # Format debate output (removed emoji to fix Windows error)
+                output = f"**DEBATE: {topic}**\n\n"
+                for exchange in result.get('debate_log', []):
+                    side_emoji = "🔵" if exchange['side'] == "PRO" else "🔴"
+                    output += f"**Round {exchange['round']} - {side_emoji} {exchange['side']}:**\n{exchange['argument']}\n\n"
+                
+                verdict = result.get('verdict', {})
+                output += f"\n**VERDICT:** {verdict.get('winner', 'TIE')}\n{verdict.get('analysis', '')}"
+                
+                return jsonify({
+                    "status": "success",
+                    "agent": "debate",
+                    "response": output
+                }), 200
+            else:
+                return jsonify(result), 200
+        
+        # 6. Job Interview
+        elif any(kw in message for kw in interview_keywords):
+            from Backend.JobInterviewer import job_interviewer
+            
+            # Extract job role
+            import re
+            role_match = re.search(r'(?:for|as)\s+([A-Z][a-z\s]+(?:Engineer|Developer|Manager|Scientist|Analyst))', original_message)
+            job_role = role_match.group(1) if role_match else "Software Engineer"
+            
+            result = job_interviewer.start_interview(job_role, user_id=user['user_id'])
+            
+            if result.get('status') == 'success':
+                output = f"**INTERVIEW STARTED: {job_role}**\n\n"
+                output += f"**Question 1:**\n{result['question']}\n\n"
+                output += "_Type your answer to continue the interview._"
+                
+                return jsonify({
+                    "status": "success",
+                    "agent": "interview",
+                    "response": output
+                }), 200
+            else:
+                return jsonify(result), 200
+        
+        # 7. Personality Clone
+        elif any(kw in message for kw in clone_keywords):
+            return jsonify({
+                "status": "info",
+                "agent": "personality_clone",
+                "response": "To create a personality clone, use:\n• `Create clone from: [your messages]`\n• Or upload a file via the file upload endpoint"
+            }), 200
+        
+        # Default: No specialized agent needed
+        else:
+            return jsonify({
+                "status": "info",
+                "message": "No specialized agent detected. Use specific keywords like 'calculate', 'browse', 'debate', 'interview', etc."
+            }), 200
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== REAL WEATHER & CRYPTO APIS ====================
+
+@app.route('/api/v1/weather', methods=['GET'])
+def get_weather_api():
+    """Get real-time weather data from OpenWeatherMap."""
+    try:
+        from Backend.WeatherService import weather_service
+        
+        city = request.args.get('city', 'London')
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+        
+        result = weather_service.get_weather(city=city, lat=lat, lon=lon)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/weather/forecast', methods=['GET'])
+def get_forecast_api():
+    """Get weather forecast for upcoming days."""
+    try:
+        from Backend.WeatherService import weather_service
+        
+        city = request.args.get('city', 'London')
+        days = request.args.get('days', 5, type=int)
+        
+        result = weather_service.get_forecast(city=city, days=min(days, 5))
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/crypto/prices', methods=['GET'])
+def get_crypto_prices_api():
+    """Get real-time cryptocurrency prices from CoinGecko."""
+    try:
+        from Backend.CryptoService import crypto_service
+        
+        # Get comma-separated coin IDs or default to top 10
+        coins_param = request.args.get('coins')
+        coins = coins_param.split(',') if coins_param else None
+        vs_currency = request.args.get('currency', 'usd')
+        
+        result = crypto_service.get_prices(coins=coins, vs_currency=vs_currency)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/crypto/details/<coin_id>', methods=['GET'])
+def get_crypto_details_api(coin_id):
+    """Get detailed information about a specific cryptocurrency."""
+    try:
+        from Backend.CryptoService import crypto_service
+        
+        result = crypto_service.get_coin_details(coin_id)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/crypto/search', methods=['GET'])
+def search_crypto_api():
+    """Search for cryptocurrencies."""
+    try:
+        from Backend.CryptoService import crypto_service
+        
+        query = request.args.get('q', '')
+        if not query:
+            return jsonify({"status": "error", "message": "Query parameter 'q' required"}), 400
+        
+        result = crypto_service.search_coins(query)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/news', methods=['GET'])
+def get_news_api():
+    """Get real-time news headlines from NewsAPI."""
+    try:
+        from Backend.NewsService import news_service
+        
+        category = request.args.get('category')  # tech, business, sports, etc.
+        country = request.args.get('country', 'us')
+        page_size = request.args.get('page_size', 10, type=int)
+        
+        result = news_service.get_top_headlines(
+            category=category,
+            country=country,
+            page_size=page_size
+        )
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/news/search', methods=['GET'])
+def search_news_api():
+    """Search news articles."""
+    try:
+        from Backend.NewsService import news_service
+        
+        query = request.args.get('q', '')
+        if not query:
+            return jsonify({"status": "error", "message": "Query parameter 'q' required"}), 400
+        
+        page_size = request.args.get('page_size', 10, type=int)
+        
+        result = news_service.search_news(query, page_size=page_size)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/github/repos/<username>', methods=['GET'])
+def get_github_repos_api(username):
+    """Get GitHub user's repositories."""
+    try:
+        from Backend.GitHubService import github_service
+        
+        sort = request.args.get('sort', 'updated')
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        result = github_service.get_user_repos(
+            username=username,
+            sort=sort,
+            per_page=per_page
+        )
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/github/trending', methods=['GET'])
+def get_github_trending_api():
+    """Get trending GitHub repositories."""
+    try:
+        from Backend.GitHubService import github_service
+        
+        language = request.args.get('language', '')
+        
+        result = github_service.get_trending_repos(language=language)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/v1/github/search', methods=['GET'])
+def search_github_api():
+    """Search GitHub repositories."""
+    try:
+        from Backend.GitHubService import github_service
+        
+        query = request.args.get('q', '')
+        if not query:
+            return jsonify({"status": "error", "message": "Query parameter 'q' required"}), 400
+        
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        result = github_service.search_repos(query, per_page=per_page)
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ==================== LEGACY CODE LOADING ====================
+
+
 
 @app.route('/api/v1/whatsapp/send', methods=['POST'])
 @require_api_key

@@ -43,7 +43,7 @@ try {
 }
 
 // 📡 API Configuration
-const USE_CLOUD_API = false; // Set to true for production (Render), false for local dev
+const USE_CLOUD_API = true; // Set to true for production (Render), false for local dev
 const BASE_URL = USE_CLOUD_API ? 'https://kai-api-nxxv.onrender.com' : 'http://localhost:5000';
 const API_URL = `${BASE_URL}/api/v1`;
 
@@ -112,12 +112,19 @@ onAuthStateChanged(auth, async (user) => {
         // === LOAD ALL USER DATA FROM FIREBASE ===
 
         // 1. Load Profile
+        LOG.info('AUTH', 'Loading profile from Firebase...', { uid: user.uid });
         const profile = await FirebaseDB.loadUserProfile(user.uid);
         if (profile) {
             cachedUserProfile = profile;
-            LOG.info('AUTH', 'Profile loaded from Firebase', { name: profile.name, lang: profile.responseLanguage });
+            LOG.info('AUTH', '✅ Profile loaded from Firebase', {
+                name: profile.name,
+                nickname: profile.nickname,
+                lang: profile.responseLanguage,
+                interests: profile.interests?.length || 0
+            });
         } else {
-            // Create default profile from auth data
+            // Create default profile from auth data (but DON'T save it yet)
+            // Only save if user explicitly updates their profile in settings
             cachedUserProfile = {
                 name: user.displayName || '',
                 nickname: '',
@@ -128,9 +135,12 @@ onAuthStateChanged(auth, async (user) => {
                 interests: [],
                 avatarUrl: user.photoURL || ''
             };
-            // Save default profile to Firebase
-            await FirebaseDB.saveUserProfile(user.uid, cachedUserProfile);
-            LOG.info('AUTH', 'Created and saved default profile');
+            LOG.warn('AUTH', '⚠️ No profile found in Firebase - using auth defaults (NOT saved)', {
+                name: cachedUserProfile.name,
+                email: cachedUserProfile.email
+            });
+            // DON'T save the default profile - let user save it via settings
+            // This prevents overwriting any profile that might exist
         }
 
         // Update user avatar in header
@@ -2821,20 +2831,165 @@ function stopListening() {
 };
 
 
-// === 🖼️ OVERLAY MODE ===
+// === 🖼️ MINI MODE (Compact Floating Window) ===
+let isMiniMode = false;
+let miniModePosition = { x: window.innerWidth - 420, y: 20 };
+let isDragging = false;
+let dragOffset = { x: 0, y: 0 };
+
 (window as any).toggleOverlayMode = () => {
-    document.body.classList.toggle('overlay-mode');
-    // Add CSS via JS for the overlay mode
-    if (document.body.classList.contains('overlay-mode')) {
-        sidebar!.style.display = 'none';
-        document.body.style.background = 'transparent';
-        // More styles would be needed in CSS, but// This is a placeholder as I need to find the function first.
-        // I will cancel this tool call and use view_file.t
-        notify('MINI_MODE ACTIVE');
+    isMiniMode = !isMiniMode;
+
+    if (isMiniMode) {
+        // ✅ ACTIVATE MINI MODE
+        document.body.classList.add('mini-mode');
+
+        // Hide sidebar and welcome screen
+        if (sidebar) sidebar.style.display = 'none';
+        if (welcomeScreen) welcomeScreen.style.display = 'none';
+
+        // Create mini mode container
+        let miniContainer = document.getElementById('mini-mode-container');
+        if (!miniContainer) {
+            miniContainer = document.createElement('div');
+            miniContainer.id = 'mini-mode-container';
+            miniContainer.style.cssText = `
+                position: fixed;
+                top: ${miniModePosition.y}px;
+                left: ${miniModePosition.x}px;
+                width: 400px;
+                height: 600px;
+                background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 27, 75, 0.98));
+                border: 1px solid rgba(99, 102, 241, 0.4);
+                border-radius: 16px;
+                box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.1);
+                backdrop-filter: blur(20px);
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                cursor: move;
+            `;
+
+            // Mini mode header
+            const miniHeader = document.createElement('div');
+            miniHeader.style.cssText = `
+                padding: 12px 16px;
+                background: rgba(99, 102, 241, 0.1);
+                border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: move;
+            `;
+            miniHeader.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px; font-weight: 700; color: #818cf8; text-transform: uppercase; letter-spacing: 0.1em;">⚡ KAI MINI</span>
+                </div>
+                <button onclick="toggleOverlayMode()" style="background: none; border: none; color: #818cf8; cursor: pointer; font-size: 16px; padding: 4px;">✕</button>
+            `;
+
+            // Make draggable
+            miniHeader.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                dragOffset.x = e.clientX - miniModePosition.x;
+                dragOffset.y = e.clientY - miniModePosition.y;
+                miniContainer!.style.cursor = 'grabbing';
+            });
+
+            // Mini messages container (clone from main)
+            const miniMessages = document.createElement('div');
+            miniMessages.id = 'mini-messages';
+            miniMessages.style.cssText = `
+                flex: 1;
+                overflow-y: auto;
+                padding: 16px;
+                background: transparent;
+            `;
+
+            // Mini input area (clone from main)
+            const miniInputArea = document.createElement('div');
+            miniInputArea.style.cssText = `
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border-top: 1px solid rgba(99, 102, 241, 0.2);
+            `;
+            miniInputArea.innerHTML = `
+                <textarea 
+                    id="mini-input" 
+                    placeholder="Message KAI..." 
+                    style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; color: #e0e7ff; font-size: 13px; resize: none; height: 60px;"
+                ></textarea>
+            `;
+
+            miniContainer.appendChild(miniHeader);
+            miniContainer.appendChild(miniMessages);
+            miniContainer.appendChild(miniInputArea);
+            document.body.appendChild(miniContainer);
+
+            // Handle dragging
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    miniModePosition.x = e.clientX - dragOffset.x;
+                    miniModePosition.y = e.clientY - dragOffset.y;
+                    // Keep within bounds
+                    miniModePosition.x = Math.max(0, Math.min(window.innerWidth - 400, miniModePosition.x));
+                    miniModePosition.y = Math.max(0, Math.min(window.innerHeight - 600, miniModePosition.y));
+                    miniContainer!.style.left = miniModePosition.x + 'px';
+                    miniContainer!.style.top = miniModePosition.y + 'px';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    if (miniContainer) miniContainer.style.cursor = 'move';
+                }
+            });
+
+            // Connect mini input to main send function
+            const miniInput = document.getElementById('mini-input') as HTMLTextAreaElement;
+            if (miniInput) {
+                miniInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        const msg = miniInput.value.trim();
+                        if (msg) {
+                            sendMessage(msg);
+                            miniInput.value = '';
+                        }
+                    }
+                });
+            }
+        }
+
+        // Clone messages to mini container
+        const miniMessages = document.getElementById('mini-messages');
+        const mainMessages = document.getElementById('messages-list');
+        if (miniMessages && mainMessages) {
+            miniMessages.innerHTML = mainMessages.innerHTML;
+            miniMessages.scrollTop = miniMessages.scrollHeight;
+        }
+
+        // Hide main chat
+        const mainContainer = document.querySelector('.chat-container') as HTMLElement;
+        if (mainContainer) mainContainer.style.display = 'none';
+
+        notify('MINI MODE ACTIVE - Drag to move!');
     } else {
-        sidebar!.style.display = 'flex';
-        document.body.style.background = 'var(--surface-dark)';
-        notify('FULL_MODE ACTIVE');
+        // ✅ DEACTIVATE MINI MODE
+        document.body.classList.remove('mini-mode');
+
+        // Remove mini container
+        const miniContainer = document.getElementById('mini-mode-container');
+        if (miniContainer) miniContainer.remove();
+
+        // Restore UI
+        if (sidebar) sidebar.style.display = 'flex';
+        const mainContainer = document.querySelector('.chat-container') as HTMLElement;
+        if (mainContainer) mainContainer.style.display = 'flex';
+
+        notify('FULL MODE ACTIVE');
     }
 };
 
@@ -3129,8 +3284,9 @@ async function saveProfile() {
     // Save to Firebase if user is authenticated
     if (auth?.currentUser?.uid) {
         try {
-            await setDoc(doc(db, 'user_profiles', auth.currentUser.uid), userPreferences);
-            LOG.info('SETTINGS', 'Profile synced to Firebase', { responseLanguage });
+            // 🔥 FIX: Save to correct path matching FirebaseService.ts structure
+            await FirebaseDB.saveUserProfile(auth.currentUser.uid, userPreferences);
+            LOG.info('SETTINGS', '✅ Profile synced to Firebase', { name, nickname, responseLanguage });
         } catch (e) {
             LOG.warn('SETTINGS', 'Failed to sync profile to Firebase', e);
         }

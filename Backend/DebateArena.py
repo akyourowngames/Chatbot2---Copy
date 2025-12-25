@@ -15,13 +15,23 @@ logger = logging.getLogger(__name__)
 
 class AIDebateArena:
     """
-    Create debates between two AI agents on any topic.
-    Each agent argues for their assigned side.
+    Create debates between AI agents on any topic.
+    Supports custom formats, multiple participants, and personas.
     """
+    
+    DEBATE_FORMATS = {
+        "standard": {"rounds": 3, "structure": "Opening → Rebuttals → Closing"},
+        "lincoln-douglas": {"rounds": 4, "structure": "Affirmative → Negative Cross-Ex → Rebuttals"},
+        "oxford": {"rounds": 2, "structure": "Opening Speeches → Rebuttals"},
+        "parliamentary": {"rounds": 3, "structure": "Government → Opposition → Points of Information"}
+    }
     
     def __init__(self):
         self._llm = None
-        logger.info("[DEBATE] AI Debate Arena initialized")
+        self.debate_format = "standard"
+        self.participants = []
+        self.templates = self._load_templates()
+        logger.info("[DEBATE] AI Debate Arena initialized with enhanced features")
     
     @property
     def llm(self):
@@ -34,13 +44,35 @@ class AIDebateArena:
                 logger.error(f"[DEBATE] LLM load failed: {e}")
         return self._llm
     
-    def start_debate(self, topic: str, rounds: int = 3) -> Dict[str, Any]:
+    def set_debate_format(self, format_type: str):
+        """Set debate format (standard, lincoln-douglas, oxford, parliamentary)."""
+        if format_type in self.DEBATE_FORMATS:
+            self.debate_format = format_type
+            logger.info(f"[DEBATE] Format set to: {format_type}")
+        else:
+            logger.warning(f"[DEBATE] Unknown format: {format_type}, using standard")
+    
+    def add_participant(self, name: str, stance: str, persona: str = None):
+        """Add a custom participant with name, stance, and optional persona."""
+        self.participants.append({
+            "name": name,
+            "stance": stance,
+            "persona": persona or "neutral expert"
+        })
+        logger.info(f"[DEBATE] Added participant: {name} ({stance})")
+    
+    def get_debate_templates(self) -> List[Dict[str, str]]:
+        """Get pre-built debate topic templates."""
+        return self.templates
+    
+    def start_debate(self, topic: str, rounds: int = 3, participants: List[Dict] = None) -> Dict[str, Any]:
         """
         Start a debate on any topic.
         
         Args:
             topic: The debate topic (e.g., "Is AI good for humanity?")
             rounds: Number of debate rounds (default 3)
+            participants: Optional list of custom participants
             
         Returns:
             Complete debate transcript with verdict
@@ -48,7 +80,11 @@ class AIDebateArena:
         if not self.llm:
             return {"status": "error", "message": "LLM not available"}
         
-        logger.info(f"[DEBATE] Starting: {topic}")
+        # Use custom participants if provided
+        if participants:
+            self.participants = participants
+        
+        logger.info(f"[DEBATE] Starting: {topic} (format: {self.debate_format})")
         
         # Determine the two sides
         sides = self._analyze_topic(topic)
@@ -241,6 +277,61 @@ Be fair and objective."""
 {result['verdict']['analysis'][:500]}..."""
         
         return output
+    
+    def _load_templates(self) -> List[Dict[str, str]]:
+        """Load debate topic templates."""
+        return [
+            {"topic": "Social media should be banned for users under 16", "category": "Technology"},
+            {"topic": "Universal basic income should be implemented globally", "category": "Economics"},
+            {"topic": "Space exploration is more important than ocean exploration", "category": "Science"},
+            {"topic": "Artificial intelligence will benefit humanity more than harm it", "category": "Technology"},
+            {"topic": "Remote work is better than office work", "category": "Workplace"},
+            {"topic": "Electric vehicles should replace all gas-powered cars by 2035", "category": "Environment"},
+            {"topic": "College education should be free for all", "category": "Education"},
+            {"topic": "Reality TV does more harm than good", "category": "Entertainment"},
+        ]
+    
+    def multi_participant_debate(self, topic: str, participants: List[Dict], rounds: int = 2) -> Dict[str, Any]:
+        """Run a debate with 3+ participants (panel discussion format)."""
+        if len(participants) < 3:
+            return {"status": "error", "message": "Need at least 3 participants for panel debate"}
+        
+        logger.info(f"[DEBATE] Panel debate: {len(participants)} participants")
+        
+        debate_log = []
+        
+        for round_num in range(1, rounds + 1):
+            for participant in participants:
+                arg_prompt = f"""You are {participant['name']}, arguing: {participant['stance']}
+Persona: {participant.get('persona', 'expert')}
+
+TOPIC: {topic}
+ROUND: {round_num}
+
+Provide your argument (2-3 sentences):"""
+                
+                argument = self.llm(
+                    messages=[{"role": "user", "content": arg_prompt}],
+                    model="llama-3.3-70b-versatile",
+                    inject_memory=False
+                )
+                
+                debate_log.append({
+                    "round": round_num,
+                    "participant": participant['name'],
+                    "stance": participant['stance'],
+                    "argument": argument.strip()
+                })
+        
+        return {
+            "status": "success",
+            "topic": topic,
+            "format": "panel",
+            "participants": participants,
+            "rounds": rounds,
+            "debate_log": debate_log,
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 # Global instance

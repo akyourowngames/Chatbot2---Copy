@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>KAI Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 320px;
+            height: 400px;
+            background: linear-gradient(135deg, #1e1b4b, #0f172a);
+            color: #e0e7ff;
+            font-family: -apple-system, sans-serif;
+            padding: 16px;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin-bottom: 16px;
+            color: #a5b4fc;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status {
+            padding: 12px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            padding: 14px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 11px;
+            color: #818cf8;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>⚡ KAI Assistant</h1>
+
+    <div class="status" id="status">
+        Extension active on this page
+    </div>
+
+    <div class="buttons">
+        <button id="toggle-widget">Open KAI Widget</button>
+        <button id="analyze-page">Analyze Page</button>
+        <button id="fill-form">Fill Form</button>
+    </div>
+
+    <div class="footer">
+        AI-Powered Browser Automation
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

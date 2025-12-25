@@ -23,7 +23,8 @@ class PersonalityClone:
     def __init__(self):
         self._llm = None
         self.clones = {}  # Store personality profiles by user_id
-        logger.info("[CLONE] Personality Clone system initialized")
+        self.supported_formats = ['json', 'txt', 'csv', 'whatsapp', 'telegram', 'discord']
+        logger.info("[CLONE] Personality Clone system initialized with file upload support")
     
     @property
     def llm(self):
@@ -263,6 +264,195 @@ Your response (AS THE CLONE):"""
             "compatibility_score": score,
             "shared_traits": list(shared_traits),
             "style_match": same_style
+        }
+    
+    def analyze_file(self, filepath: str, format_type: str = "auto", user_id: str = "default") -> Dict[str, Any]:
+        """
+        Analyze personality from a file (chat exports, text dumps).
+        
+        Args:
+            filepath: Path to the file
+            format_type: File format (auto, json, txt, csv, whatsapp, etc.)
+            user_id: User identifier
+            
+        Returns:
+            Personality profile
+        """
+        try:
+            # Detect format if auto
+            if format_type == "auto":
+                format_type = self._detect_format(filepath)
+            
+            # Parse file based on format
+            messages = self._parse_file(filepath, format_type)
+            
+            if not messages:
+                return {"status": "error", "message": "No messages extracted from file"}
+            
+            # Analyze messages
+            return self.analyze_messages(messages, user_id)
+            
+        except Exception as e:
+            logger.error(f"[CLONE] File analysis failed: {e}")
+            return {"status": "error", "message": str(e)}
+    
+    def _detect_format(self, filepath: str) -> str:
+        """Auto-detect file format."""
+        import os
+        ext = os.path.splitext(filepath)[1].lower()
+        
+        if ext == '.json':
+            return 'json'
+        elif ext == '.csv':
+            return 'csv'
+        else:
+            # Check content for WhatsApp/Telegram patterns
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read(1000)
+                    if '[' in content and '] ' in content and ':' in content:
+                        return 'whatsapp'
+                    elif 'Telegram' in content:
+                        return 'telegram'
+            except:
+                pass
+        
+        return 'txt'
+    
+    def _parse_file(self, filepath: str, format_type: str) -> List[str]:
+        """Parse file and extract messages."""
+        messages = []
+        
+        try:
+            if format_type == 'json':
+                import json
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # Try common JSON structures
+                    if isinstance(data, list):
+                        messages = [str(item.get('text', item)) for item in data if isinstance(item, dict)]
+                    elif isinstance(data, dict) and 'messages' in data:
+                        messages = [str(m.get('text', m)) for m in data['messages']]
+            
+            elif format_type == 'csv':
+                import csv
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # Try common column names
+                        text = row.get('message', row.get('text', row.get('content', '')))
+                        if text:
+                            messages.append(text)
+            
+            elif format_type == 'whatsapp':
+                import re
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    # WhatsApp format: [timestamp] Name: Message
+                    for line in f:
+                        match = re.search(r'\d+/\d+/\d+.*?\]\s*([^:]+):\s*(.+)', line)
+                        if match:
+                            messages.append(match.group(2).strip())
+            
+            elif format_type == 'telegram':
+                # Similar to WhatsApp
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        if ':' in line:
+                            parts = line.split(':', 1)
+                            if len(parts) > 1:
+                                messages.append(parts[1].strip())
+            
+            else:  # txt or unknown
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    # Split by newlines or double newlines
+                    messages = [m.strip() for m in content.split('\n') if len(m.strip()) > 10]
+        
+        except Exception as e:
+            logger.error(f"[CLONE] File parsing failed: {e}")
+        
+        return messages
+    
+    def update_clone(self, user_id: str, new_messages: List[str]) -> Dict[str, Any]:
+        """Update/evolve an existing clone with new messages."""
+        if user_id not in self.clones:
+            return {"status": "error", "message": "Clone doesn't exist. Create one first."}
+        
+        # Combine old and new messages
+        old_profile = self.clones[user_id]
+        old_samples = old_profile.get("sample_phrases", [])
+        combined = old_samples + new_messages
+        
+        # Re-analyze with combined data
+        result = self.analyze_messages(combined, user_id)
+        
+        if result.get("status") == "success":
+            result["message"] = f"Clone updated with {len(new_messages)} new messages"
+        
+        return result
+    
+    def style_transfer(self, text: str, user_id: str) -> str:
+        """Rewrite text in the user's communication style."""
+        if user_id not in self.clones:
+            return "❌ Clone not found. Create one first!"
+        
+        profile = self.clones[user_id]
+        
+        if not self.llm:
+            return text
+        
+        style_desc = {
+            "casual_brief": "very short, casual with slang",
+            "detailed": "longer, more detailed",
+            "expressive": "using emojis and enthusiasm",
+            "informal": "casual and relaxed",
+            "balanced": "normal conversational"
+        }
+        
+        style = style_desc.get(profile.get("communication_style", "balanced"), "conversational")
+        emojis = " ".join(profile.get("top_emojis", []))
+        
+        prompt = f"""Rewrite this text to match this person's style:
+
+Style: {style}
+Tone: {profile.get('tone', 'friendly')}
+Common emojis: {emojis}
+Avg length: {profile.get('avg_word_count', 10)} words
+
+Original text: "{text}"
+
+Rewritten version (match their style exactly):"""
+        
+        result = self.llm(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            inject_memory=False
+        )
+        
+        return result.strip()
+    
+    def get_writing_insights(self, user_id: str) -> Dict[str, Any]:
+        """Get detailed writing analytics for a user."""
+        if user_id not in self.clones:
+            return {"status": "error", "message": "Clone not found"}
+        
+        profile = self.clones[user_id]
+        
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "insights": {
+                "communication_style": profile.get("communication_style"),
+                "tone": profile.get("tone"),
+                "personality_traits": profile.get("personality_traits", []),
+                "avg_message_length": f"{profile.get('avg_message_length', 0)} chars",
+                "avg_word_count": f"{profile.get('avg_word_count', 0)} words",
+                "emoji_frequency": profile.get("emoji_usage", 0),
+                "slang_level": profile.get("slang_level"),
+                "question_rate": f"{profile.get('question_rate', 0) * 100:.1f}%",
+                "top_words": profile.get("top_words", [])[:10],
+                "favorite_emojis": profile.get("top_emojis", [])
+            }
         }
 
 

@@ -20,6 +20,10 @@ class TaskType(Enum):
     WRITE = "write"
     ANALYZE = "analyze"
     CODE = "code"  # Code writing, debugging, execution
+    TOOL_USE = "tool_use"  # API calling, function execution
+    WEB_BROWSE = "web_browse"  # Browser automation
+    DOC_ANALYSIS = "doc_analysis"  # Document deep analysis
+    MULTIMODAL = "multimodal"  # Image + text reasoning
     RESEARCH_AND_WRITE = "research_and_write"
     FULL_PIPELINE = "full_pipeline"  # Research → Write → Analyze
 
@@ -43,17 +47,39 @@ class AgentOrchestrator:
             from Backend.Agents.WriterAgent import writer_agent
             from Backend.Agents.AnalystAgent import analyst_agent
             from Backend.Agents.CoderAgent import coder_agent
+            from Backend.Agents.ToolUsingAgent import tool_using_agent
+            from Backend.Agents.WebBrowsingAgent import web_browsing_agent
+            from Backend.Agents.DocumentAnalysisAgent import document_analysis_agent
+            from Backend.Agents.MultiModalAgent import multimodal_agent
+            from Backend.Agents.AgentCollaboration import agent_collaboration
             
             self.agents = {
                 "research": research_agent,
                 "writer": writer_agent,
                 "analyst": analyst_agent,
-                "coder": coder_agent
+                "coder": coder_agent,
+                "tool_using": tool_using_agent,
+                "web_browsing": web_browsing_agent,
+                "doc_analysis": document_analysis_agent,
+                "multimodal": multimodal_agent
             }
-            logger.info(f"[ORCHESTRATOR] Loaded {len(self.agents)} agents")
+            
+            # Register agents in collaboration system
+            agent_collaboration.register_agent("research", research_agent, ["research", "web search", "information gathering"])
+            agent_collaboration.register_agent("writer", writer_agent, ["writing", "content creation", "articles"])
+            agent_collaboration.register_agent("analyst", analyst_agent, ["analysis", "review", "critique"])
+            agent_collaboration.register_agent("coder", coder_agent, ["coding", "programming", "debugging"])
+            agent_collaboration.register_agent("tool_using", tool_using_agent, ["API calling", "functions", "tools"])
+            agent_collaboration.register_agent("web_browsing", web_browsing_agent, ["web automation", "browser", "scraping"])
+            agent_collaboration.register_agent("doc_analysis", document_analysis_agent, ["document analysis", "PDF", "DOCX"])
+            agent_collaboration.register_agent("multimodal", multimodal_agent, ["vision", "image analysis", "multimodal"])
+            
+            self.collaboration = agent_collaboration
+            logger.info(f"[ORCHESTRATOR] Loaded {len(self.agents)} agents with collaboration")
         except Exception as e:
             logger.error(f"[ORCHESTRATOR] Failed to load agents: {e}")
             self.agents = {}
+            self.collaboration = None
     
     def _get_llm(self):
         """Get LLM for orchestrator decisions."""
@@ -80,12 +106,20 @@ Available agents:
 2. WRITER - Content creation, articles, reports
 3. ANALYST - Review, improve, fact-check
 4. CODER - Code writing, debugging, execution
+5. TOOL_USE - API calling, function execution
+6. WEB_BROWSE - Browser automation, web scraping
+7. DOC_ANALYSIS - Deep document analysis (PDF/DOCX)
+8. MULTIMODAL - Image and text reasoning
 
 Reply with ONLY one of these task types:
 - RESEARCH (just need facts/research)
 - WRITE (just need content creation)
 - ANALYZE (just need analysis/review)
 - CODE (code writing, debugging, or execution)
+- TOOL_USE (need to call APIs or use tools)
+- WEB_BROWSE (browser automation needed)
+- DOC_ANALYSIS (document analysis)
+- MULTIMODAL (image analysis with context)
 - RESEARCH_AND_WRITE (research then write)
 - FULL_PIPELINE (research, write, then review)
 
@@ -103,6 +137,10 @@ Answer with just the type, nothing else:"""
                 "WRITE": TaskType.WRITE,
                 "ANALYZE": TaskType.ANALYZE,
                 "CODE": TaskType.CODE,
+                "TOOL_USE": TaskType.TOOL_USE,
+                "WEB_BROWSE": TaskType.WEB_BROWSE,
+                "DOC_ANALYSIS": TaskType.DOC_ANALYSIS,
+                "MULTIMODAL": TaskType.MULTIMODAL,
                 "RESEARCH_AND_WRITE": TaskType.RESEARCH_AND_WRITE,
                 "FULL_PIPELINE": TaskType.FULL_PIPELINE
             }
@@ -119,6 +157,10 @@ Answer with just the type, nothing else:"""
             TaskType.WRITE: ["writer"],
             TaskType.ANALYZE: ["analyst"],
             TaskType.CODE: ["coder"],
+            TaskType.TOOL_USE: ["tool_using"],
+            TaskType.WEB_BROWSE: ["web_browsing"],
+            TaskType.DOC_ANALYSIS: ["doc_analysis"],
+            TaskType.MULTIMODAL: ["multimodal"],
             TaskType.RESEARCH_AND_WRITE: ["research", "writer"],
             TaskType.FULL_PIPELINE: ["research", "writer", "analyst"]
         }
@@ -153,6 +195,10 @@ Answer with just the type, nothing else:"""
                 TaskType.WRITE: ["writer"],
                 TaskType.ANALYZE: ["analyst"],
                 TaskType.CODE: ["coder"],
+                TaskType.TOOL_USE: ["tool_using"],
+                TaskType.WEB_BROWSE: ["web_browsing"],
+                TaskType.DOC_ANALYSIS: ["doc_analysis"],
+                TaskType.MULTIMODAL: ["multimodal"],
                 TaskType.RESEARCH_AND_WRITE: ["research", "writer"],
                 TaskType.FULL_PIPELINE: ["research", "writer", "analyst"]
             }

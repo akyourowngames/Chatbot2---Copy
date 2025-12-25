@@ -63,20 +63,6 @@ const ProfileSection: React.FC = () => {
       if (user) {
         setUserId(user.uid);
 
-        // Reset profile to defaults first, then load from Firebase
-        const defaultProfile: UserProfile = {
-          name: user.displayName || '',
-          nickname: '',
-          email: user.email || '',
-          bio: '',
-          responseStyle: 'casual',
-          responseLanguage: 'english',
-          interests: [],
-          avatarUrl: user.photoURL || ''
-        };
-        setProfile(defaultProfile);
-        setInterestsInput('');
-
         // Load profile from Firestore
         try {
           const profileDoc = await getDoc(doc(db, 'users', user.uid, 'data', 'profile'));
@@ -84,12 +70,38 @@ const ProfileSection: React.FC = () => {
             const data = profileDoc.data() as UserProfile;
             setProfile(data);
             setInterestsInput(data.interests?.join(', ') || '');
+            console.log('[ProfileSection] Profile loaded from Firebase:', data);
           } else {
-            // No profile in Firebase yet, use defaults (with auth data)
-            console.log('No profile found, using defaults from auth');
+            // No profile in Firebase yet, create default from auth data
+            const defaultProfile: UserProfile = {
+              name: user.displayName || '',
+              nickname: '',
+              email: user.email || '',
+              bio: '',
+              responseStyle: 'casual',
+              responseLanguage: 'english',
+              interests: [],
+              avatarUrl: user.photoURL || ''
+            };
+            setProfile(defaultProfile);
+            setInterestsInput('');
+            console.log('[ProfileSection] No profile found, using defaults from auth');
           }
         } catch (e) {
-          console.error('Failed to load profile from Firebase:', e);
+          console.error('[ProfileSection] Failed to load profile from Firebase:', e);
+          // On error, fallback to auth data
+          const defaultProfile: UserProfile = {
+            name: user.displayName || '',
+            nickname: '',
+            email: user.email || '',
+            bio: '',
+            responseStyle: 'casual',
+            responseLanguage: 'english',
+            interests: [],
+            avatarUrl: user.photoURL || ''
+          };
+          setProfile(defaultProfile);
+          setInterestsInput('');
         }
       } else {
         // User signed out - reset everything
@@ -151,9 +163,10 @@ const ProfileSection: React.FC = () => {
         setProfile(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
 
         // Auto-save avatar to Firebase and notify main interface
-        await setDoc(doc(db, 'users', userId, 'data', 'profile'), { avatarUrl: newAvatarUrl }, { merge: true });
+        const updatedProfile = { ...profile, avatarUrl: newAvatarUrl };
+        await setDoc(doc(db, 'users', userId, 'data', 'profile'), updatedProfile, { merge: true });
         if (window.opener) {
-          window.opener.postMessage({ type: 'PROFILE_UPDATED', profile: { ...profile, avatarUrl: newAvatarUrl } }, '*');
+          window.opener.postMessage({ type: 'PROFILE_UPDATED', profile: updatedProfile }, '*');
         }
       } else {
         // Get public URL
@@ -165,9 +178,10 @@ const ProfileSection: React.FC = () => {
         setProfile(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
 
         // Auto-save avatar to Firebase and notify main interface
-        await setDoc(doc(db, 'users', userId, 'data', 'profile'), { avatarUrl: newAvatarUrl }, { merge: true });
+        const updatedProfile = { ...profile, avatarUrl: newAvatarUrl };
+        await setDoc(doc(db, 'users', userId, 'data', 'profile'), updatedProfile, { merge: true });
         if (window.opener) {
-          window.opener.postMessage({ type: 'PROFILE_UPDATED', profile: { ...profile, avatarUrl: newAvatarUrl } }, '*');
+          window.opener.postMessage({ type: 'PROFILE_UPDATED', profile: updatedProfile }, '*');
         }
       }
     } catch (e) {
@@ -197,8 +211,14 @@ const ProfileSection: React.FC = () => {
         interests: interestsArray
       };
 
+      console.log('[ProfileSection] 💾 Saving profile to Firebase:', updatedProfile);
+      console.log('[ProfileSection] User ID:', userId);
+      console.log('[ProfileSection] Path:', `users/${userId}/data/profile`);
+
       // Save to Firebase Firestore (new path structure)
       await setDoc(doc(db, 'users', userId, 'data', 'profile'), updatedProfile);
+
+      console.log('[ProfileSection] ✅ Profile saved successfully!');
 
       setProfile(updatedProfile);
 
@@ -208,6 +228,9 @@ const ProfileSection: React.FC = () => {
           type: 'PROFILE_UPDATED',
           profile: updatedProfile
         }, '*');
+        console.log('[ProfileSection] 📨 Notified parent window of profile update');
+      } else {
+        console.warn('[ProfileSection] ⚠️ No parent window (window.opener) found');
       }
 
       // Show success feedback
@@ -289,7 +312,10 @@ const ProfileSection: React.FC = () => {
               <input
                 type="text"
                 value={profile.name}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                onChange={(e) => {
+                  console.log('[ProfileSection] 📝 Name changed to:', e.target.value);
+                  setProfile({ ...profile, name: e.target.value });
+                }}
                 placeholder="Your Name"
                 className="w-full cyber-input p-3 text-sm text-indigo-100 font-bold"
               />
@@ -299,7 +325,10 @@ const ProfileSection: React.FC = () => {
               <input
                 type="text"
                 value={profile.nickname}
-                onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
+                onChange={(e) => {
+                  console.log('[ProfileSection] 📝 Nickname changed to:', e.target.value);
+                  setProfile({ ...profile, nickname: e.target.value });
+                }}
                 placeholder="Preferred Name"
                 className="w-full cyber-input p-3 text-sm text-indigo-100 font-bold"
               />
