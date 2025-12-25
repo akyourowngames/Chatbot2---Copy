@@ -1866,8 +1866,17 @@ function addMessage(role: string, content: string, attachedFile: string | null =
     };
 
     // Include metadata if provided (for rich media persistence)
-    if (metadata) {
-        messageObj.metadata = metadata;
+    // Filter out undefined values to prevent Firebase errors
+    if (metadata && typeof metadata === 'object') {
+        const cleanMetadata: any = {};
+        for (const key in metadata) {
+            if (metadata[key] !== undefined && metadata[key] !== null) {
+                cleanMetadata[key] = metadata[key];
+            }
+        }
+        if (Object.keys(cleanMetadata).length > 0) {
+            messageObj.metadata = cleanMetadata;
+        }
     }
 
     currentChatMessages.push(messageObj);
@@ -2255,16 +2264,21 @@ if (auth) {
         };
 
         // Include metadata for rich media persistence (Spotify, PDF, etc.)
+        // Filter out undefined values to prevent Firebase errors
         if (data.type || data.spotify || data.url || data.anime || data.sources) {
-            assistantMessage.metadata = {
-                type: data.type,
-                spotify: data.spotify,
-                anime: data.anime,
-                url: data.url,
-                title: data.title,
-                sources: data.sources,
-                data: data.data
-            };
+            const metadata: any = {};
+            if (data.type) metadata.type = data.type;
+            if (data.spotify) metadata.spotify = data.spotify;
+            if (data.anime) metadata.anime = data.anime;
+            if (data.url) metadata.url = data.url;
+            if (data.title) metadata.title = data.title;
+            if (data.sources) metadata.sources = data.sources;
+            if (data.data) metadata.data = data.data;
+
+            // Only add metadata if it has properties
+            if (Object.keys(metadata).length > 0) {
+                assistantMessage.metadata = metadata;
+            }
         }
         currentChatMessages.push(assistantMessage);
 
