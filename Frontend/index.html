@@ -59,6 +59,23 @@
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Accessibility: Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background-color: var(--surface-dark);
@@ -67,6 +84,13 @@
             height: 100dvh;
             width: 100vw;
             position: fixed;
+        }
+
+        /* Global image responsiveness */
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
         }
 
         .scan-line {
@@ -156,7 +180,7 @@
         }
 
         .msg-block {
-            animation: slideIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+            animation: messageAppear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
             padding: 20px;
             margin-bottom: 24px;
             background: rgba(255, 255, 255, 0.015);
@@ -164,15 +188,17 @@
             position: relative;
         }
 
-        @keyframes slideIn {
+        @keyframes messageAppear {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(20px) scale(0.98);
+                filter: blur(4px);
             }
 
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
+                filter: blur(0);
             }
         }
 
@@ -328,32 +354,32 @@
             height: 8px;
             background: var(--primary);
             border-radius: 50%;
-            animation: typingBounce 1.4s infinite ease-in-out;
+            animation: typingWave 1.4s ease-in-out infinite;
         }
 
         .typing-indicator .dot:nth-child(1) {
-            animation-delay: -0.32s;
-        }
-
-        .typing-indicator .dot:nth-child(2) {
-            animation-delay: -0.16s;
-        }
-
-        .typing-indicator .dot:nth-child(3) {
             animation-delay: 0s;
         }
 
-        @keyframes typingBounce {
+        .typing-indicator .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typingWave {
 
             0%,
-            80%,
+            60%,
             100% {
-                transform: scale(0.6);
-                opacity: 0.4;
+                transform: translateY(0) scale(1);
+                opacity: 0.6;
             }
 
-            40% {
-                transform: scale(1);
+            30% {
+                transform: translateY(-8px) scale(1.2);
                 opacity: 1;
             }
         }
@@ -421,10 +447,36 @@
             box-shadow: -4px 0 20px rgba(99, 102, 241, 0.1), 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
+        /* Card Hover Effects - Integration Cards */
+        .mt-4.rounded-xl,
+        .mt-4.rounded-2xl {
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .mt-4.rounded-xl:hover,
+        .mt-4.rounded-2xl:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
+                0 0 30px rgba(99, 102, 241, 0.2);
+        }
+
         /* Glowing Input Focus */
         .tactical-console:focus-within {
             border-color: var(--primary);
             box-shadow: 0 0 30px rgba(99, 102, 241, 0.15), 0 -10px 40px rgba(0, 0, 0, 0.6);
+            animation: inputPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes inputPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 30px rgba(99, 102, 241, 0.15), 0 -10px 40px rgba(0, 0, 0, 0.6);
+            }
+
+            50% {
+                box-shadow: 0 0 40px rgba(99, 102, 241, 0.25), 0 -10px 40px rgba(0, 0, 0, 0.6);
+            }
         }
 
         /* Premium Execute Button */
@@ -445,14 +497,85 @@
             transition: left 0.5s ease;
         }
 
+        #executeBtn::after {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(45deg, transparent, rgba(99, 102, 241, 0.3), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
         #executeBtn:hover::before {
             left: 100%;
+        }
+
+        #executeBtn:hover::after {
+            opacity: 1;
+            animation: buttonGlow 2s ease-in-out infinite;
         }
 
         #executeBtn:hover {
             transform: scale(1.02);
             box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
         }
+
+        #executeBtn:active {
+            transform: scale(0.98);
+        }
+
+        @keyframes buttonGlow {
+
+            0%,
+            100% {
+                filter: brightness(1);
+            }
+
+            50% {
+                filter: brightness(1.3);
+            }
+        }
+
+        /* ========== PHASE 2 UI POLISH ========== */
+
+        /* Notification/Toast Animations */
+        .notification,
+        .toast {
+            animation: toastSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes toastSlideIn {
+            from {
+                transform: translateX(100%) scale(0.8);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Focus Visible States for Accessibility */
+        button:focus-visible {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+        }
+
+        input:focus,
+        textarea:focus,
+        input:focus-visible,
+        textarea:focus-visible {
+            outline: none !important;
+        }
+
+        /* Button Press Feedback */
+        button:active:not(:disabled) {
+            transform: scale(0.96);
+            transition: transform 0.1s;
+        }
+
 
         /* Spotify Player - Subtle styling */
         .spotify-player-card {
@@ -503,6 +626,18 @@
             #welcome-screen .grid {
                 gap: 1.5rem;
             }
+
+            /* Better spacing for source cards */
+            .source-cards-container {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 14px;
+            }
+
+            /* Larger integration cards */
+            .mt-4.rounded-xl,
+            .mt-4.rounded-2xl {
+                margin-top: 24px;
+            }
         }
 
         /* ========== RESPONSIVE: EXTRA LARGE (1920px+) ========== */
@@ -522,6 +657,21 @@
 
             .msg-block {
                 font-size: 1.05rem;
+            }
+
+            /* Ultra-wide screen optimizations */
+            .source-cards-container {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 16px;
+            }
+
+            /* Bigger text for large screens */
+            .source-title {
+                font-size: 14px;
+            }
+
+            .source-domain {
+                font-size: 11px;
             }
         }
 
@@ -679,6 +829,51 @@
             pre code {
                 font-size: 11px !important;
             }
+
+            /* Image responsiveness - ensure generated images fit mobile screens */
+            .markdown-body img,
+            .msg-block img {
+                max-width: 100% !important;
+                height: auto !important;
+                object-fit: contain;
+                border-radius: 8px;
+            }
+
+            /* Ensure NASA card images are responsive */
+            .aspect-video img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+            /* Improved card responsiveness */
+            .mt-4.rounded-xl,
+            .mt-4.rounded-2xl {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                max-width: 100% !important;
+            }
+
+            /* Weather, news, and other integration cards */
+            .mt-4.p-6,
+            .mt-4.p-4 {
+                padding: 12px !important;
+            }
+
+            /* Grid layouts on mobile - force single column */
+            .grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            .grid-cols-2,
+            .grid-cols-3 {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* NASA card aspect ratio fix */
+            .aspect-video {
+                aspect-ratio: 16/9 !important;
+            }
         }
 
         /* ========== RESPONSIVE: SMALL MOBILE (max-width: 480px) ========== */
@@ -748,6 +943,24 @@
             /* Disable scanlines on mobile for performance */
             .scan-line {
                 display: none;
+            }
+
+            /* Larger tap targets for source cards */
+            .source-card {
+                padding: 16px;
+                min-height: 60px;
+            }
+
+            /* Disable hover effects that don't work on touch */
+            .source-card:hover {
+                transform: none !important;
+                border-color: rgba(139, 92, 246, 0.15);
+            }
+
+            /* Better touch feedback */
+            .source-card:active {
+                background: rgba(139, 92, 246, 0.15);
+                transform: scale(0.98);
             }
         }
 
@@ -968,6 +1181,379 @@
 
             to {}
         }
+
+        /* Mobile Close Button - Hidden on desktop */
+        .settings-mobile-close {
+            display: none;
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            width: 40px;
+            height: 40px;
+            z-index: 200;
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-mobile-close:hover {
+            background: rgba(99, 102, 241, 0.4);
+            transform: scale(1.05);
+        }
+
+        .settings-mobile-close:active {
+            transform: scale(0.95);
+        }
+
+        @media (max-width: 768px) {
+            .settings-mobile-close {
+                display: flex;
+            }
+        }
+
+        /* ========== SETTINGS MODAL RESPONSIVE ========== */
+
+        /* Mobile: Stacked layout with horizontal tabs */
+        @media (max-width: 768px) {
+            .settings-modal .panel {
+                flex-direction: column !important;
+                max-width: 100% !important;
+                height: 100%;
+            }
+
+            /* Sidebar becomes top header + horizontal scrollable tabs */
+            .settings-sidebar {
+                width: 100% !important;
+                height: auto !important;
+                min-height: auto !important;
+                max-height: none !important;
+                border-right: none !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                background: #0a0a0c !important;
+                flex-shrink: 0;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+
+            /* Hide the large header section on mobile */
+            .settings-sidebar>.p-6.border-b {
+                display: none !important;
+            }
+
+            /* Nav container - horizontal scrollable tabs */
+            .settings-sidebar nav {
+                display: flex !important;
+                flex-direction: column !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                height: auto !important;
+                flex: none !important;
+            }
+
+            /* Mobile header row with logo and close button */
+            .settings-sidebar nav::before {
+                content: 'KAI SETTINGS';
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 12px 16px;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.15em;
+                color: #a5b4fc;
+                background: linear-gradient(180deg, rgba(99, 102, 241, 0.1) 0%, transparent 100%);
+                border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+            }
+
+            /* Section headers (Management, Systems, Advanced) - HIDE on mobile */
+            .settings-sidebar nav>div:not([class]):not(:last-child),
+            .settings-sidebar nav>div[class*="text-zinc"],
+            .settings-sidebar nav>.text-\\[10px\\] {
+                display: none !important;
+            }
+
+            /* Nav items container - horizontal scroll */
+            .settings-sidebar nav {
+                flex-direction: row !important;
+                flex-wrap: nowrap;
+                overflow-x: auto !important;
+                padding: 0 !important;
+                gap: 0 !important;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+
+            .settings-sidebar nav::-webkit-scrollbar {
+                display: none;
+            }
+
+            /* Each nav button as a horizontal tab */
+            .settings-nav-item {
+                white-space: nowrap;
+                padding: 14px 18px !important;
+                height: auto !important;
+                min-height: 48px;
+                border-left: none !important;
+                border-bottom: 3px solid transparent !important;
+                flex-shrink: 0;
+                display: flex !important;
+                align-items: center;
+                justify-content: center !important;
+                color: rgba(255, 255, 255, 0.6);
+                font-size: 9px !important;
+                letter-spacing: 0.1em !important;
+            }
+
+            /* Hide chevron icons on mobile */
+            .settings-nav-item>i[data-lucide="chevron-right"] {
+                display: none !important;
+            }
+
+            /* Make icon + text stay together */
+            .settings-nav-item>div {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .settings-nav-item.active {
+                border-bottom-color: #6366f1 !important;
+                background: rgba(99, 102, 241, 0.15) !important;
+                color: #fff !important;
+            }
+
+            /* Close settings button - make it a floating X */
+            .settings-sidebar nav>div.pt-12 {
+                display: none !important;
+            }
+
+            /* Footer version info - hide on mobile */
+            .settings-sidebar>.p-4.border-t {
+                display: none !important;
+            }
+
+            /* Add mobile close button via CSS (will add JS handler) */
+            .settings-modal .panel::before {
+                content: '✕';
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                width: 36px;
+                height: 36px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(99, 102, 241, 0.2);
+                border: 1px solid rgba(99, 102, 241, 0.3);
+                border-radius: 8px;
+                color: white;
+                font-size: 16px;
+                z-index: 100;
+                cursor: pointer;
+                pointer-events: auto;
+            }
+
+            /* Content takes remaining space */
+            .settings-content {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 16px !important;
+                overflow-y: auto;
+                flex: 1;
+                min-height: 0;
+            }
+
+            /* Settings header - simplify on mobile */
+            .settings-content>.flex.items-center.justify-between.mb-8 {
+                margin-bottom: 16px !important;
+            }
+
+            .settings-content h2#settings-tab-title {
+                font-size: 12px !important;
+                letter-spacing: 0.15em !important;
+            }
+
+            /* Avatar section - STACK vertically on mobile */
+            .settings-section .flex.items-start.gap-8 {
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 20px !important;
+            }
+
+            /* Avatar container - center and slightly smaller */
+            .settings-section .flex.items-start.gap-8>.relative.group {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .settings-section .flex.items-start.gap-8>.relative.group>div:first-child {
+                width: 100px !important;
+                height: 100px !important;
+            }
+
+            /* Form section - full width */
+            .settings-section .flex.items-start.gap-8>.flex-1 {
+                width: 100% !important;
+            }
+
+            /* Optimize form inputs for mobile */
+            .cyber-input {
+                font-size: 16px !important;
+                padding: 14px 12px !important;
+                font-weight: 500 !important;
+                text-transform: none !important;
+                border-radius: 6px;
+                min-height: 50px;
+            }
+
+            .cyber-input::placeholder {
+                font-size: 13px;
+                color: rgba(255, 255, 255, 0.3);
+            }
+
+            /* Force single column for ALL grids */
+            .settings-section .grid,
+            .settings-section .grid-cols-2,
+            .settings-section .grid-cols-3 {
+                grid-template-columns: 1fr !important;
+                gap: 14px !important;
+            }
+
+            /* Settings toggle buttons - larger touch targets */
+            .settings-toggle {
+                width: 56px !important;
+                height: 28px !important;
+            }
+
+            .settings-toggle .thumb {
+                width: 20px !important;
+                height: 20px !important;
+                top: 4px !important;
+                left: 4px !important;
+            }
+
+            .settings-toggle.on .thumb {
+                left: 32px !important;
+            }
+
+            /* Settings section headers */
+            .settings-content h3 {
+                font-size: 11px !important;
+                margin-top: 20px !important;
+                padding-top: 20px !important;
+            }
+
+            /* Dropdown selects - larger and touch-friendly */
+            select,
+            select.cyber-input {
+                font-size: 15px !important;
+                padding: 14px 12px !important;
+                min-height: 50px !important;
+                text-transform: none !important;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236366f1' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: right 12px center;
+                background-size: 18px;
+                padding-right: 44px !important;
+                appearance: none;
+                -webkit-appearance: none;
+            }
+
+            /* All buttons larger */
+            .settings-content button:not(.settings-nav-item) {
+                min-height: 50px !important;
+                font-size: 12px !important;
+                padding: 14px 20px !important;
+            }
+
+            /* Save button - sticky at bottom */
+            .settings-section button[onclick*="saveSettings"],
+            .settings-section button:last-of-type {
+                position: sticky;
+                bottom: 0;
+                margin-top: 20px;
+                width: 100%;
+                background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            }
+
+            /* Linked info banner - smaller on mobile */
+            .settings-section>.flex.items-center.gap-3.p-3 {
+                padding: 10px !important;
+            }
+
+            .settings-section>.flex.items-center.gap-3.p-3 p {
+                font-size: 10px !important;
+            }
+
+            /* Textarea inputs */
+            textarea.cyber-input {
+                min-height: 100px !important;
+            }
+        }
+
+        /* Tablet: Sidebar visible but narrower */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .settings-sidebar {
+                width: 200px !important;
+            }
+
+            .settings-nav-item {
+                font-size: 9px;
+                padding: 10px 12px;
+            }
+
+            .settings-content {
+                padding: 1.5rem;
+            }
+        }
+
+        /* Large screens: Wider sidebar, more padding */
+        @media (min-width: 1440px) {
+            .settings-modal .panel {
+                max-width: 1600px;
+            }
+
+            .settings-sidebar {
+                width: 320px;
+            }
+
+            .settings-nav-item {
+                font-size: 11px;
+                padding: 14px 20px;
+            }
+
+            .settings-content {
+                padding: 3rem;
+            }
+
+            .cyber-input {
+                font-size: 13px;
+                padding: 14px;
+            }
+        }
+
+        /* Extra large screens */
+        @media (min-width: 1920px) {
+            .settings-modal .panel {
+                max-width: 1800px;
+            }
+
+            .settings-sidebar {
+                width: 360px;
+            }
+
+            .settings-content {
+                padding: 4rem;
+            }
+        }
+
 
         /* ========== 🦴 SKELETON LOADERS - BEAST MODE ========== */
         @keyframes skeleton-shimmer {
@@ -1747,6 +2333,10 @@
     <div id="settings-modal" class="settings-modal">
         <div class="backdrop" onclick="closeSettings()"></div>
         <div class="panel">
+            <!-- Mobile Close Button -->
+            <button onclick="closeSettings()" class="settings-mobile-close" aria-label="Close Settings">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
             <!-- Settings Sidebar -->
             <aside class="settings-sidebar">
                 <div class="p-6 border-b border-indigo-900/30">
@@ -2371,7 +2961,17 @@
 
     <script src="index.tsx" type="module"></script>
     <script>
-        lucide.createIcons();
+        // Initialize Lucide icons
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        // Open Settings - navigate directly to the settings React app
+        function openSettings() {
+            window.location.href = './kai-os---tactical-settings/index.html';
+        }
+
+        // Export as global function
+        window.openSettings = openSettings;
+
         const input = document.getElementById('messageInput');
         if (input) {
             input.addEventListener('input', () => {

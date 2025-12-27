@@ -229,23 +229,19 @@ def PerUserChatBot(query: str, user_id: str, session_id: str = None,
         # Add current query
         messages.append({"role": "user", "content": query})
         
-        # 4. Get LLM response
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        # 4. Get LLM response with SOCIAL INTELLIGENCE 🧠
+        from Backend.LLM import ChatCompletion
+        
+        # Use our ChatCompletion which includes social intelligence processing
+        answer = ChatCompletion(
             messages=messages,
-            max_tokens=1024,
-            temperature=0.5,
-            top_p=0.9,
-            stream=True,
+            system_prompt=None,  # Already in messages
+            text_only=True,
+            model="llama-3.3-70b-versatile",
+            user_id=user_id,
+            inject_memory=False,  # We already injected memory above
+            apply_social_intelligence=True  # 🔥 ENABLE SOCIAL INTELLIGENCE
         )
-        
-        # Stream response
-        answer = ""
-        for chunk in completion:
-            if chunk.choices[0].delta.content:
-                answer += chunk.choices[0].delta.content
-        
-        answer = answer.replace("</s>", "").strip()
         
         # 5. Extract and save memories
         if MEMORY_AVAILABLE:

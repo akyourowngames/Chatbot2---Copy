@@ -125,69 +125,42 @@ const ProfileSection: React.FC = () => {
   }, []);
 
   // Handle profile image upload to Supabase
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !userId) return;
 
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image must be smaller than 2MB');
+      return;
+    }
+
     setUploadingImage(true);
     try {
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/avatar_${Date.now()}.${fileExt}`;
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('profile-images')
-        .upload(fileName, file, {
-          upsert: true,
-          contentType: file.type
-        });
-
-      if (error) {
-        console.error('Supabase upload error:', error);
-        // Fallback: try kai-images bucket
-        const { data: fallbackData, error: fallbackError } = await supabase.storage
-          .from('kai-images')
-          .upload(`avatars/${fileName}`, file, {
-            upsert: true,
-            contentType: file.type
-          });
-
-        if (fallbackError) throw fallbackError;
-
-        const { data: urlData } = supabase.storage
-          .from('kai-images')
-          .getPublicUrl(`avatars/${fileName}`);
-
-        const newAvatarUrl = urlData.publicUrl;
+      // Convert image to base64 data URL (no Supabase needed - fixes signature error)
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const newAvatarUrl = reader.result as string;
         setProfile(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
 
-        // Auto-save avatar to Firebase and notify main interface
+        // Auto-save avatar to Firebase (main app will sync via Firestore listener)
         const updatedProfile = { ...profile, avatarUrl: newAvatarUrl };
         await setDoc(doc(db, 'users', userId, 'data', 'profile'), updatedProfile, { merge: true });
-        if (window.opener) {
-          window.opener.postMessage({ type: 'PROFILE_UPDATED', profile: updatedProfile }, '*');
-        }
-      } else {
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('profile-images')
-          .getPublicUrl(fileName);
 
-        const newAvatarUrl = urlData.publicUrl;
-        setProfile(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
+        console.log('[ProfileSection] ✅ Avatar saved as data URL to Firebase');
+        setUploadingImage(false);
+      };
 
-        // Auto-save avatar to Firebase and notify main interface
-        const updatedProfile = { ...profile, avatarUrl: newAvatarUrl };
-        await setDoc(doc(db, 'users', userId, 'data', 'profile'), updatedProfile, { merge: true });
-        if (window.opener) {
-          window.opener.postMessage({ type: 'PROFILE_UPDATED', profile: updatedProfile }, '*');
-        }
-      }
+      reader.onerror = () => {
+        console.error('Failed to read image file');
+        alert('Failed to upload image. Please try again.');
+        setUploadingImage(false);
+      };
+
+      reader.readAsDataURL(file);
     } catch (e) {
       console.error('Failed to upload image:', e);
       alert('Failed to upload image. Please try again.');
-    } finally {
       setUploadingImage(false);
     }
   };
@@ -222,16 +195,8 @@ const ProfileSection: React.FC = () => {
 
       setProfile(updatedProfile);
 
-      // Notify parent window (main chat interface) of profile update
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'PROFILE_UPDATED',
-          profile: updatedProfile
-        }, '*');
-        console.log('[ProfileSection] 📨 Notified parent window of profile update');
-      } else {
-        console.warn('[ProfileSection] ⚠️ No parent window (window.opener) found');
-      }
+      // Profile saved to Firebase - main app will auto-sync via Firestore listener
+      console.log('[ProfileSection] 📨 Profile saved, main app will sync automatically');
 
       // Show success feedback
       setSaved(true);
@@ -262,10 +227,11 @@ const ProfileSection: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-start gap-8">
-        <div className="relative group">
-          <div className="w-32 h-32 cyber-border bg-indigo-950/20 overflow-hidden rounded-lg">
+    <div className="space-y-5 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Avatar + Basic Info - Stack on mobile, side-by-side on larger */}
+      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-8">
+        <div className="relative group shrink-0">
+          <div className="w-24 h-24 sm:w-32 sm:h-32 cyber-border bg-indigo-950/20 overflow-hidden rounded-lg">
             {profile.avatarUrl ? (
               <img
                 src={profile.avatarUrl}
@@ -274,12 +240,12 @@ const ProfileSection: React.FC = () => {
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-indigo-900/30">
-                <span className="text-4xl text-indigo-400">{profile.name?.[0]?.toUpperCase() || '?'}</span>
+                <span className="text-3xl sm:text-4xl text-indigo-400">{profile.name?.[0]?.toUpperCase() || '?'}</span>
               </div>
             )}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 sm:flex items-center justify-center transition-opacity cursor-pointer hidden"
             >
               {uploadingImage ? (
                 <Loader2 className="text-white animate-spin" />
@@ -292,23 +258,23 @@ const ProfileSection: React.FC = () => {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            onChange={handleImageUpload}
+            onChange={handleAvatarUpload}
             className="hidden"
           />
-          <div className="mt-4 text-center">
+          <div className="mt-2 sm:mt-4 text-center">
             <span
               onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest underline decoration-indigo-500/30 underline-offset-4 cursor-pointer hover:text-indigo-400"
+              className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest underline decoration-indigo-500/30 underline-offset-4 cursor-pointer hover:text-indigo-400 active:text-indigo-300"
             >
               {uploadingImage ? 'Uploading...' : 'Change Avatar'}
             </span>
           </div>
         </div>
 
-        <div className="flex-1 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="flex-1 space-y-3 sm:space-y-4 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Full Name</label>
+              <label className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">👤 Your Name</label>
               <input
                 type="text"
                 value={profile.name}
@@ -317,11 +283,12 @@ const ProfileSection: React.FC = () => {
                   setProfile({ ...profile, name: e.target.value });
                 }}
                 placeholder="Your Name"
-                className="w-full cyber-input p-3 text-sm text-indigo-100 font-bold"
+                className="w-full cyber-input p-2.5 sm:p-3 text-sm text-indigo-100 font-bold rounded-sm"
               />
+              <p className="text-[8px] text-zinc-600 mt-0.5">KAI will address you by this name</p>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Nickname</label>
+              <label className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">🏷️ Nickname (Optional)</label>
               <input
                 type="text"
                 value={profile.nickname}
@@ -330,96 +297,113 @@ const ProfileSection: React.FC = () => {
                   setProfile({ ...profile, nickname: e.target.value });
                 }}
                 placeholder="Preferred Name"
-                className="w-full cyber-input p-3 text-sm text-indigo-100 font-bold"
+                className="w-full cyber-input p-2.5 sm:p-3 text-sm text-indigo-100 font-bold rounded-sm"
               />
+              <p className="text-[8px] text-zinc-600 mt-0.5">Casual name KAI can use</p>
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Email</label>
+            <label className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">📧 Email</label>
             <input
               type="email"
               value={profile.email}
               disabled
-              className="w-full cyber-input p-3 text-sm text-zinc-500 font-bold opacity-60 cursor-not-allowed"
+              className="w-full cyber-input p-2.5 sm:p-3 text-sm text-zinc-500 font-bold opacity-60 cursor-not-allowed rounded-sm"
             />
           </div>
         </div>
       </div>
 
+      {/* AI Personalization Section */}
+      <div className="border-t border-indigo-900/20 pt-5 sm:pt-6">
+        <h3 className="text-[11px] sm:text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-4">
+          <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
+          AI Personalization
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+          <div className="space-y-1">
+            <label className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Preferred Response Style</label>
+            <select
+              value={profile.responseStyle}
+              onChange={(e) => setProfile({ ...profile, responseStyle: e.target.value as any })}
+              className="w-full cyber-input p-2.5 sm:p-3 text-sm text-indigo-100 font-bold rounded-sm appearance-none cursor-pointer"
+            >
+              <option value="casual">Casual & Friendly</option>
+              <option value="professional">Professional</option>
+              <option value="brief">Brief & Concise</option>
+              <option value="detailed">Detailed & Thorough</option>
+              <option value="technical">Technical & Precise</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Response Language</label>
+            <select
+              value={profile.responseLanguage}
+              onChange={(e) => setProfile({ ...profile, responseLanguage: e.target.value as any })}
+              className="w-full cyber-input p-2.5 sm:p-3 text-sm text-indigo-100 font-bold rounded-sm appearance-none cursor-pointer"
+            >
+              <option value="english">English</option>
+              <option value="hindi">Hindi</option>
+              <option value="hinglish">Hinglish</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">✨ Your Interests (Comma-Separated)</label>
+          <input
+            type="text"
+            value={interestsInput}
+            onChange={(e) => setInterestsInput(e.target.value)}
+            placeholder="coding, gaming, anime, music, AI"
+            className="w-full cyber-input p-2.5 sm:p-3 text-sm text-indigo-100 rounded-sm"
+          />
+          <p className="text-[8px] text-zinc-600 mt-0.5">KAI will tailor responses based on your interests</p>
+        </div>
+      </div>
+
+      {/* About You Section */}
       <div className="space-y-1">
-        <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Bio / About You</label>
+        <label className="text-[9px] sm:text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">📝 About You (Bio)</label>
         <textarea
-          className="w-full cyber-input p-4 text-sm text-indigo-100 min-h-[120px]"
+          className="w-full cyber-input p-3 sm:p-4 text-sm text-indigo-100 min-h-[100px] sm:min-h-[120px] rounded-sm resize-none"
           value={profile.bio}
           onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
           placeholder="Tell KAI about yourself..."
         ></textarea>
+        <p className="text-[8px] text-zinc-600 mt-0.5">KAI will remember this context in conversations</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Response Language</label>
-          <select
-            value={profile.responseLanguage}
-            onChange={(e) => setProfile({ ...profile, responseLanguage: e.target.value as any })}
-            className="w-full cyber-input p-3 text-sm text-indigo-100 font-bold"
+      {/* Save Button - Fixed positioning */}
+      <div className="mt-6 sm:mt-8 pt-6 sm:pt-8 border-t border-white/10">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+          <p className="text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wide">
+            Changes sync automatically with KAI
+          </p>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-bold uppercase tracking-widest rounded-sm transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-indigo-500/50 active:scale-95"
           >
-            <option value="english">English</option>
-            <option value="hindi">Hindi</option>
-            <option value="hinglish">Hinglish</option>
-          </select>
+            {saving ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Syncing...</span>
+              </>
+            ) : saved ? (
+              <>
+                <Check size={16} />
+                <span>Saved!</span>
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                <span>Save & Sync</span>
+              </>
+            )}
+          </button>
         </div>
-        <div className="space-y-1">
-          <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Response Style</label>
-          <select
-            value={profile.responseStyle}
-            onChange={(e) => setProfile({ ...profile, responseStyle: e.target.value as any })}
-            className="w-full cyber-input p-3 text-sm text-indigo-100 font-bold"
-          >
-            <option value="casual">Casual & Friendly</option>
-            <option value="professional">Professional</option>
-            <option value="brief">Brief & Concise</option>
-            <option value="detailed">Detailed & Thorough</option>
-            <option value="technical">Technical & Precise</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Interests (comma-separated)</label>
-        <input
-          type="text"
-          value={interestsInput}
-          onChange={(e) => setInterestsInput(e.target.value)}
-          placeholder="coding, music, AI, gaming..."
-          className="w-full cyber-input p-3 text-sm text-indigo-100"
-        />
-      </div>
-
-      <div className="border-t border-indigo-900/20 pt-8 flex justify-end gap-4">
-        {saved && (
-          <div className="flex items-center gap-2 text-green-500 text-xs font-bold uppercase tracking-widest">
-            <Check size={16} />
-            Profile Synced to Cloud!
-          </div>
-        )}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="cut-corner bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-wait px-8 py-3 text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-[0_0_20px_rgba(99,102,241,0.2)] transition-all active:scale-95"
-        >
-          {saving ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              Syncing...
-            </>
-          ) : (
-            <>
-              <Save size={16} />
-              Sync to Cloud
-            </>
-          )}
-        </button>
       </div>
     </div>
   );

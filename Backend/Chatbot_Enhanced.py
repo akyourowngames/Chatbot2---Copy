@@ -19,7 +19,11 @@ import os
 import sys
 import re  # For knowledge grounding patterns
 import threading
+import logging
 import google.generativeai as genai
+
+# 🔧 BEAST MODE: Structured Logging
+logger = logging.getLogger(__name__)
 
 # ==================== SPEED OPTIMIZATIONS ====================
 FAST_MODE = True  # Enable for < 0.6s responses (skips some features)
@@ -36,10 +40,10 @@ def _init_gemini():
         if api_key:
             genai.configure(api_key=api_key)
             GEMINI_CONFIGURED = True
-            print("[GEMINI] Pre-configured for speed")
+            logger.info("[GEMINI] Pre-configured for speed")
             return True
     except Exception as e:
-        print(f"[GEMINI] Config error: {e}")
+        logger.error(f"[GEMINI] Config error: {e}")
     return False
 
 # Initialize on import
@@ -218,6 +222,7 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
     - Auto Knowledge Grounding (web search for factual Qs)
     """
     start_time = time.time()
+    timings = {}  # 🔧 BEAST MODE: Track phase timings
     
     try:
         # ===== 0. SWARM AGENT HANDOFF (NEW) =====
@@ -256,12 +261,13 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
             from Backend.SmartModelRouter import route_query, should_think
             model_name, provider, routing_analysis = route_query(Query, force_model)
             is_thinking_mode = should_think(Query)
-            print(f"[CHAT] Routing to {model_name} (thinking={is_thinking_mode})")
+            logger.info(f"[CHAT] Routing to {model_name} (provider={provider}, thinking={is_thinking_mode})")
         except ImportError:
             model_name = "gemini-2.0-flash-exp"  # Default to best model
             provider = "gemini"
             is_thinking_mode = False
             routing_analysis = {}
+        timings['routing'] = (time.time() - start_time) * 1000
         
         # ===== 2. SMART RETRY SYSTEM (NEW) =====
         try:
@@ -378,12 +384,24 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
         
         # Use appropriate provider
         if provider == "gemini":
-            Answer = _call_gemini(conversation_messages, model_name)
+            # Get raw Gemini response
+            raw_answer = _call_gemini(conversation_messages, model_name)
+            
+            # Apply social intelligence to Gemini responses too!
+            from Backend.SocialIntelligence import social_intelligence
+            Answer = social_intelligence.process_response(
+                user_input=Query,
+                llm_response=raw_answer,
+                user_id="default",  # TODO: Pass actual user_id from API
+                history=messages
+            )
         else:
             Answer = ChatCompletion(
                 messages=conversation_messages,
                 model=model_name,
-                text_only=True
+                text_only=True,
+                user_id="default",  # TODO: Pass actual user_id from API
+                apply_social_intelligence=True  # 🔥 ENABLE SOCIAL INTELLIGENCE
             )
         
         # ===== 7. RESPONSE ENHANCEMENT (DISABLED IN FAST_MODE) =====
@@ -413,12 +431,12 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
         else:
             _async_save()
         
-        # Cache the response
         generation_time = time.time() - start_time
+        timings['total'] = generation_time * 1000
         if use_cache and CACHE_AVAILABLE:
             cache_response(Query, Answer, generation_time)
         
-        print(f"[CHAT] Response generated in {generation_time:.2f}s using {model_name}")
+        logger.info(f"[CHAT] Response generated in {generation_time:.2f}s using {model_name} | Phases: {', '.join(f'{k}={v:.0f}ms' for k,v in timings.items())}")
         
         # Return dict with metadata for API
         return {
@@ -512,8 +530,14 @@ def _call_gemini(messages: list, model_name: str = "gemini-2.0-flash-exp") -> st
     
     except Exception as e:
         print(f"[GEMINI] Error: {e}")
-        # Fallback to Groq
-        return ChatCompletion(messages, model="llama-3.3-70b-versatile", text_only=True)
+        # Fallback to Groq WITH SOCIAL INTELLIGENCE
+        return ChatCompletion(
+            messages, 
+            model="llama-3.3-70b-versatile", 
+            text_only=True,
+            user_id="default",
+            apply_social_intelligence=True
+        )
 
 def add_interaction_to_history(query: str, response: str, role: str = "assistant") -> bool:
     """

@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>KAI Assistant</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAI Operator</title>
     <style>
         * {
             margin: 0;
@@ -12,82 +13,184 @@
         }
 
         body {
-            width: 320px;
-            height: 400px;
-            background: linear-gradient(135deg, #1e1b4b, #0f172a);
+            width: 350px;
+            min-height: 400px;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
             color: #e0e7ff;
-            font-family: -apple-system, sans-serif;
-            padding: 16px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            padding: 20px;
         }
 
-        h1 {
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .header h1 {
             font-size: 20px;
-            margin-bottom: 16px;
-            color: #a5b4fc;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            color: #818cf8;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 11px;
+            color: rgba(224, 231, 255, 0.6);
         }
 
         .status {
-            padding: 12px;
             background: rgba(99, 102, 241, 0.1);
             border: 1px solid rgba(99, 102, 241, 0.3);
             border-radius: 8px;
-            margin-bottom: 16px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .status-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #a78bfa;
+            margin-bottom: 8px;
+        }
+
+        .status-value {
+            font-size: 13px;
+            color: #e0e7ff;
+        }
+
+        .status-value.success {
+            color: #10b981;
+        }
+
+        .status-value.error {
+            color: #ef4444;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            color: #a78bfa;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 6px;
+            color: #e0e7ff;
             font-size: 13px;
         }
 
-        .buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+        .form-group input:focus {
+            outline: none;
+            border-color: #818cf8;
         }
 
-        button {
-            padding: 14px;
+        .btn {
+            width: 100%;
+            padding: 12px;
             background: linear-gradient(135deg, #6366f1, #8b5cf6);
             border: none;
             border-radius: 8px;
             color: white;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s;
+            margin-bottom: 10px;
+            transition: all 0.2s;
         }
 
-        button:hover {
+        .btn:hover {
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
         }
 
-        button:active {
+        .btn:active {
             transform: translateY(0);
         }
 
-        .footer {
-            margin-top: 20px;
-            text-align: center;
+        .btn-secondary {
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .info {
             font-size: 11px;
+            color: rgba(224, 231, 255, 0.5);
+            text-align: center;
+            margin-top: 15px;
+            line-height: 1.5;
+        }
+
+        .toggle-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .toggle-btn {
+            background: none;
+            border: none;
             color: #818cf8;
+            cursor: pointer;
+            font-size: 11px;
+            text-decoration: underline;
+            padding: 0;
+        }
+
+        #manual-form {
+            display: none;
         }
     </style>
 </head>
 
 <body>
-    <h1>⚡ KAI Assistant</h1>
-
-    <div class="status" id="status">
-        Extension active on this page
+    <div class="header">
+        <h1>⚡ KAI OPERATOR</h1>
+        <p>AI-Powered Browser Automation</p>
     </div>
 
-    <div class="buttons">
-        <button id="toggle-widget">Open KAI Widget</button>
-        <button id="analyze-page">Analyze Page</button>
-        <button id="fill-form">Fill Form</button>
+    <div class="status">
+        <div class="status-title">Profile Status</div>
+        <div class="status-value" id="profile-status">Checking...</div>
     </div>
 
-    <div class="footer">
-        AI-Powered Browser Automation
+    <button class="btn" id="sync-btn">🔄 Sync from KAI App</button>
+    <button class="btn btn-secondary" id="test-fill">🧪 Test Form Fill</button>
+
+    <div class="toggle-section">
+        <button class="toggle-btn" id="toggle-manual">Or enter profile manually</button>
+    </div>
+
+    <div id="manual-form">
+        <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="name" placeholder="John Doe">
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="email" placeholder="john@example.com">
+        </div>
+        <div class="form-group">
+            <label>Phone (Optional)</label>
+            <input type="tel" id="phone" placeholder="+1234567890">
+        </div>
+        <button class="btn" id="save-manual">💾 Save Profile</button>
+    </div>
+
+    <div class="info">
+        Make sure you're logged into KAI at <br>
+        <strong>localhost:3000</strong> before syncing
     </div>
 
     <script src="popup.js"></script>

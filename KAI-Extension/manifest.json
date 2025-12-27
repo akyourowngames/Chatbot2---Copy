@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "KAI - AI Browser Assistant",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "AI-powered browser automation with chat, form filling, and page analysis",
     "permissions": [
         "activeTab",
@@ -9,7 +9,8 @@
         "scripting"
     ],
     "host_permissions": [
-        "http://localhost:5000/*",
+        "http://localhost:*/*",
+        "https://*.onrender.com/*",
         "<all_urls>"
     ],
     "action": {

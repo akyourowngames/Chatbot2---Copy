@@ -73,7 +73,12 @@ class PerUserMemorySystem:
         self.compression_min_count = 5  # Min memories to compress together
         self.importance_decay_rate = 0.02  # Daily decay rate
         
-        logger.info("[MEMORY] Per-User Memory System initialized")
+        # 🔧 BEAST MODE: Content hash cache for deduplication
+        self._content_hashes: Dict[str, set] = {}  # user_id -> set of content hashes
+        self._embedding_cache: Dict[str, List[float]] = {}  # text_hash -> embedding
+        self._cache_max_size = 500
+        
+        logger.info("[MEMORY] Per-User Memory System initialized (Beast Mode)")
     
     def _init_embedding_model(self):
         """Initialize the embedding model"""
@@ -103,16 +108,87 @@ class PerUserMemorySystem:
     # ==================== EMBEDDING GENERATION ====================
     
     def _generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding vector for text"""
+        """Generate embedding vector for text with caching."""
+        # 🔧 BEAST MODE: Check cache first
+        text_hash = hashlib.md5(text.encode()).hexdigest()
+        if text_hash in self._embedding_cache:
+            return self._embedding_cache[text_hash]
+        
         if self.embedding_model:
             try:
+                import time
+                start = time.time()
                 embedding = self.embedding_model.encode(text, convert_to_numpy=True)
-                return embedding.tolist()
+                result = embedding.tolist()
+                duration_ms = (time.time() - start) * 1000
+                logger.debug(f"[MEMORY] Embedding generated in {duration_ms:.0f}ms")
+                
+                # Cache the result
+                self._cache_embedding(text_hash, result)
+                return result
             except Exception as e:
                 logger.error(f"[MEMORY] Embedding error: {e}")
         
         # Fallback: Simple hash-based pseudo-embedding
         return self._fallback_embedding(text)
+    
+    def _generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
+        """
+        🔧 BEAST MODE: Generate embeddings for multiple texts at once.
+        Up to 3x faster than individual calls.
+        """
+        if not texts:
+            return []
+        
+        # Check cache for all texts
+        results = [None] * len(texts)
+        uncached_indices = []
+        uncached_texts = []
+        
+        for i, text in enumerate(texts):
+            text_hash = hashlib.md5(text.encode()).hexdigest()
+            if text_hash in self._embedding_cache:
+                results[i] = self._embedding_cache[text_hash]
+            else:
+                uncached_indices.append(i)
+                uncached_texts.append(text)
+        
+        # Batch encode uncached texts
+        if uncached_texts and self.embedding_model:
+            try:
+                import time
+                start = time.time()
+                embeddings = self.embedding_model.encode(uncached_texts, convert_to_numpy=True, batch_size=32)
+                duration_ms = (time.time() - start) * 1000
+                logger.info(f"[MEMORY] Batch embedded {len(uncached_texts)} texts in {duration_ms:.0f}ms")
+                
+                for idx, embedding in zip(uncached_indices, embeddings):
+                    result = embedding.tolist()
+                    results[idx] = result
+                    # Cache each result
+                    text_hash = hashlib.md5(texts[idx].encode()).hexdigest()
+                    self._cache_embedding(text_hash, result)
+                    
+            except Exception as e:
+                logger.error(f"[MEMORY] Batch embedding error: {e}")
+                # Fallback to individual encoding
+                for idx in uncached_indices:
+                    results[idx] = self._fallback_embedding(texts[idx])
+        else:
+            # Fallback for uncached without model
+            for idx in uncached_indices:
+                results[idx] = self._fallback_embedding(texts[idx])
+        
+        return results
+    
+    def _cache_embedding(self, text_hash: str, embedding: List[float]):
+        """Cache an embedding with size limit."""
+        if len(self._embedding_cache) >= self._cache_max_size:
+            # Remove oldest entries (simple FIFO)
+            keys_to_remove = list(self._embedding_cache.keys())[:100]
+            for key in keys_to_remove:
+                del self._embedding_cache[key]
+        self._embedding_cache[text_hash] = embedding
     
     def _fallback_embedding(self, text: str) -> List[float]:
         """Fallback embedding using word hashing"""
@@ -169,10 +245,16 @@ class PerUserMemorySystem:
         if not user_id or not content:
             return None
         
+        # 🔧 BEAST MODE: Fast deduplication via content hash
+        content_hash = hashlib.md5(content.encode()).hexdigest()
+        if user_id in self._content_hashes and content_hash in self._content_hashes[user_id]:
+            logger.debug(f"[MEMORY] Skipping duplicate content for user {user_id[:8]}")
+            return None
+        
         # Generate embedding
         embedding = self._generate_embedding(content)
         
-        # Check for duplicate/similar memories
+        # Check for similar memories (semantic dedup)
         existing = self.search_similar(user_id, content, limit=1, threshold=0.9)
         if existing:
             # Update existing memory instead

@@ -19,10 +19,51 @@ import cohere
 import time
 import random
 import threading
+import logging
+from functools import wraps
+from typing import Optional, List, Dict, Any
 
 import google.generativeai as genai
 
+# 🔧 BEAST MODE: Enhanced Logging
+logger = logging.getLogger(__name__)
+
 env_vars = dotenv_values(".env")
+
+# 🔧 BEAST MODE: Performance Tracking
+_request_timings: List[Dict[str, Any]] = []
+MAX_TIMING_HISTORY = 100
+
+def track_timing(provider: str, duration_ms: float, success: bool, model: str = None):
+    """Track API request timing for performance monitoring."""
+    global _request_timings
+    _request_timings.append({
+        "provider": provider,
+        "model": model,
+        "duration_ms": round(duration_ms, 2),
+        "success": success,
+        "timestamp": time.time()
+    })
+    # Keep only recent history
+    if len(_request_timings) > MAX_TIMING_HISTORY:
+        _request_timings = _request_timings[-MAX_TIMING_HISTORY:]
+    
+    status = "✓" if success else "✗"
+    logger.info(f"[LLM] {provider} {status} in {duration_ms:.0f}ms")
+
+def get_avg_latency(provider: str = None) -> float:
+    """Get average latency for a provider (or all providers)."""
+    relevant = [t for t in _request_timings if t["success"] and (not provider or t["provider"] == provider)]
+    if not relevant:
+        return 0
+    return sum(t["duration_ms"] for t in relevant) / len(relevant)
+
+# 🔧 BEAST MODE: Exponential Backoff with Jitter
+def calculate_backoff(attempt: int, base_seconds: float = 30, max_seconds: float = 300) -> float:
+    """Calculate exponential backoff with jitter."""
+    backoff = min(base_seconds * (2 ** attempt), max_seconds)
+    jitter = random.uniform(0, backoff * 0.3)  # 30% jitter
+    return backoff + jitter
 
 # ==================== MULTI-KEY ROTATION SYSTEM ====================
 # 14 Groq API Keys for 14x capacity (~1.4M tokens/day)
@@ -84,10 +125,12 @@ def get_next_groq_client():
         # All keys rate-limited, return the one with earliest unlock
         return min(GROQ_CLIENTS, key=lambda x: x["rate_limited_until"])
 
-def mark_key_rate_limited(client_info, wait_seconds=60):
-    """Mark a key as rate-limited for a period"""
+def mark_key_rate_limited(client_info, attempt: int = 0):
+    """Mark a key as rate-limited with exponential backoff."""
+    wait_seconds = calculate_backoff(attempt)
     client_info["rate_limited_until"] = time.time() + wait_seconds
-    print(f"[LLM] Key #{client_info['key_index']+1} rate-limited for {wait_seconds}s")
+    client_info["rate_limit_attempt"] = attempt + 1
+    logger.warning(f"[LLM] Key #{client_info['key_index']+1} rate-limited for {wait_seconds:.0f}s (attempt {attempt + 1})")
 
 # Legacy single client for backward compatibility
 groq_client = GROQ_CLIENTS[0]["client"] if GROQ_CLIENTS else None
@@ -135,9 +178,12 @@ def get_next_gemini_key():
         # All rate-limited, return earliest unlock
         return min(GEMINI_KEYS, key=lambda x: x["rate_limited_until"])
 
-def mark_gemini_key_rate_limited(key_info, wait_seconds=60):
+def mark_gemini_key_rate_limited(key_info, attempt: int = 0):
+    """Mark Gemini key as rate-limited with exponential backoff."""
+    wait_seconds = calculate_backoff(attempt)
     key_info["rate_limited_until"] = time.time() + wait_seconds
-    print(f"[LLM] Gemini Key #{key_info['idx']+1} rate-limited for {wait_seconds}s")
+    key_info["rate_limit_attempt"] = attempt + 1
+    logger.warning(f"[LLM] Gemini Key #{key_info['idx']+1} rate-limited for {wait_seconds:.0f}s (attempt {attempt + 1})")
 
 print(f"[LLM] 🌟 Gemini Multi-Key: {len(GEMINI_KEYS)} keys active!")
 
@@ -161,10 +207,11 @@ if COHERE_API_KEY and len(COHERE_API_KEY) > 10:
     except Exception as e:
         print(f"[LLM] Cohere Init Failed: {e}")
 
-def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.3-70b-versatile", user_id="default", inject_memory=True):
+def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.3-70b-versatile", user_id="default", inject_memory=True, apply_social_intelligence=True):
     """
     Unified chat completion function with robust error handling.
     🚀 MULTI-KEY ROTATION: Automatically rotates through 6 Groq keys!
+    🧠 SOCIAL INTELLIGENCE: Makes responses human-like and contextually appropriate!
     """
     if not GROQ_CLIENTS:
         return "System Error: No Groq API Keys configured. Please check .env file."
@@ -178,7 +225,8 @@ def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.
             # Get the user's query (last user message)
             user_query = ""
             for msg in reversed(messages):
-                if msg.get('role') == 'user':
+                # ✅ FIX: Ensure msg is a dict before calling .get()
+                if isinstance(msg, dict) and msg.get('role') == 'user':
                     user_query = msg.get('content', '')
                     break
             
@@ -186,7 +234,8 @@ def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.
                 # Get relevant memories for context
                 context_data = contextual_memory.get_context(user_query)
                 
-                if context_data and context_data.get("relevant_memories"):
+                # ✅ FIX: Check if context_data is dict before calling .get()
+                if isinstance(context_data, dict) and context_data.get("relevant_memories"):
                     memory_items = context_data.get("relevant_memories", [])[:5]
                     if memory_items:
                         memory_context = "\n\n[MEMORY - What you know about the user]:\n"
@@ -247,7 +296,8 @@ Focus on answering the user's question directly without unnecessary preamble.
         client_info = get_next_groq_client()
         if not client_info:
             break
-            
+        
+        start_time = time.time()
         try:
             response = client_info["client"].chat.completions.create(
                 model=model,
@@ -258,19 +308,70 @@ Focus on answering the user's question directly without unnecessary preamble.
                 stream=False,
                 stop=None
             )
-            return response.choices[0].message.content
+            
+            # 🔧 Track successful request timing
+            duration_ms = (time.time() - start_time) * 1000
+            track_timing("Groq", duration_ms, True, model)
+            
+            # Reset rate limit attempt counter on success
+            client_info["rate_limit_attempt"] = 0
+            
+            response_text = response.choices[0].message.content
+            
+            # 🧠 SOCIAL INTELLIGENCE: Process response for social appropriateness
+            if apply_social_intelligence:
+                try:
+                    from Backend.SocialIntelligence import social_intelligence
+                    
+                    # Extract user query from messages
+                    user_query = ""
+                    for msg in reversed(messages):
+                        if msg.get('role') == 'user':
+                            user_query = msg.get('content', '')
+                            break
+                    
+                    # Apply social intelligence
+                    response_text = social_intelligence.process_response(
+                        user_input=user_query,
+                        llm_response=response_text,
+                        user_id=user_id,
+                        history=messages
+                    )
+                except Exception as si_error:
+                    print(f"[LLM] Social Intelligence processing failed: {si_error}")
+                    # Continue with original response if social intelligence fails
+            
+            return response_text
             
         except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
             error_msg = str(e).lower()
             keys_tried += 1
-            print(f"[LLM] Groq Key #{client_info['key_index']+1} Error: {e}")
             
-            # Check for Rate Limit (429)
+            # 🔧 BEAST MODE: Categorize errors
+            error_type = "unknown"
             if "429" in error_msg or "rate limit" in error_msg:
-                # Mark this key as rate-limited and try next key immediately
-                mark_key_rate_limited(client_info, wait_seconds=120)
-                print(f"[LLM] Rotating to next key... ({keys_tried}/{len(GROQ_CLIENTS)} tried)")
+                error_type = "rate_limit"
+            elif "authentication" in error_msg or "unauthorized" in error_msg:
+                error_type = "auth"
+            elif "timeout" in error_msg or "timed out" in error_msg:
+                error_type = "timeout"
+            elif "connection" in error_msg:
+                error_type = "network"
+            
+            track_timing("Groq", duration_ms, False, model)
+            logger.warning(f"[LLM] Groq Key #{client_info['key_index']+1} Error [{error_type}]: {e}")
+            
+            # Handle rate limiting with exponential backoff
+            if error_type == "rate_limit":
+                attempt = client_info.get("rate_limit_attempt", 0)
+                mark_key_rate_limited(client_info, attempt)
+                logger.info(f"[LLM] Rotating to next key... ({keys_tried}/{len(GROQ_CLIENTS)} tried)")
                 continue
+            
+            # Auth errors - fail immediately
+            if error_type == "auth":
+                return f"Authentication Error: {e}"
             
             # Other errors (Auth, BadRequest) -> Fail immediately or return error
             if "authentication" in error_msg or "unauthorized" in error_msg:

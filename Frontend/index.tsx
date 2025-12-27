@@ -3,7 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, sendEmailVerification } from "firebase/auth";
-import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, writeBatch, getDoc, setDoc, orderBy } from "firebase/firestore";
+import { getFirestore, collection, addDoc, query, where, getDocs, deleteDoc, doc, writeBatch, getDoc, setDoc, orderBy, onSnapshot } from "firebase/firestore";
 import * as FirebaseDB from './services/FirebaseService';
 
 declare var lucide: any;
@@ -43,7 +43,7 @@ try {
 }
 
 // 📡 API Configuration
-const USE_CLOUD_API = true; // Set to true for production (Render), false for local dev
+const USE_CLOUD_API = false; // Set to true for production (Render), false for local dev
 const BASE_URL = USE_CLOUD_API ? 'https://kai-api-nxxv.onrender.com' : 'http://localhost:5000';
 const API_URL = `${BASE_URL}/api/v1`;
 
@@ -98,6 +98,60 @@ window.addEventListener('message', (event) => {
 // Load profile when auth state changes
 let lastUserId: string | null = null;
 
+// 🔥 SYNC AUTH TO CHROME EXTENSION - Critical for Operator Mode
+function syncAuthToExtension(user: any) {
+    if (!user) {
+        LOG.info('EXT_SYNC', 'Clearing extension auth (user logged out)');
+        try {
+            // Try to notify extension that user logged out
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({ action: 'authChanged', user: null });
+            }
+        } catch (e) { /* Extension not available */ }
+        return;
+    }
+
+    const authData = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || user.email?.split('@')[0] || 'User'
+    };
+
+    LOG.info('EXT_SYNC', '⚡ Syncing auth to extension...', authData);
+
+    // Method 1: Direct chrome.storage (if extension is installed)
+    try {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({ firebaseUser: authData }, () => {
+                LOG.info('EXT_SYNC', '✅ Auth saved to chrome.storage');
+            });
+        }
+    } catch (e) {
+        LOG.warn('EXT_SYNC', 'chrome.storage not available:', e);
+    }
+
+    // Method 2: Send message to extension
+    try {
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({ action: 'saveAuth', user: authData }, (response) => {
+                if (response?.success) {
+                    LOG.info('EXT_SYNC', '✅ Auth sent to extension via message');
+                }
+            });
+        }
+    } catch (e) {
+        LOG.warn('EXT_SYNC', 'Extension messaging not available');
+    }
+
+    // Method 3: Store in localStorage for extension to pick up
+    try {
+        localStorage.setItem('kai_extension_auth', JSON.stringify(authData));
+        LOG.info('EXT_SYNC', '✅ Auth stored in localStorage for extension');
+    } catch (e) {
+        LOG.warn('EXT_SYNC', 'localStorage not available');
+    }
+}
+
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         // Check if this is a different user than before
@@ -108,6 +162,9 @@ onAuthStateChanged(auth, async (user) => {
 
         lastUserId = user.uid;
         LOG.info('AUTH', 'User signed in, loading data from Firebase...', { uid: user.uid, email: user.email });
+
+        // 🔥 SYNC TO CHROME EXTENSION (Critical for Operator Mode)
+        syncAuthToExtension(user);
 
         // === LOAD ALL USER DATA FROM FIREBASE ===
 
@@ -145,6 +202,27 @@ onAuthStateChanged(auth, async (user) => {
 
         // Update user avatar in header
         updateUserAvatar(cachedUserProfile?.avatarUrl || user.photoURL || '', user.email || user.uid);
+
+        // 🔥 Set up real-time listener for profile changes (replaces window.postMessage from popup)
+        const profileDocRef = doc(db, 'users', user.uid, 'data', 'profile');
+        onSnapshot(profileDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const profileData = docSnap.data();
+                LOG.info('PROFILE', '🔄 Profile auto-synced from Firestore', {
+                    name: profileData.name,
+                    interests: profileData.interests?.length || 0
+                });
+
+                // Update cached profile
+                cachedUserProfile = profileData;
+                localStorage.setItem('kai_user_profile', JSON.stringify(cachedUserProfile));
+
+                // Update avatar in header if changed
+                updateUserAvatar(profileData.avatarUrl || '', user.email || user.uid);
+            }
+        }, (error) => {
+            LOG.error('PROFILE', 'Firestore listener error', error);
+        });
 
         // 2. Load Chat History
         try {
@@ -212,19 +290,8 @@ function updateUserAvatar(avatarUrl: string, seed: string) {
     }
 }
 
-// Listen for profile updates from settings popup
-window.addEventListener('message', (event) => {
-    if (event.data?.type === 'PROFILE_UPDATED' && event.data.profile) {
-        LOG.info('PROFILE', 'Received profile update from settings');
-        cachedUserProfile = event.data.profile;
-
-        // Update avatar in header
-        const user = auth?.currentUser;
-        if (user) {
-            updateUserAvatar(cachedUserProfile?.avatarUrl || '', user.email || user.uid);
-        }
-    }
-});
+// Firebase Firestore real-time listener for profile sync (replaces window.postMessage approach)
+// This listener is set up in the onAuthStateChanged callback above
 
 // === MEMORY CORE VISUALIZATION ===
 // Inject styles for the brain pulse
@@ -282,7 +349,7 @@ style.textContent = `
     border: 1px solid rgba(139, 92, 246, 0.15); border-radius: 12px;
     text-decoration: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(10px); cursor: pointer; position: relative; overflow: hidden;
-    animation: slideUp 0.4s ease-out backwards;
+    animation: cardSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
   }
   .source-card:nth-child(1) { animation-delay: 0.05s; }
   .source-card:nth-child(2) { animation-delay: 0.1s; }
@@ -290,15 +357,36 @@ style.textContent = `
   .source-card:nth-child(4) { animation-delay: 0.2s; }
   .source-card:nth-child(5) { animation-delay: 0.25s; }
   
+  @keyframes cardSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
   .source-card::before {
     content: ''; position: absolute; inset: 0;
     background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), transparent);
     opacity: 0; transition: opacity 0.3s;
   }
+  
+  .source-card::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+  }
+  
   .source-card:hover::before { opacity: 1; }
+  .source-card:hover::after { transform: translateX(100%); }
   
   .source-card:hover {
-    border-color: rgba(139, 92, 246, 0.5); transform: translateY(-3px) scale(1.02);
+    border-color: rgba(139, 92, 246, 0.5); 
+    transform: translateY(-4px) scale(1.02);
     box-shadow: 0 8px 25px rgba(139, 92, 246, 0.25), 0 0 0 1px rgba(139, 92, 246, 0.1);
   }
   
@@ -326,6 +414,31 @@ style.textContent = `
   }
   .source-card:hover .source-arrow {
     color: #a78bfa; transform: translateX(3px);
+  }
+  
+  /* Mobile responsiveness for source cards */
+  @media (max-width: 768px) {
+    .source-cards-wrapper {
+      margin-top: 12px;
+      padding: 12px;
+    }
+    
+    .source-cards-container {
+      grid-template-columns: 1fr !important;
+      gap: 8px;
+    }
+    
+    .source-card {
+      padding: 10px 12px;
+    }
+    
+    .source-title {
+      font-size: 11px;
+    }
+    
+    .source-domain {
+      font-size: 9px;
+    }
   }
 `;
 document.head.appendChild(style);
@@ -2126,6 +2239,77 @@ if (auth) {
 }
 
 // Interface Actions
+
+// 🛡️ BEAST MODE: Self-Healing Connection with Auto-Retry
+async function secureFetch(url: string, options: any, retries = 2): Promise<Response> {
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok && response.status >= 500) {
+            throw new Error(`Server Error: ${response.status}`);
+        }
+        return response;
+    } catch (error) {
+        if (retries > 0) {
+            LOG.warn('NETWORK', `Connection unstable. Rerouting... (${retries} retries left)`);
+
+            // Show tactical "Rerouting" toast
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-yellow-500/10 border border-yellow-500/50 text-yellow-500 px-4 py-2 rounded-lg backdrop-blur-md text-sm font-mono z-50';
+            toast.innerHTML = `<i data-lucide="shield-alert" class="inline w-4 h-4 mr-2"></i>LINK_UNSTABLE // REROUTING (${retries})`;
+            toast.style.animation = 'toastSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            document.body.appendChild(toast);
+            if (window.lucide) window.lucide.createIcons();
+
+            setTimeout(() => toast.remove(), 2500);
+
+            // Delay before retry
+            await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 700));
+            return secureFetch(url, options, retries - 1);
+        }
+        throw error;
+    }
+}
+
+// 🧠 BEAST MODE: Dynamic Thought Stream
+let thoughtStreamInterval: any = null;
+const TACTICAL_THOUGHTS = [
+    "PARSING_SEMANTIC_INTENT",
+    "ACCESSING_VECTOR_DB",
+    "ANALYZING_CONTEXT_GRAPH",
+    "OPTIMIZING_NEURAL_PATH",
+    "SYNTHESIZING_OUTPUT",
+    "ENCRYPTING_PAYLOAD"
+];
+
+function startThoughtStream() {
+    const statusEl = document.querySelector('.skeleton-typing .typing-indicator, .skeleton-typing span');
+    if (!statusEl) return;
+
+    let step = 0;
+    statusEl.textContent = TACTICAL_THOUGHTS[0] + "...";
+
+    if (thoughtStreamInterval) clearInterval(thoughtStreamInterval);
+    thoughtStreamInterval = setInterval(() => {
+        step = (step + 1) % TACTICAL_THOUGHTS.length;
+        statusEl.textContent = TACTICAL_THOUGHTS[step] + "...";
+    }, 1200);
+}
+
+function stopThoughtStream() {
+    if (thoughtStreamInterval) {
+        clearInterval(thoughtStreamInterval);
+        thoughtStreamInterval = null;
+    }
+}
+
+// 🎭 BEAST MODE: Adaptive Personality Analysis
+function analyzeInputStyle(text: string): string {
+    const words = text.trim().split(/\s+/).length;
+    if (words < 8) return 'concise';      // Quick command mode
+    if (words > 25) return 'detailed';    // Deep dive mode
+    return 'neutral';
+}
+
 (window as any).sendMessage = async () => {
     const queryStr = messageInput.value.trim();
     if (!queryStr || isProcessing) return;
@@ -2184,12 +2368,16 @@ if (auth) {
         // Get user preferences for personalized responses
         const userPrefs = (window as any).getUserPreferences ? (window as any).getUserPreferences() : null;
 
+        // 🎭 BEAST MODE: Analyze input style for adaptive responses
+        const styleHint = analyzeInputStyle(queryStr);
+
         // Include attachments in request
         const requestBody: any = {
             query: queryStr,
             session_id: currentChatId,
             uid: auth?.currentUser?.uid,
-            user_preferences: userPrefs  // Pass user preferences to KAI
+            user_preferences: userPrefs,
+            style_hint: styleHint  // Pass the style hint for adaptive personality!
         };
 
         // Add files if any are pending
@@ -2204,12 +2392,24 @@ if (auth) {
             pendingFiles = [];
         }
 
-        const response = await fetch(`${API_URL}/chat`, {
+        // 🧠 BEAST MODE: Start thought stream for dynamic status updates
+        startThoughtStream();
+
+        // 🛡️ BEAST MODE: Use secureFetch with auto-retry
+        const response = await secureFetch(`${API_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
         const data = await response.json();
+
+        // 🧠 BEAST MODE: Stop thought stream
+        stopThoughtStream();
+
+        // Remove typing indicator
+        if (typingIndicator && typingIndicator.parentNode) {
+            typingIndicator.remove();
+        }
 
         // 🧠 MEMORY VISUALIZATION TRIGGER
         // Check for metadata from the new ChatBot return structure
@@ -3151,15 +3351,10 @@ LOG.info('SYSTEM', 'KAI OS Tactical Interface Initialized.');
 // Settings state
 let settingsState = JSON.parse(localStorage.getItem('kai_settings') || '{}');
 
-// Open settings modal
+// Open settings - navigate to full-page React settings app
 function openSettings() {
-    const modal = document.getElementById('settings-modal');
-    if (modal) {
-        modal.classList.add('open');
-        lucide.createIcons();
-        loadSettingsData();
-        LOG.info('SETTINGS', 'Settings modal opened');
-    }
+    LOG.info('SETTINGS', 'Navigating to full-page settings on port 3001');
+    window.location.href = 'http://localhost:3001';
 }
 (window as any).openSettings = openSettings;
 

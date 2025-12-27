@@ -189,6 +189,47 @@
     transform: translateY(0);
 }
 
+/* Primary button - AI Fill */
+.kai-btn-primary {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 700;
+    grid-column: span 2;
+    position: relative;
+    overflow: hidden;
+}
+
+.kai-btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: kai-shimmer 2s infinite;
+}
+
+@keyframes kai-shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.kai-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6) !important;
+    transform: translateY(-2px);
+}
+
+/* Header styling */
+.kai-header span {
+    color: #a5b4fc;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
 /* Scrollbar styling */
 .kai-messages::-webkit-scrollbar {
     width: 6px;

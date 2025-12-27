@@ -1766,6 +1766,7 @@ def chat():
     image_path = data.get('image_path')  # Legacy support
     attachments = data.get('attachments', [])  # New: array of {name, url, type}
     user_preferences = data.get('user_preferences')  # User profile settings
+    style_hint = data.get('style_hint', 'neutral')  # 🎭 BEAST MODE: Adaptive Personality (concise/detailed/neutral)
     
     # === PER-USER MEMORY SYSTEM (NEW - Beast Mode) ===
     user_id = data.get('uid', 'anonymous')  # Firebase UID from frontend
@@ -1860,6 +1861,15 @@ def chat():
         if user_context_parts:
             user_context = "[USER CONTEXT: " + " ".join(user_context_parts) + "]\n\n"
             print(f"[CHAT] User preferences loaded: {name or 'Anonymous'}, style={response_style}, lang={response_language}")
+    
+    # 🎭 BEAST MODE: Adaptive Style Based on Input Length
+    adaptive_style_instructions = {
+        'concise': "The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).",
+        'detailed': "The user sent a DETAILED question. Provide a thorough, comprehensive response with explanations.",
+        'neutral': ""  # No special instruction
+    }
+    if style_hint in adaptive_style_instructions and adaptive_style_instructions[style_hint]:
+        user_context += f"[ADAPTIVE STYLE: {adaptive_style_instructions[style_hint]}]\n\n"
     
     # === ATTACHMENT HANDLING (NEW) ===
     # Process any attached files (images get vision analysis)
@@ -7246,7 +7256,7 @@ def agent_chat():
         calc_keywords = ['calculate', 'compute', '×', '*', '+', '-', '/', 'math', 'multiply']
         browse_keywords = ['browse', 'navigate', 'go to', 'visit', 'screenshot', 'extract from']
         doc_keywords = ['analyze document', 'analyze this pdf', 'analyze this docx', 'read document', 'summarize pdf']
-        image_keywords = ['analyze image', 'what\\'s in this image', 'describe image', 'compare images']
+        image_keywords = ['analyze image', "what's in this image", 'describe image', 'compare images']
         debate_keywords = ['start a debate', 'debate:', 'create debate', 'debate about', 'debate on']
         interview_keywords = ['start interview', 'mock interview', 'job interview', 'interview for']
         clone_keywords = ['personality clone', 'create clone', 'chat as clone', 'my writing style']
@@ -8791,6 +8801,453 @@ def voice_list_voices():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ==================== OPERATOR MODE ENDPOINTS ====================
+# 🎯 HACKATHON FEATURE: AI-Powered DOM Control
+# Enables KAI to understand and control any web page intelligently
+
+@app.route('/api/v1/operator/analyze', methods=['POST'])
+@rate_limit("default")
+def operator_analyze_page():
+    """
+    Analyze page DOM and generate smart fill/click actions.
+    
+    Receives DOM structure from Chrome extension, uses AI to understand
+    the page context, and returns actionable commands.
+    """
+    try:
+        data = request.json
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        dom_structure = data.get('dom', {})
+        user_profile = data.get('profile', {})
+        user_query = data.get('query', 'Fill this form')
+        user_id = data.get('user_id', 'default')
+        
+        # Get user profile from backend if not provided
+        if not user_profile and user_id != 'default':
+            try:
+                if firebase_dal:
+                    stored_profile = firebase_dal.get_document('users', user_id)
+                    if stored_profile:
+                        user_profile = stored_profile.get('profile', {})
+            except Exception as profile_err:
+                print(f"[OPERATOR] Could not fetch profile: {profile_err}")
+        
+        # Import and use DOMController
+        try:
+            from Backend.DOMController import dom_controller
+            import asyncio
+            
+            # Run async analysis
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(
+                    dom_controller.analyze_page(dom_structure, user_profile, user_query)
+                )
+            finally:
+                loop.close()
+            
+            return jsonify({
+                "success": True,
+                "type": "operator_analysis",
+                **result
+            }), 200
+            
+        except ImportError as ie:
+            print(f"[OPERATOR] DOMController not available: {ie}")
+            return jsonify({
+                "error": "Operator mode not available",
+                "details": str(ie)
+            }), 503
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/operator/quick-fill', methods=['POST'])
+@rate_limit("default")
+def operator_quick_fill():
+    """
+    Quick synchronous form fill using rule-based matching.
+    Faster but less intelligent than /analyze.
+    """
+    try:
+        data = request.json
+        
+        dom_structure = data.get('dom', {})
+        user_profile = data.get('profile', {})
+        
+        from Backend.DOMController import dom_controller
+        
+        actions = dom_controller.get_quick_fill_actions(dom_structure, user_profile)
+        
+        return jsonify({
+            "success": True,
+            "type": "quick_fill",
+            "actions": actions,
+            "count": len(actions)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/operator/status', methods=['GET'])
+def operator_status():
+    """Get operator mode status and capabilities."""
+    try:
+        from Backend.DOMController import dom_controller
+        status = dom_controller.get_status()
+        
+        return jsonify({
+            "success": True,
+            "operator_mode": True,
+            "capabilities": [
+                "form_fill",
+                "button_click", 
+                "dropdown_select",
+                "checkbox_toggle",
+                "ai_analysis"
+            ],
+            **status
+        }), 200
+        
+    except ImportError:
+        return jsonify({
+            "success": False,
+            "operator_mode": False,
+            "error": "DOMController not available"
+        }), 200
+
+
+@app.route('/api/v1/operator/execute', methods=['POST'])
+@rate_limit("default")
+def operator_execute_actions():
+    """
+    Log action execution results from the extension.
+    The extension executes actions locally, this tracks results.
+    """
+    try:
+        data = request.json
+        
+        actions_executed = data.get('actions', [])
+        results = data.get('results', [])
+        page_url = data.get('url', '')
+        
+        # Log for analytics
+        success_count = sum(1 for r in results if r.get('success', False))
+        total_count = len(results)
+        
+        print(f"[OPERATOR] Executed {success_count}/{total_count} actions on {page_url}")
+        
+        return jsonify({
+            "success": True,
+            "executed": total_count,
+            "successful": success_count,
+            "failed": total_count - success_count
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==================== EXTENSION MEMORY & AUTOMATION API ====================
+
+@app.route('/api/v1/extension/memory', methods=['GET'])
+def get_extension_memory():
+    """Get user's extension memory (preferences, frequent actions, site data)"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            doc_ref = firebase_storage.db.collection('extension_memory').document(user_id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                return jsonify({"success": True, "memory": doc.to_dict()})
+            
+            # Return default memory structure
+            default_memory = {
+                "user_id": user_id,
+                "site_actions": {},
+                "favorite_sites": [],
+                "frequent_commands": [],
+                "preferences": {
+                    "voice_enabled": True,
+                    "auto_speak": False,
+                    "default_fill_delay": 100
+                },
+                "created_at": datetime.utcnow().isoformat()
+            }
+            doc_ref.set(default_memory)
+            return jsonify({"success": True, "memory": default_memory})
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/extension/memory', methods=['POST'])
+def update_extension_memory():
+    """Update user's extension memory"""
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            doc_ref = firebase_storage.db.collection('extension_memory').document(user_id)
+            
+            # Merge update data
+            update_data = {k: v for k, v in data.items() if k != 'user_id'}
+            update_data['updated_at'] = datetime.utcnow().isoformat()
+            
+            doc_ref.set(update_data, merge=True)
+            return jsonify({"success": True, "message": "Memory updated"})
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/extension/macros', methods=['GET'])
+def get_extension_macros():
+    """Get user's saved macros"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            doc_ref = firebase_storage.db.collection('extension_macros').document(user_id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                return jsonify({"success": True, "macros": doc.to_dict().get('macros', [])})
+            
+            return jsonify({"success": True, "macros": []})
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/extension/macros', methods=['POST'])
+def save_extension_macro():
+    """Save a new macro or update existing"""
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        macro = data.get('macro')
+        
+        if not user_id or not macro:
+            return jsonify({"error": "user_id and macro required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            import uuid
+            doc_ref = firebase_storage.db.collection('extension_macros').document(user_id)
+            doc = doc_ref.get()
+            
+            macros = doc.to_dict().get('macros', []) if doc.exists else []
+            
+            # Add ID and timestamp
+            if 'id' not in macro:
+                macro['id'] = f"macro_{uuid.uuid4().hex[:8]}"
+            macro['created_at'] = datetime.utcnow().isoformat()
+            macro['run_count'] = 0
+            
+            # Check for existing macro with same name
+            existing_idx = next((i for i, m in enumerate(macros) if m.get('name') == macro.get('name')), None)
+            if existing_idx is not None:
+                macros[existing_idx] = macro
+            else:
+                macros.append(macro)
+            
+            doc_ref.set({'user_id': user_id, 'macros': macros}, merge=True)
+            return jsonify({"success": True, "macro_id": macro['id'], "message": "Macro saved"})
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/extension/macros/<macro_id>', methods=['DELETE'])
+def delete_extension_macro(macro_id):
+    """Delete a macro"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            doc_ref = firebase_storage.db.collection('extension_macros').document(user_id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                macros = doc.to_dict().get('macros', [])
+                macros = [m for m in macros if m.get('id') != macro_id]
+                doc_ref.set({'macros': macros}, merge=True)
+                return jsonify({"success": True, "message": "Macro deleted"})
+            
+            return jsonify({"error": "Macro not found"}), 404
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/extension/templates', methods=['GET'])
+def get_extension_templates():
+    """Get user's form templates"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            doc_ref = firebase_storage.db.collection('extension_templates').document(user_id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                return jsonify({"success": True, "templates": doc.to_dict().get('templates', [])})
+            
+            return jsonify({"success": True, "templates": []})
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/extension/templates', methods=['POST'])
+def save_extension_template():
+    """Save a new form template"""
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        template = data.get('template')
+        
+        if not user_id or not template:
+            return jsonify({"error": "user_id and template required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            import uuid
+            doc_ref = firebase_storage.db.collection('extension_templates').document(user_id)
+            doc = doc_ref.get()
+            
+            templates = doc.to_dict().get('templates', []) if doc.exists else []
+            
+            # Add ID and timestamp
+            if 'id' not in template:
+                template['id'] = f"tpl_{uuid.uuid4().hex[:8]}"
+            template['created_at'] = datetime.utcnow().isoformat()
+            
+            # Check for existing template with same name
+            existing_idx = next((i for i, t in enumerate(templates) if t.get('name') == template.get('name')), None)
+            if existing_idx is not None:
+                templates[existing_idx] = template
+            else:
+                templates.append(template)
+            
+            doc_ref.set({'user_id': user_id, 'templates': templates}, merge=True)
+            return jsonify({"success": True, "template_id": template['id'], "message": "Template saved"})
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/extension/templates/<template_id>', methods=['DELETE'])
+def delete_extension_template(template_id):
+    """Delete a template"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({"error": "user_id required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            doc_ref = firebase_storage.db.collection('extension_templates').document(user_id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                templates = doc.to_dict().get('templates', [])
+                templates = [t for t in templates if t.get('id') != template_id]
+                doc_ref.set({'templates': templates}, merge=True)
+                return jsonify({"success": True, "message": "Template deleted"})
+            
+            return jsonify({"error": "Template not found"}), 404
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/v1/extension/track-action', methods=['POST'])
+def track_extension_action():
+    """Track user action for learning patterns"""
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        action = data.get('action')  # e.g., "fill", "click", "open"
+        site = data.get('site')
+        details = data.get('details', {})
+        
+        if not user_id or not action:
+            return jsonify({"error": "user_id and action required"}), 400
+        
+        if firebase_storage and firebase_storage.db:
+            doc_ref = firebase_storage.db.collection('extension_memory').document(user_id)
+            doc = doc_ref.get()
+            
+            memory = doc.to_dict() if doc.exists else {"user_id": user_id, "site_actions": {}, "frequent_commands": []}
+            
+            # Update site-specific actions
+            if site:
+                if 'site_actions' not in memory:
+                    memory['site_actions'] = {}
+                if site not in memory['site_actions']:
+                    memory['site_actions'][site] = {"visits": 0, "actions": []}
+                
+                memory['site_actions'][site]['visits'] += 1
+                memory['site_actions'][site]['last_visit'] = datetime.utcnow().isoformat()
+                if details:
+                    memory['site_actions'][site]['last_data'] = details
+            
+            # Update command frequency
+            if 'frequent_commands' not in memory:
+                memory['frequent_commands'] = []
+            
+            cmd_found = False
+            for cmd in memory['frequent_commands']:
+                if cmd.get('cmd') == action:
+                    cmd['count'] = cmd.get('count', 0) + 1
+                    cmd_found = True
+                    break
+            
+            if not cmd_found:
+                memory['frequent_commands'].append({"cmd": action, "count": 1})
+            
+            # Sort by frequency
+            memory['frequent_commands'].sort(key=lambda x: x.get('count', 0), reverse=True)
+            memory['frequent_commands'] = memory['frequent_commands'][:20]  # Keep top 20
+            
+            memory['updated_at'] = datetime.utcnow().isoformat()
+            doc_ref.set(memory, merge=True)
+            
+            return jsonify({"success": True, "message": "Action tracked"})
+        
+        return jsonify({"error": "Database not available"}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # ==================== STARTUP ====================
 
