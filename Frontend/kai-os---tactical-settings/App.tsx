@@ -177,7 +177,7 @@ const App: React.FC = () => {
 
           <div className="pt-8 sm:pt-12 mt-auto">
             <button
-              onClick={() => window.location.href = 'http://localhost:3000'}
+              onClick={() => window.location.href = '/'}
               className="w-full flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 text-indigo-500/80 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors rounded-sm group"
             >
               <X size={16} className="group-hover:scale-110 transition-transform" />

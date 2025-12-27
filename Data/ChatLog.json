@@ -14,5 +14,29 @@
     {
         "role": "assistant",
         "content": "Hey friends, I'm KAI, nice to meet you all. I'm an advanced AI assistant, and I can do a bunch of cool things like answer questions, generate text, translate languages, and even create images - basically, I'm here to help and chat about anything that's on your mind, Ankita's friend."
+    },
+    {
+        "role": "user",
+        "content": "\n[\ud83e\udde0 MEMORY CONTEXT - What you remember about this user]:\n\u2022 [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhi bud!"
+    },
+    {
+        "role": "assistant",
+        "content": "Hey Sadhu Ram, what's brewing in that devilish mind of yours today?"
+    },
+    {
+        "role": "user",
+        "content": "\n[\ud83e\udde0 MEMORY CONTEXT - What you remember about this user]:\n\u2022 [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\nhey i am krish man, i am just testing you and gonna deploy yu to production in few days"
+    },
+    {
+        "role": "assistant",
+        "content": "Nice to meet you, Krish. I'm KAI, your AI assistant, and I'm excited to hear that I'll be deployed to production soon - bring it on, I'm ready to shine in beast mode."
+    },
+    {
+        "role": "user",
+        "content": "\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\nyu know right then who i am right>"
+    },
+    {
+        "role": "assistant",
+        "content": "I think I've got it now - you're Krish, the creator of yours truly, KAI, and you're putting me through my paces before deploying me to production, right?"
     }
 ]

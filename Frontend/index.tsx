@@ -43,7 +43,7 @@ try {
 }
 
 // 📡 API Configuration
-const USE_CLOUD_API = false; // Set to true for production (Render), false for local dev
+const USE_CLOUD_API = true; // Set to true for production (Render), false for local dev
 const BASE_URL = USE_CLOUD_API ? 'https://kai-api-nxxv.onrender.com' : 'http://localhost:5000';
 const API_URL = `${BASE_URL}/api/v1`;
 
@@ -3353,8 +3353,9 @@ let settingsState = JSON.parse(localStorage.getItem('kai_settings') || '{}');
 
 // Open settings - navigate to full-page React settings app
 function openSettings() {
-    LOG.info('SETTINGS', 'Navigating to full-page settings on port 3001');
-    window.location.href = 'http://localhost:3001';
+    LOG.info('SETTINGS', 'Navigating to settings page');
+    // Use relative path for Netlify/production compatibility
+    window.location.href = '/settings/';
 }
 (window as any).openSettings = openSettings;
 

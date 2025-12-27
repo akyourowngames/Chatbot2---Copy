@@ -14,5 +14,29 @@
     "last_accessed": 1766842756.1338851,
     "access_count": 0,
     "generation_time": 1.2045488357543945
+  },
+  "40d59e278e96ba4ffd8a683efbe454e6": {
+    "query": "\n[\ud83e\udde0 MEMORY CONTEXT - What you remember about this user]:\n\u2022 [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhi bud!",
+    "response": "Hey Sadhu Ram, what's brewing in that devilish mind of yours today?",
+    "timestamp": 1766851570.059375,
+    "last_accessed": 1766851570.059375,
+    "access_count": 0,
+    "generation_time": 1.1681888103485107
+  },
+  "0ff74a7a88a1262eea1faf6a28c96d73": {
+    "query": "\n[\ud83e\udde0 MEMORY CONTEXT - What you remember about this user]:\n\u2022 [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\nhey i am krish man, i am just testing you and gonna deploy yu to production in few days",
+    "response": "Nice to meet you, Krish. I'm KAI, your AI assistant, and I'm excited to hear that I'll be deployed to production soon - bring it on, I'm ready to shine in beast mode.",
+    "timestamp": 1766851609.2888827,
+    "last_accessed": 1766851609.2888827,
+    "access_count": 0,
+    "generation_time": 3.1212151050567627
+  },
+  "1dd91bbedf795843dec7a040abc003fd": {
+    "query": "\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\nyu know right then who i am right>",
+    "response": "I think I've got it now - you're Krish, the creator of yours truly, KAI, and you're putting me through my paces before deploying me to production, right?",
+    "timestamp": 1766851630.1958776,
+    "last_accessed": 1766851630.1958776,
+    "access_count": 0,
+    "generation_time": 0.7936742305755615
   }
 }

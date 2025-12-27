@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# DON'T ignore settings - needed for Netlify
+!settings/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

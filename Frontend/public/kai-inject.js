@@ -14,7 +14,8 @@
     }
     window.KAI_INJECTED = true;
 
-    const API_URL = 'http://localhost:5000/api/v1';
+    // Use Render production API (localhost for development only)
+    const API_URL = 'https://kai-api-nxxv.onrender.com/api/v1';
 
     // === FLOATING WIDGET ===
     const createWidget = () => {

@@ -105,8 +105,41 @@
       "category": "preference",
       "importance": 0.9,
       "timestamp": "2025-12-26T17:20:46.214432",
-      "last_accessed": "2025-12-27T19:09:16.134395",
-      "access_count": 30,
+      "last_accessed": "2025-12-27T21:37:10.772007",
+      "access_count": 33,
+      "confidence": 1.0,
+      "cloud_synced": true
+    },
+    {
+      "id": "fact_11_20251227213649",
+      "content": "krish",
+      "category": "general",
+      "importance": 0.4,
+      "timestamp": "2025-12-27T21:36:49.288882",
+      "last_accessed": "2025-12-27T21:36:49.288882",
+      "access_count": 0,
+      "confidence": 1.0,
+      "cloud_synced": true
+    },
+    {
+      "id": "fact_12_20251227213650",
+      "content": "just",
+      "category": "general",
+      "importance": 0.4,
+      "timestamp": "2025-12-27T21:36:50.282494",
+      "last_accessed": "2025-12-27T21:36:50.282494",
+      "access_count": 0,
+      "confidence": 1.0,
+      "cloud_synced": true
+    },
+    {
+      "id": "fact_13_20251227213710",
+      "content": "right",
+      "category": "general",
+      "importance": 0.4,
+      "timestamp": "2025-12-27T21:37:10.197873",
+      "last_accessed": "2025-12-27T21:37:10.197873",
+      "access_count": 0,
       "confidence": 1.0,
       "cloud_synced": true
     }
@@ -1401,10 +1434,25 @@
       "timestamp": "2025-12-27T19:09:16.132626",
       "user": "\n[🧠 MEMORY CONTEXT - What you remember about this user]:\n• [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Ankita' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\ngive yr intro to my friends and what can yu do?",
       "assistant": "Hey friends, I'm KAI, nice to meet you all. I'm an advanced AI assistant, and I can do a bunch of cool things like answer questions, generate text, translate languages, and even create images - basically, I'm here to help and chat about anything that's on your mind, Ankita's friend."
+    },
+    {
+      "timestamp": "2025-12-27T21:36:10.048724",
+      "user": "\n[🧠 MEMORY CONTEXT - What you remember about this user]:\n• [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhi bud!",
+      "assistant": "Hey Sadhu Ram, what's brewing in that devilish mind of yours today?"
+    },
+    {
+      "timestamp": "2025-12-27T21:36:49.287632",
+      "user": "\n[🧠 MEMORY CONTEXT - What you remember about this user]:\n• [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\nhey i am krish man, i am just testing you and gonna deploy yu to production in few days",
+      "assistant": "Nice to meet you, Krish. I'm KAI, your AI assistant, and I'm excited to hear that I'll be deployed to production soon - bring it on, I'm ready to shine in beast mode."
+    },
+    {
+      "timestamp": "2025-12-27T21:37:10.195229",
+      "user": "\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is KAI_TACTICAL_01. Call them 'Sadhu Ram' casually. About the user: hi i like you! Provide detailed and thorough explanations. IMPORTANT: Respond in English only.]\n\nyu know right then who i am right>",
+      "assistant": "I think I've got it now - you're Krish, the creator of yours truly, KAI, and you're putting me through my paces before deploying me to production, right?"
     }
   ],
   "relationships": {},
   "stats": {
-    "total_interactions": 257
+    "total_interactions": 260
   }
 }

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && cp -r settings dist/ && cp _redirects dist/",
+    "build:win": "vite build && xcopy /E /I /Y settings dist\\settings && copy /Y _redirects dist\\_redirects",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,7 +16,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
-    
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
