@@ -172,6 +172,22 @@ except Exception as e:
 def health():
     return {"status": "ok"}, 200
 
+# ==================== CACHE CLEAR ENDPOINT ====================
+@app.route("/api/v1/cache/clear", methods=["POST"])
+def clear_cache_endpoint():
+    """Clear the response cache - use when responses are broken"""
+    try:
+        from Backend.ResponseCache import clear_cache, get_cache_stats
+        stats_before = get_cache_stats()
+        clear_cache()
+        return {
+            "success": True,
+            "message": "Cache cleared successfully",
+            "cache_before": stats_before
+        }, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+
 # ==================== FILE SERVING ====================
 @app.route('/data/<path:filename>')
 @app.route('/Data/<path:filename>')  # Also handle uppercase for frontend

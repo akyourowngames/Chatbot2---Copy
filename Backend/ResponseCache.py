@@ -42,10 +42,11 @@ class ResponseCache:
     
     def _get_cache_key(self, query: str) -> str:
         """Generate cache key from query"""
-        # Normalize query
+        # Normalize query - keep more text for better matching
         normalized = query.lower().strip()
-        # Remove punctuation
-        normalized = ''.join(c for c in normalized if c.isalnum() or c.isspace())
+        # Keep alphanumeric, spaces, and some punctuation for better differentiation
+        # IMPORTANT: Don't over-normalize or different queries will match!
+        normalized = ' '.join(normalized.split())  # Normalize whitespace only
         # Generate hash
         return hashlib.md5(normalized.encode()).hexdigest()
     
@@ -56,6 +57,10 @@ class ResponseCache:
     
     def get(self, query: str) -> Optional[str]:
         """Get cached response if available"""
+        # SKIP caching for short/casual messages - they need fresh responses
+        if len(query.strip()) < 50:
+            return None  # Don't cache short casual messages
+            
         cache_key = self._get_cache_key(query)
         
         if cache_key in self.cache:
