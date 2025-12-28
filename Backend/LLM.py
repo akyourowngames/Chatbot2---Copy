@@ -207,7 +207,7 @@ if COHERE_API_KEY and len(COHERE_API_KEY) > 10:
     except Exception as e:
         print(f"[LLM] Cohere Init Failed: {e}")
 
-def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.3-70b-versatile", user_id="default", inject_memory=True, apply_social_intelligence=True):
+def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.3-70b-versatile", user_id="default", inject_memory=True, apply_social_intelligence=False):  # DISABLED persona system
     """
     Unified chat completion function with robust error handling.
     🚀 MULTI-KEY ROTATION: Automatically rotates through 6 Groq keys!

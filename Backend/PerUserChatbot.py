@@ -240,7 +240,7 @@ def PerUserChatBot(query: str, user_id: str, session_id: str = None,
             model="llama-3.3-70b-versatile",
             user_id=user_id,
             inject_memory=False,  # We already injected memory above
-            apply_social_intelligence=True  # 🔥 ENABLE SOCIAL INTELLIGENCE
+            apply_social_intelligence=False  # DISABLED - was causing canned responses on Render
         )
         
         # 5. Extract and save memories
