@@ -42,59 +42,48 @@ class EnhancedImageGenerator:
             user_id: Optional user ID for user-specific storage
             
         Returns:
-            List of image file paths
+            List of image URLs (direct Pollinations URLs for cloud compatibility)
         """
         images = []
         
         for i in range(num_images):
             try:
-                # Encode prompt
-                encoded_prompt = requests.utils.quote(prompt)
+                # Encode prompt - replace special chars that break URL
+                safe_prompt = prompt.replace('"', '').replace("'", "").replace('\n', ' ').strip()
+                encoded_prompt = requests.utils.quote(safe_prompt)
                 
                 # Generate unique URL with seed for variety
                 seed = datetime.now().microsecond + i
-                # Append model parameter (flux is the new state-of-the-art free model)
-                url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model={model}"
+                # Direct Pollinations URL - no need to download!
+                # This works on Render without file system issues
+                direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model={model}"
                 
-                # Download image
-                response = requests.get(url, timeout=30)
+                print(f"[ImageGen] Generating image {i+1}/{num_images} with {model}...")
+                print(f"[ImageGen] URL: {direct_url[:100]}...")
                 
-                if response.status_code == 200:
-                    # Save image locally first
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"{prompt[:30].replace(' ', '_')}_{timestamp}_{i+1}.png"
-                    filepath = os.path.join(self.output_dir, filename)
-                    
-                    with open(filepath, 'wb') as f:
-                        f.write(response.content)
-                    
-                    # Always upload to Supabase Storage
-                    try:
-                        from Backend.SupabaseDB import supabase_db
-                        if supabase_db:
-                            print(f"[EnhancedImageGen] Uploading image {i+1} to Supabase...")
-                            # Pass user_id for user-specific storage
-                            cloud_url = supabase_db.upload_image(filepath, folder='generated', user_id=user_id)
-                            if cloud_url:
-                                print(f"✓ Generated and uploaded image {i+1}/{num_images} to Supabase")
-                                # Keep local file as backup, but return cloud URL
-                                images.append(cloud_url)
-                            else:
-                                # Upload failed, use local path
-                                print(f"[EnhancedImageGen] Upload failed, using local path")
-                                images.append(f"/data/Images/{filename}")
-                        else:
-                            # Supabase not available, use local path
-                            print(f"[EnhancedImageGen] Supabase not available, using local path")
-                            images.append(f"/data/Images/{filename}")
-                    except Exception as upload_error:
-                        print(f"[EnhancedImageGen] Upload error: {upload_error}, using local path")
-                        images.append(f"/data/Images/{filename}")
-                else:
-                    print(f"✗ Failed to generate image {i+1}")
+                # Verify the image is accessible (quick HEAD request)
+                try:
+                    response = requests.head(direct_url, timeout=10, allow_redirects=True)
+                    if response.status_code == 200:
+                        print(f"[ImageGen] Image {i+1} ready at Pollinations")
+                        images.append(direct_url)
+                    else:
+                        # Still add URL - Pollinations generates on first GET request
+                        print(f"[ImageGen] Image {i+1} will generate on access (status: {response.status_code})")
+                        images.append(direct_url)
+                except requests.exceptions.Timeout:
+                    # Pollinations may timeout on HEAD but work on GET
+                    print(f"[ImageGen] HEAD timeout - adding URL anyway")
+                    images.append(direct_url)
+                except Exception as head_err:
+                    # Add URL anyway - it should work when loaded
+                    print(f"[ImageGen] HEAD check failed: {head_err}, adding URL")
+                    images.append(direct_url)
                     
             except Exception as e:
-                print(f"Error generating image {i+1}: {e}")
+                print(f"[ImageGen] Error generating image {i+1}: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Log action for retry ONLY AFTER SUCCESS
         if images and action_history:
@@ -104,6 +93,7 @@ class EnhancedImageGenerator:
                 description=f"Generate image ({model}): {prompt[:30]}..."
             )
         
+        print(f"[ImageGen] Generated {len(images)} image URL(s)")
         return images
     
     def generate_with_style(self, prompt: str, style: str = "realistic", 

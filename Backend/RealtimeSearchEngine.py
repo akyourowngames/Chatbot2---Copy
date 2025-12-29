@@ -284,7 +284,7 @@ def RealtimeSearchEngine(prompt, clear_cache=False):
             gemini_keys.insert(0, main_key)
         
         if not gemini_keys:
-            print(f"[RealtimeSearch] ⚠️ No Gemini keys found, skipping to DuckDuckGo")
+            print(f"[RealtimeSearch] WARNING: No Gemini keys found, skipping to DuckDuckGo")
             raise Exception("No Gemini API keys available")
         
         # Try each key until one works
@@ -349,13 +349,12 @@ Provide a comprehensive answer with real-time data."""
                                                 "url": getattr(chunk.web, 'uri', '')
                                             })
                     except Exception as src_err:
-                        print(f"[RealtimeSearch] ⚠️ Source extraction error: {src_err}")
+                        print(f"[RealtimeSearch] WARNING: Source extraction error: {src_err}")
                     
-                    print(f"[RealtimeSearch] ✅ Gemini grounding response with {len(sources)} sources")
+                    print(f"[RealtimeSearch] SUCCESS: Gemini grounding response with {len(sources)} sources")
                     
-                    # Return structured response with sources
                     result = {
-                        "text": f"🔍 **{clean_query}**\n\n{result_text}",
+                        "text": f"**{clean_query}**\n\n{result_text}",
                         "sources": sources,
                         "engine": "gemini"
                     }
@@ -363,22 +362,22 @@ Provide a comprehensive answer with real-time data."""
                     RealtimeSearchEngine._cache[cache_key] = (result, _time.time())
                     return result
                 else:
-                    print(f"[RealtimeSearch] ⚠️ Empty Gemini response with key {idx+1}")
+                    print(f"[RealtimeSearch] WARNING: Empty Gemini response with key {idx+1}")
                     
             except Exception as e:
                 last_error = str(e)
                 if "quota" in str(e).lower() or "429" in str(e):
-                    print(f"[RealtimeSearch] ⚠️ Gemini key {idx+1} quota exceeded, trying next...")
+                    print(f"[RealtimeSearch] WARNING: Gemini key {idx+1} quota exceeded, trying next...")
                     continue
                 else:
-                    print(f"[RealtimeSearch] ⚠️ Gemini key {idx+1} error: {e}")
+                    print(f"[RealtimeSearch] WARNING: Gemini key {idx+1} error: {e}")
                     break
         
         # All keys failed
-        print(f"[RealtimeSearch] ⚠️ All Gemini keys failed: {last_error}, falling back to DuckDuckGo")
+        print(f"[RealtimeSearch] WARNING: All Gemini keys failed: {last_error}, falling back to DuckDuckGo")
                 
     except Exception as e:
-        print(f"[RealtimeSearch] ⚠️ Gemini grounding error: {e}, falling back to DuckDuckGo")
+        print(f"[RealtimeSearch] WARNING: Gemini grounding error: {e}, falling back to DuckDuckGo")
     
     # === FALLBACK: DuckDuckGo Direct Search with Retries ===
     try:
@@ -395,7 +394,7 @@ Provide a comprehensive answer with real-time data."""
                 print(f"[RealtimeSearch] Using old duckduckgo_search package")
             except ImportError:
                 ddgs_module = None
-                print(f"[RealtimeSearch] ⚠️ No DuckDuckGo package installed")
+                print(f"[RealtimeSearch] WARNING: No DuckDuckGo package installed")
         
         if ddgs_module:
             # Try with minimal retries for speed (reduced from 3 to 2)
@@ -410,9 +409,9 @@ Provide a comprehensive answer with real-time data."""
                             results = list(ddgs.text(clean_query, max_results=5, backend="html"))
                         
                         if results:
-                            print(f"[RealtimeSearch] 📋 DuckDuckGo: {len(results)} results (attempt {attempt+1})")
+                            print(f"[RealtimeSearch] DuckDuckGo: {len(results)} results (attempt {attempt+1})")
                             
-                            response_text = f"🔍 **Web Search Results for: {clean_query}**\n\n"
+                            response_text = f"**Web Search Results for: {clean_query}**\n\n"
                             
                             for i, r in enumerate(results, 1):
                                 title = r.get('title', 'No title')
@@ -437,16 +436,16 @@ Provide a comprehensive answer with real-time data."""
                             RealtimeSearchEngine._cache[cache_key] = (result, _time.time())
                             return result
                         else:
-                            print(f"[RealtimeSearch] ⚠️ No results on attempt {attempt+1}, retrying...")
+                            print(f"[RealtimeSearch] WARNING: No results on attempt {attempt+1}, retrying...")
                             import time
                             time.sleep(0.3)  # Quick retry
                 except Exception as ddg_err:
-                    print(f"[RealtimeSearch] ⚠️ DDG attempt {attempt+1} failed: {ddg_err}")
+                    print(f"[RealtimeSearch] WARNING: DDG attempt {attempt+1} failed: {ddg_err}")
                     import time
                     time.sleep(0.3)  # Quick retry
         
         # === FALLBACK 2: Use requests to scrape DuckDuckGo directly ===
-        print(f"[RealtimeSearch] 🔄 Trying direct web scrape fallback...")
+        print(f"[RealtimeSearch] Trying direct web scrape fallback...")
         try:
             import requests
             from bs4 import BeautifulSoup
@@ -464,7 +463,7 @@ Provide a comprehensive answer with real-time data."""
                 results = soup.find_all('div', class_='result')[:5]
                 
                 if results:
-                    response_text = f"🔍 **Web Search Results for: {clean_query}**\n\n"
+                    response_text = f"**Web Search Results for: {clean_query}**\n\n"
                     
                     for i, result in enumerate(results, 1):
                         title_elem = result.find('a', class_='result__a')
@@ -479,7 +478,7 @@ Provide a comprehensive answer with real-time data."""
                         
                         sources.append({"title": title, "url": href})
                     
-                    print(f"[RealtimeSearch] ✅ Direct scrape: {len(results)} results")
+                    print(f"[RealtimeSearch] SUCCESS: Direct scrape: {len(results)} results")
                     result = {
                         "text": response_text,
                         "sources": sources,
@@ -489,13 +488,13 @@ Provide a comprehensive answer with real-time data."""
                     RealtimeSearchEngine._cache[cache_key] = (result, _time.time())
                     return result
         except Exception as scrape_err:
-            print(f"[RealtimeSearch] ⚠️ Direct scrape failed: {scrape_err}")
+            print(f"[RealtimeSearch] WARNING: Direct scrape failed: {scrape_err}")
         
         # If all else fails
         return {"text": f"I couldn't find real-time data for '{clean_query}'. All search methods are temporarily unavailable. Please try again in a moment.", "sources": [], "engine": "none"}
                 
     except Exception as e:
-        print(f"[RealtimeSearch] ❌ All search methods failed: {e}")
+        print(f"[RealtimeSearch] ERROR: All search methods failed: {e}")
         return {"text": f"Search failed: {str(e)}. Please try again.", "sources": [], "engine": "error"}
 
 app = Flask(__name__)
