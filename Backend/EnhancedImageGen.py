@@ -27,24 +27,34 @@ class EnhancedImageGenerator:
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
     
     def generate_pollinations(self, prompt: str, num_images: int = 1, 
-                             width: int = 1024, height: int = 1024, model: str = "flux",
+                             width: int = 1024, height: int = 1024, model: str = "turbo",
                              user_id: str = None) -> List[str]:
         """
         Generate images using Pollinations AI (Free, no API key needed)
-        Now defaults to the powerful 'flux' model.
+        Defaults to 'turbo' model for reliability.
+        
+        Available models (in order of reliability):
+        - turbo: Fast and reliable, good quality
+        - flux: High quality but often overloaded
+        - flux-realism: Realistic images
+        - flux-anime: Anime style
+        - flux-3d: 3D renders
         
         Args:
             prompt: Image description
             num_images: Number of images to generate
             width: Image width
             height: Image height
-            model: Model to use (default: flux)
+            model: Model to use (default: turbo - most reliable)
             user_id: Optional user ID for user-specific storage
             
         Returns:
             List of image URLs (direct Pollinations URLs for cloud compatibility)
         """
         images = []
+        # Fallback models if primary fails
+        fallback_models = ["turbo", "flux-realism", "flux-anime"]
+        models_to_try = [model] + [m for m in fallback_models if m != model]
         
         for i in range(num_images):
             try:
@@ -54,31 +64,37 @@ class EnhancedImageGenerator:
                 
                 # Generate unique URL with seed for variety
                 seed = datetime.now().microsecond + i
-                # Direct Pollinations URL - no need to download!
-                # This works on Render without file system issues
-                direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model={model}"
                 
-                print(f"[ImageGen] Generating image {i+1}/{num_images} with {model}...")
+                # Try primary model first, then fallbacks
+                current_model = model
+                direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model={current_model}"
+                
+                print(f"[ImageGen] Generating image {i+1}/{num_images} with {current_model}...")
                 print(f"[ImageGen] URL: {direct_url[:100]}...")
                 
-                # Verify the image is accessible (quick HEAD request)
+                # Quick check - but don't fail based on HEAD request
+                # Pollinations generates on-demand on GET, HEAD may fail
                 try:
-                    response = requests.head(direct_url, timeout=10, allow_redirects=True)
-                    if response.status_code == 200:
-                        print(f"[ImageGen] Image {i+1} ready at Pollinations")
-                        images.append(direct_url)
+                    response = requests.head(direct_url, timeout=5, allow_redirects=True)
+                    content_type = response.headers.get('content-type', '')
+                    
+                    # Check if we got an error response (JSON instead of image)
+                    if 'application/json' in content_type or response.status_code >= 500:
+                        print(f"[ImageGen] Model {current_model} may be down (status: {response.status_code})")
+                        # Try turbo as reliable fallback
+                        if current_model != "turbo":
+                            current_model = "turbo"
+                            direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model={current_model}"
+                            print(f"[ImageGen] Falling back to {current_model} model")
                     else:
-                        # Still add URL - Pollinations generates on first GET request
-                        print(f"[ImageGen] Image {i+1} will generate on access (status: {response.status_code})")
-                        images.append(direct_url)
+                        print(f"[ImageGen] Image {i+1} ready at Pollinations")
                 except requests.exceptions.Timeout:
-                    # Pollinations may timeout on HEAD but work on GET
-                    print(f"[ImageGen] HEAD timeout - adding URL anyway")
-                    images.append(direct_url)
+                    # Timeout is OK - Pollinations generates on GET
+                    print(f"[ImageGen] HEAD timeout - URL should work on GET")
                 except Exception as head_err:
-                    # Add URL anyway - it should work when loaded
-                    print(f"[ImageGen] HEAD check failed: {head_err}, adding URL")
-                    images.append(direct_url)
+                    print(f"[ImageGen] HEAD check failed: {head_err}, proceeding anyway")
+                
+                images.append(direct_url)
                     
             except Exception as e:
                 print(f"[ImageGen] Error generating image {i+1}: {e}")
