@@ -31,30 +31,20 @@ class EnhancedImageGenerator:
                              user_id: str = None) -> List[str]:
         """
         Generate images using Pollinations AI (Free, no API key needed)
-        Defaults to 'turbo' model for reliability.
-        
-        Available models (in order of reliability):
-        - turbo: Fast and reliable, good quality
-        - flux: High quality but often overloaded
-        - flux-realism: Realistic images
-        - flux-anime: Anime style
-        - flux-3d: 3D renders
+        Uses 'turbo' model - fast and reliable.
         
         Args:
             prompt: Image description
             num_images: Number of images to generate
             width: Image width
             height: Image height
-            model: Model to use (default: turbo - most reliable)
+            model: Model to use (default: turbo)
             user_id: Optional user ID for user-specific storage
             
         Returns:
             List of image URLs (direct Pollinations URLs for cloud compatibility)
         """
         images = []
-        # Fallback models if primary fails
-        fallback_models = ["turbo", "flux-realism", "flux-anime"]
-        models_to_try = [model] + [m for m in fallback_models if m != model]
         
         for i in range(num_images):
             try:
@@ -65,34 +55,11 @@ class EnhancedImageGenerator:
                 # Generate unique URL with seed for variety
                 seed = datetime.now().microsecond + i
                 
-                # Try primary model first, then fallbacks
-                current_model = model
-                direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model={current_model}"
+                # Always use turbo model - most reliable
+                direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model=turbo"
                 
-                print(f"[ImageGen] Generating image {i+1}/{num_images} with {current_model}...")
+                print(f"[ImageGen] Generating image {i+1}/{num_images} with turbo model...")
                 print(f"[ImageGen] URL: {direct_url[:100]}...")
-                
-                # Quick check - but don't fail based on HEAD request
-                # Pollinations generates on-demand on GET, HEAD may fail
-                try:
-                    response = requests.head(direct_url, timeout=5, allow_redirects=True)
-                    content_type = response.headers.get('content-type', '')
-                    
-                    # Check if we got an error response (JSON instead of image)
-                    if 'application/json' in content_type or response.status_code >= 500:
-                        print(f"[ImageGen] Model {current_model} may be down (status: {response.status_code})")
-                        # Try turbo as reliable fallback
-                        if current_model != "turbo":
-                            current_model = "turbo"
-                            direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true&model={current_model}"
-                            print(f"[ImageGen] Falling back to {current_model} model")
-                    else:
-                        print(f"[ImageGen] Image {i+1} ready at Pollinations")
-                except requests.exceptions.Timeout:
-                    # Timeout is OK - Pollinations generates on GET
-                    print(f"[ImageGen] HEAD timeout - URL should work on GET")
-                except Exception as head_err:
-                    print(f"[ImageGen] HEAD check failed: {head_err}, proceeding anyway")
                 
                 images.append(direct_url)
                     
@@ -105,8 +72,8 @@ class EnhancedImageGenerator:
         if images and action_history:
             action_history.log_action(
                 action_type="image_gen",
-                params={"prompt": prompt, "num_images": num_images, "width": width, "height": height, "model": model},
-                description=f"Generate image ({model}): {prompt[:30]}..."
+                params={"prompt": prompt, "num_images": num_images, "width": width, "height": height, "model": "turbo"},
+                description=f"Generate image (turbo): {prompt[:30]}..."
             )
         
         print(f"[ImageGen] Generated {len(images)} image URL(s)")
