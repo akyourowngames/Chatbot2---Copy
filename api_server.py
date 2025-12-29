@@ -6,7 +6,7 @@ Serving all AI capabilities via REST API
 PRODUCTION-READY with secure CORS, rate limiting, and security headers.
 """
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_cors import CORS
 import threading
 import json
@@ -60,7 +60,7 @@ CORS(app, resources={
     r"/api/*": {
         "origins": "*",  # Allow all for hackathon demo
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-API-Key", "X-Requested-With"],
+        "allow_headers": ["Content-Type", "Authorization", "X-API-Key", "X-Requested-With", "X-Drive-Token", "X-User-Id"],
         "supports_credentials": False,  # Must be False when origins is "*"
         "max_age": 600,
     },
@@ -187,6 +187,237 @@ def clear_cache_endpoint():
         }, 200
     except Exception as e:
         return {"error": str(e)}, 500
+
+# ==================== GOOGLE DRIVE INTEGRATION ====================
+# NOTE: Drive feature temporarily disabled for hackathon polish
+# Will be re-enabled after polishing is complete
+# Uncomment the code below to restore Drive functionality
+
+# # Session storage for OAuth state (in production, use Redis/DB)
+# _oauth_states = {}
+
+# @app.route("/api/v1/drive/auth", methods=["GET"])
+# def drive_auth():
+#     """Get Google Drive OAuth authorization URL"""
+#     try:
+#         from Backend.GoogleDriveAPI import get_drive_api
+#         api = get_drive_api()
+#         
+#         if not api.is_available():
+#             return {"error": "Google Drive not configured. Set GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET"}, 503
+#         
+#         auth_url, state = api.get_auth_url()
+#         _oauth_states[state] = {"created": datetime.now().isoformat()}
+#         
+#         return {
+#             "auth_url": auth_url,
+#             "state": state
+#         }, 200
+#     except Exception as e:
+#         return {"error": str(e)}, 500
+
+# @app.route("/api/v1/drive/callback", methods=["GET"])
+# def drive_callback():
+#     """OAuth callback - exchange code for tokens and redirect to frontend"""
+#     try:
+#         from Backend.GoogleDriveAPI import get_drive_api
+#         import json
+#         import urllib.parse
+#         
+#         code = request.args.get('code')
+#         state = request.args.get('state')
+#         error = request.args.get('error')
+#         
+#         # Frontend URL - redirect there with tokens
+#         frontend_url = "http://localhost:3000"
+#         
+#         if error:
+#             return redirect(f"{frontend_url}/drive-callback.html?error={urllib.parse.quote(error)}")
+#         
+#         if not code or not state:
+#             return redirect(f"{frontend_url}/drive-callback.html?error=missing_params")
+#         
+#         # Verify state
+#         if state not in _oauth_states:
+#             return redirect(f"{frontend_url}/drive-callback.html?error=invalid_state")
+#         
+#         del _oauth_states[state]  # Consume state
+#         
+#         api = get_drive_api()
+#         tokens = api.exchange_code(code, state)
+#         
+#         # Encode tokens as base64 to pass in URL
+#         import base64
+#         tokens_json = json.dumps(tokens)
+#         tokens_b64 = base64.urlsafe_b64encode(tokens_json.encode()).decode()
+#         
+#         # Redirect to frontend callback page with tokens in URL
+#         return redirect(f"{frontend_url}/drive-callback.html?success=true&tokens={tokens_b64}")
+#         
+#     except Exception as e:
+#         import urllib.parse
+#         frontend_url = "http://localhost:3000"
+#         return redirect(f"{frontend_url}/drive-callback.html?error={urllib.parse.quote(str(e))}")
+
+
+# @app.route("/api/v1/drive/files", methods=["GET"])
+# def drive_list_files():
+#     """List user's Google Drive files"""
+#     try:
+#         from Backend.GoogleDriveAPI import get_drive_api
+#         
+#         access_token = request.headers.get('X-Drive-Token') or request.args.get('access_token')
+#         if not access_token:
+#             return {"error": "Access token required (X-Drive-Token header or access_token param)"}, 401
+#         
+#         page_token = request.args.get('page_token')
+#         query = request.args.get('q')
+#         
+#         api = get_drive_api()
+#         result = api.list_files(access_token, page_token=page_token, query=query)
+#         
+#         return {
+#             "files": result['files'],
+#             "next_page_token": result.get('next_page_token')
+#         }, 200
+#     except Exception as e:
+#         return {"error": str(e)}, 500
+
+# @app.route("/api/v1/drive/import", methods=["POST"])
+# def drive_import_file():
+#     """Import a file from Google Drive and extract its content"""
+#     try:
+#         from Backend.GoogleDriveAPI import get_drive_api
+#         
+#         data = request.get_json()
+#         file_id = data.get('drive_file_id')
+#         access_token = data.get('access_token') or request.headers.get('X-Drive-Token')
+#         
+#         if not file_id:
+#             return {"error": "drive_file_id required"}, 400
+#         if not access_token:
+#             return {"error": "access_token required"}, 401
+#         
+#         # Download from Drive
+#         drive_api = get_drive_api()
+#         file_bytes, mime_type, filename = drive_api.download_file(file_id, access_token)
+#         
+#         # Determine file type
+#         ext_map = {
+#             'application/pdf': 'pdf',
+#             'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+#             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+#             'text/plain': 'txt',
+#             'text/csv': 'csv',
+#             'application/json': 'json'
+#         }
+#         file_type = ext_map.get(mime_type, 'unknown')
+#         
+#         # Extract text content
+#         extracted_text = ""
+#         try:
+#             from Backend.TextExtractor import extract_text_from_file
+#             extracted_text = extract_text_from_file(file_bytes, file_type)
+#         except Exception as e:
+#             print(f"[DRIVE] Text extraction warning: {e}")
+#             extracted_text = f"[Unable to extract text from {file_type} file]"
+#         
+#         # For now, just return the extracted content
+#         # In future, could save to SharedFileManager when Firebase is available
+#         return {
+#             "success": True,
+#             "filename": filename,
+#             "file_type": file_type,
+#             "size": len(file_bytes),
+#             "mime_type": mime_type,
+#             "extracted_text": extracted_text[:10000] if extracted_text else "",  # Limit to 10k chars
+#             "text_length": len(extracted_text) if extracted_text else 0,
+#             "message": f"Successfully imported '{filename}' from Google Drive"
+#         }, 200
+#     except Exception as e:
+#         import traceback
+#         traceback.print_exc()
+#         return {"error": str(e)}, 500
+
+# @app.route("/api/v1/drive/refresh", methods=["POST"])
+# def drive_refresh_token():
+#     """Refresh an expired access token"""
+#     try:
+#         from Backend.GoogleDriveAPI import get_drive_api
+#         
+#         data = request.get_json()
+#         refresh_token = data.get('refresh_token')
+#         
+#         if not refresh_token:
+#             return {"error": "refresh_token required"}, 400
+#         
+#         api = get_drive_api()
+#         new_tokens = api.refresh_token(refresh_token)
+#         
+#         return {
+#             "success": True,
+#             "access_token": new_tokens['access_token'],
+#             "expiry": new_tokens.get('expiry')
+#         }, 200
+#     except Exception as e:
+#         return {"error": str(e)}, 500
+
+# @app.route("/api/v1/vision/analyze", methods=["POST"])
+# def vision_analyze_drive_image():
+#     """Analyze a Drive image using Vision API"""
+#     try:
+#         data = request.get_json()
+#         drive_file_id = data.get('drive_file_id')
+#         access_token = data.get('access_token')
+#         prompt = data.get('prompt', 'Describe this image in detail. Extract any visible text.')
+#         
+#         if not drive_file_id or not access_token:
+#             return {"error": "drive_file_id and access_token required"}, 400
+#         
+#         # Download image from Drive
+#         from Backend.GoogleDriveAPI import get_drive_api
+#         drive_api = get_drive_api()
+#         file_bytes, mime_type, filename = drive_api.download_file(drive_file_id, access_token)
+#         
+#         if not mime_type.startswith('image/'):
+#             return {"error": f"File is not an image: {mime_type}"}, 400
+#         
+#         # Use Gemini Vision for analysis
+#         import google.generativeai as genai
+#         import base64
+#         
+#         # Get Gemini API key
+#         gemini_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+#         if not gemini_key:
+#             return {"error": "Gemini API key not configured"}, 503
+#         
+#         genai.configure(api_key=gemini_key)
+#         model = genai.GenerativeModel('gemini-1.5-flash')
+#         
+#         # Create image part
+#         image_data = base64.standard_b64encode(file_bytes).decode('utf-8')
+#         
+#         response = model.generate_content([
+#             {
+#                 "mime_type": mime_type,
+#                 "data": image_data
+#             },
+#             prompt
+#         ])
+#         
+#         analysis = response.text if response.text else "No analysis generated"
+#         
+#         return {
+#             "success": True,
+#             "filename": filename,
+#             "analysis": analysis,
+#             "mime_type": mime_type
+#         }, 200
+#         
+#     except Exception as e:
+#         import traceback
+#         traceback.print_exc()
+#         return {"error": str(e)}, 500
 
 # ==================== FILE SERVING ====================
 @app.route('/data/<path:filename>')
@@ -1756,7 +1987,65 @@ def delete_all_conversations():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # --- CHAT & CORE ---
+
+# ==================== SMART REALTIME DETECTION ====================
+def needs_realtime_search(query: str) -> bool:
+    """
+    Detect if a query needs real-time data instead of LLM knowledge.
+    Triggers RealtimeSearchEngine for time-sensitive queries like:
+    - "What is the price of gold today?"
+    - "Current bitcoin value"
+    - "Latest news about India"
+    """
+    query_lower = query.lower()
+    
+    # Time indicators that suggest current/live data needed
+    time_indicators = [
+        "today", "now", "current", "currently", "latest", "live", "right now", 
+        "at the moment", "this week", "this month", "2024", "2025",
+        "yesterday", "tomorrow", "recent", "recently", "happening"
+    ]
+    
+    # Topics that typically need real-time data when combined with time indicators
+    realtime_topics = [
+        # Financial
+        "price", "rate", "value", "cost", "worth", "trading",
+        "gold", "silver", "platinum", "bitcoin", "btc", "ethereum", "eth", 
+        "crypto", "cryptocurrency", "stock", "share", "nifty", "sensex",
+        "dollar", "rupee", "euro", "forex", "exchange rate",
+        # Weather
+        "weather", "temperature", "forecast", "rain", "humidity",
+        # News & Events
+        "news", "update", "headline", "breaking",
+        # Sports
+        "score", "match", "game", "ipl", "cricket", "football",
+        "who won", "who is winning", "results"
+    ]
+    
+    has_time_indicator = any(t in query_lower for t in time_indicators)
+    has_realtime_topic = any(t in query_lower for t in realtime_topics)
+    
+    # Explicit phrases that ALWAYS need realtime search
+    explicit_realtime_phrases = [
+        "what is the price", "current price", "today's price", "price of",
+        "what's happening", "latest news", "live score", "current value",
+        "how much is", "what is the rate", "exchange rate",
+        "weather in", "temperature in", "forecast for",
+        "who is the current", "who is the prime minister", "who is the president"
+    ]
+    
+    # Check explicit phrases first (highest priority)
+    if any(phrase in query_lower for phrase in explicit_realtime_phrases):
+        return True
+    
+    # Check combination of time indicator + realtime topic
+    if has_time_indicator and has_realtime_topic:
+        return True
+    
+    return False
+
 @app.route('/api/v1/chat', methods=['POST'])
 @require_api_key
 @rate_limit("chat")
@@ -2050,6 +2339,40 @@ def chat():
     
     query_lower = query.lower().strip()
     chat_metadata = {} # Initialize metadata container
+    
+    # === SMART REALTIME DETECTION (NEW - Beast Mode) ===
+    # Detect time-sensitive queries and route to RealtimeSearchEngine
+    if needs_realtime_search(original_query):
+        print(f"[SMART] 🔍 Detected time-sensitive query, using RealtimeSearchEngine: '{original_query[:50]}...'")
+        try:
+            from Backend.RealtimeSearchEngine import RealtimeSearchEngine
+            realtime_result = RealtimeSearchEngine(original_query)
+            
+            # Handle dict or string response from RealtimeSearchEngine
+            if isinstance(realtime_result, dict):
+                response_text = realtime_result.get('text', '')
+                sources = realtime_result.get('sources', [])
+                engine = realtime_result.get('engine', 'unknown')
+            else:
+                response_text = str(realtime_result)
+                sources = []
+                engine = 'unknown'
+            
+            # Return realtime response with sources for UI cards
+            print(f"[SMART] ✅ Realtime search complete via {engine}, {len(sources)} sources")
+            return jsonify({
+                "response": response_text,
+                "sources": sources,
+                "metadata": {
+                    "type": "realtime_search",
+                    "engine": engine,
+                    "memory_accessed": False,
+                    "memory_saved": False
+                }
+            })
+        except Exception as rt_error:
+            print(f"[SMART] ⚠️ Realtime search failed: {rt_error}, falling back to LLM")
+            # Fall through to normal LLM flow
     
     # === SPOTIFY MUSIC PLAYER (Cloud Ready - No YouTube Fallback) ===
     # Music requests are now routed through SmartTrigger to use Spotify only

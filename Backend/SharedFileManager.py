@@ -42,6 +42,7 @@ class FileMetadata:
     summary: str
     keywords: List[str]
     page_count: Optional[int] = None
+    drive_id: Optional[str] = None  # Google Drive file ID if imported from Drive
 
 
 @dataclass
@@ -326,6 +327,10 @@ class SharedFileManager:
 # Global instance
 shared_file_manager = SharedFileManager()
 
+def get_shared_file_manager() -> SharedFileManager:
+    """Get the global SharedFileManager instance."""
+    return shared_file_manager
+
 
 if __name__ == "__main__":
     print("SharedFileManager initialized ✅")
@@ -334,3 +339,4 @@ if __name__ == "__main__":
     print("  - Permission management")
     print("  - Firebase Storage integration")
     print("  - Activity tracking")
+    print("  - Google Drive import support")

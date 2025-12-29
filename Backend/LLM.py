@@ -216,19 +216,30 @@ def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.
     if not GROQ_CLIENTS:
         return "System Error: No Groq API Keys configured. Please check .env file."
 
+    # 🚀 SPEED: Get user query for caching and model selection
+    user_query = ""
+    for msg in reversed(messages):
+        if isinstance(msg, dict) and msg.get('role') == 'user':
+            user_query = msg.get('content', '')
+            break
+    
+    # NOTE: LLM-level caching DISABLED - was causing wrong responses
+    # ResponseCache.py handles caching with proper hash-based keys
+    
+    # 🚀 SPEED: Use faster model for short/simple queries (under 50 chars)
+    if len(user_query) < 50 and model == "llama-3.3-70b-versatile":
+        # Simple queries can use the faster 8B model
+        simple_keywords = ["hi", "hello", "thanks", "bye", "ok", "yes", "no", "what time", "date"]
+        if any(kw in user_query.lower() for kw in simple_keywords):
+            model = "llama-3.1-8b-instant"
+            print(f"[LLM] ⚡ Using faster 8B model for simple query")
+
     # ==================== MEMORY INJECTION ====================
     memory_context = ""
-    if inject_memory:
+    # 🚀 SPEED: Skip memory for short queries (greetings, simple responses)
+    if inject_memory and len(user_query) > 20:
         try:
             from Backend.ContextualMemory import contextual_memory
-            
-            # Get the user's query (last user message)
-            user_query = ""
-            for msg in reversed(messages):
-                # ✅ FIX: Ensure msg is a dict before calling .get()
-                if isinstance(msg, dict) and msg.get('role') == 'user':
-                    user_query = msg.get('content', '')
-                    break
             
             if user_query:
                 # Get relevant memories for context
@@ -340,6 +351,7 @@ Focus on answering the user's question directly without unnecessary preamble.
                 except Exception as si_error:
                     print(f"[LLM] Social Intelligence processing failed: {si_error}")
                     # Continue with original response if social intelligence fails
+            
             
             return response_text
             

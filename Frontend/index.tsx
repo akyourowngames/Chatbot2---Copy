@@ -532,6 +532,666 @@ function showMemoryToast(msg: string, type: 'save' | 'info') {
     }, 3000);
 }
 
+// ========== 📁 GOOGLE DRIVE PICKER - FILE SHARING ==========
+// State for Drive integration
+let driveTokens: { access_token?: string; refresh_token?: string; expiry?: string } = {};
+let driveFiles: any[] = [];
+let selectedDriveFile: any = null;
+
+// ========== 📄 IMPORTED FILES CONTEXT SYSTEM ==========
+interface ImportedFile {
+    id: string;
+    filename: string;
+    fileType: string;
+    mimeType: string;
+    size: number;
+    extractedText: string;
+    isImage: boolean;
+    visionAnalysis?: string;
+    importedAt: Date;
+    driveFileId?: string;
+}
+
+// Store imported files for chat context
+let importedFiles: ImportedFile[] = [];
+let activeFileContext: ImportedFile | null = null;
+
+// Load imported files from localStorage
+function loadImportedFiles() {
+    try {
+        const saved = localStorage.getItem('kai_imported_files');
+        if (saved) {
+            importedFiles = JSON.parse(saved);
+            LOG.info('FILES', `Loaded ${importedFiles.length} imported files`);
+        }
+    } catch (e) {
+        LOG.warn('FILES', 'Failed to load imported files', e);
+    }
+}
+
+// Save imported files to localStorage
+function saveImportedFiles() {
+    try {
+        localStorage.setItem('kai_imported_files', JSON.stringify(importedFiles));
+    } catch (e) {
+        LOG.warn('FILES', 'Failed to save imported files', e);
+    }
+}
+
+// Add file to imported files
+function addImportedFile(file: ImportedFile) {
+    // Remove duplicate if exists
+    importedFiles = importedFiles.filter(f => f.id !== file.id);
+    importedFiles.unshift(file); // Add to beginning
+
+    // Keep max 20 files
+    if (importedFiles.length > 20) {
+        importedFiles = importedFiles.slice(0, 20);
+    }
+
+    saveImportedFiles();
+    updateFilesPanel();
+    LOG.info('FILES', `Added file: ${file.filename}`);
+}
+
+// Get file context for chat
+function getActiveFileContext(): string {
+    if (!activeFileContext) return '';
+
+    const prefix = `[📄 Context from "${activeFileContext.filename}" (${activeFileContext.fileType})]:\n`;
+
+    if (activeFileContext.isImage && activeFileContext.visionAnalysis) {
+        return prefix + `[Image Analysis]: ${activeFileContext.visionAnalysis}\n`;
+    }
+
+    const text = activeFileContext.extractedText;
+    if (text.length > 5000) {
+        return prefix + text.substring(0, 5000) + '\n...[truncated]';
+    }
+    return prefix + text;
+}
+
+// Set active file for context injection
+function setActiveFileContext(fileId: string | null) {
+    if (!fileId) {
+        activeFileContext = null;
+        updateFilesPanel();
+        return;
+    }
+
+    activeFileContext = importedFiles.find(f => f.id === fileId) || null;
+    if (activeFileContext) {
+        showMemoryToast(`📄 "${activeFileContext.filename}" is now active context`, 'info');
+    }
+    updateFilesPanel();
+}
+(window as any).setActiveFileContext = setActiveFileContext;
+
+// Update files panel in sidebar
+function updateFilesPanel() {
+    const panel = document.getElementById('files-panel');
+    if (!panel) return;
+
+    if (importedFiles.length === 0) {
+        panel.innerHTML = '<div class="text-xs text-white/30 text-center py-2">No files imported</div>';
+        return;
+    }
+
+    panel.innerHTML = importedFiles.slice(0, 5).map(file => {
+        const isActive = activeFileContext?.id === file.id;
+        const icon = file.isImage ? '🖼️' : '📄';
+        return `
+            <div class="flex items-center gap-2 p-2 rounded cursor-pointer transition-all ${isActive ? 'bg-indigo-500/20 border border-indigo-500/40' : 'hover:bg-white/5'}"
+                 onclick="setActiveFileContext('${isActive ? '' : file.id}')">
+                <span class="text-sm">${icon}</span>
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs text-white/80 truncate">${file.filename}</div>
+                    <div class="text-[10px] text-white/40">${isActive ? '✓ Active' : file.fileType.toUpperCase()}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Initialize files on load
+loadImportedFiles();
+
+// Inject Drive Button in Sidebar (under MANAGEMENT section)
+function injectDriveButton() {
+    // Try multiple injection points
+    const sidebar = document.getElementById('sidebar');
+
+    if (!sidebar || document.getElementById('drive-import-btn')) return;
+
+    // Look for a suitable injection point - try to find the management section or telemetry section
+    const managementSection = sidebar.querySelector('.text-\\[10px\\]');
+    const telemetrySection = sidebar.querySelector('[class*="TELEMETRY"]');
+    const sessionSection = sidebar.querySelector('[class*="SESSION"]');
+
+    // Find the best spot - after MANAGEMENT buttons or before TELEMETRY
+    let targetElement = null;
+    const allDivs = sidebar.querySelectorAll('div');
+    for (let i = 0; i < allDivs.length; i++) {
+        const text = allDivs[i].textContent?.trim();
+        if (text === 'MANAGEMENT' || text?.includes('MANAGEMENT') || text === 'EXPORT' || text?.includes('PURGE')) {
+            // Look for parent container
+            targetElement = allDivs[i].closest('div')?.parentElement;
+            break;
+        }
+    }
+
+    // If no specific target, inject after first child of sidebar
+    if (!targetElement) {
+        targetElement = sidebar.children[0] || sidebar;
+    }
+
+    const driveHTML = `
+        <div id="drive-import-btn" class="mx-4 mt-4 mb-2 p-3 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 rounded-lg border border-blue-500/20 flex items-center justify-between group cursor-pointer hover:from-blue-500/20 hover:to-indigo-500/20 hover:border-blue-500/40 transition-all"
+             onclick="openDrivePicker()">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/30 transition-all">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7.71 3.5L1.15 15l3.43 5.95h13.42L21.15 15H7.71zM6.4 17.3l2.63-4.56H4.97l-1.43 2.48 2.86.08zm.14-5.66l4.57-7.91-2.86-4.98L3.29 7.7l3.25 3.94zm8.5-7.91l-4.56 7.9h9.7l-2.27-4.56-2.87-3.34z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold text-blue-300 uppercase tracking-wider group-hover:text-blue-200">📁 Import from Drive</div>
+                    <div class="text-[9px] text-white/40 group-hover:text-white/60">Google Drive Integration</div>
+                </div>
+            </div>
+            <div class="text-xs text-blue-400/50 group-hover:text-blue-400 transition-colors">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </div>
+        </div>
+        <!-- Imported Files Panel -->
+        <div class="mx-4 mb-2">
+            <div class="text-[10px] font-mono text-white/30 uppercase tracking-wider mb-1">📄 Chat Context Files</div>
+            <div id="files-panel" class="bg-black/20 rounded-lg border border-white/5 max-h-32 overflow-y-auto">
+                <div class="text-xs text-white/30 text-center py-2">No files imported</div>
+            </div>
+        </div>
+    `;
+
+    // Insert at the beginning of sidebar after the header
+    if (targetElement && targetElement !== sidebar) {
+        targetElement.insertAdjacentHTML('afterend', driveHTML);
+    } else {
+        sidebar.insertAdjacentHTML('afterbegin', driveHTML);
+    }
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Update files panel with any existing files
+    setTimeout(() => updateFilesPanel(), 100);
+
+    LOG.info('DRIVE', 'Drive import button and files panel injected');
+}
+
+// Inject Drive Picker Modal
+function injectDriveModal() {
+    if (document.getElementById('drive-picker-modal')) return;
+
+    const modalHTML = `
+        <div id="drive-picker-modal" class="fixed inset-0 z-[300] opacity-0 pointer-events-none transition-opacity duration-300">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-black/90 backdrop-blur-md" onclick="closeDrivePicker()"></div>
+            
+            <!-- Modal Content -->
+            <div class="relative z-10 flex items-center justify-center min-h-screen p-4">
+                <div class="w-full max-w-3xl bg-[#0a0a0c] border border-indigo-500/20 rounded-xl overflow-hidden shadow-2xl shadow-indigo-500/10 transform translate-y-4 transition-transform">
+                    
+                    <!-- Header -->
+                    <div class="flex items-center justify-between p-4 border-b border-white/10 bg-gradient-to-r from-blue-500/10 to-indigo-500/10">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
+                                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M7.71 3.5L1.15 15l3.43 5.95h13.42L21.15 15H7.71z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-bold text-white tracking-wide">Google Drive</h2>
+                                <p id="drive-status" class="text-xs text-white/50">Connect to import files</p>
+                            </div>
+                        </div>
+                        <button onclick="closeDrivePicker()" class="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                            <i data-lucide="x" class="w-5 h-5 text-white/50"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Content -->
+                    <div id="drive-content" class="p-6 min-h-[400px] max-h-[60vh] overflow-y-auto">
+                        <!-- Auth Required State -->
+                        <div id="drive-auth-required" class="flex flex-col items-center justify-center h-[300px] text-center">
+                            <div class="w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 mb-6">
+                                <svg class="w-10 h-10" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M7.71 3.5L1.15 15l3.43 5.95h13.42L21.15 15H7.71z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-bold text-white mb-2">Connect Google Drive</h3>
+                            <p class="text-sm text-white/50 mb-6 max-w-sm">Import documents, spreadsheets, and files from your Google Drive to use with KAI.</p>
+                            <button onclick="initDriveAuth()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2 transition-all">
+                                <svg class="w-5 h-5" viewBox="0 0 533.5 544.3" fill="currentColor">
+                                    <path d="M533.5 278.4c0-18.5-1.5-37.1-4.7-55.3H272.1v104.8h147c-6.1 33.8-25.7 63.7-54.4 82.7v68h87.7c51.5-47.4 81.1-117.4 81.1-200.2z" fill="#4285f4"/>
+                                    <path d="M272.1 544.3c73.4 0 135.3-24.1 180.4-65.7l-87.7-68c-24.4 16.6-55.9 26-92.6 26-71 0-131.2-47.9-152.8-112.3H28.9v70.1c46.2 91.9 140.3 149.9 243.2 149.9z" fill="#34a853"/>
+                                    <path d="M119.3 324.3c-11.4-33.8-11.4-70.4 0-104.2V150H28.9c-38.6 76.9-38.6 167.5 0 244.4l90.4-70.1z" fill="#fbbc04"/>
+                                    <path d="M272.1 107.7c38.8-.6 76.3 14 104.4 40.8l77.7-77.7C405 24.6 340 0 272.1.1c-102.9 0-197 58-243.2 150l90.4 70.1c21.5-64.5 81.8-112.5 152.8-112.5z" fill="#ea4335"/>
+                                </svg>
+                                Sign in with Google
+                            </button>
+                        </div>
+                        
+                        <!-- Files List (hidden by default) -->
+                        <div id="drive-files-list" class="hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="text-sm text-white/70">Select a file to import</div>
+                                <button onclick="refreshDriveFiles()" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> Refresh
+                                </button>
+                            </div>
+                            <div id="drive-files-grid" class="grid grid-cols-1 gap-2">
+                                <!-- Files loaded dynamically -->
+                            </div>
+                        </div>
+                        
+                        <!-- Loading State -->
+                        <div id="drive-loading" class="hidden flex flex-col items-center justify-center h-[300px]">
+                            <div class="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                            <p class="text-sm text-white/50">Loading your files...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div id="drive-footer" class="hidden p-4 border-t border-white/10 bg-black/30 flex items-center justify-between">
+                        <div id="selected-file-info" class="flex items-center gap-3">
+                            <!-- Selected file info -->
+                        </div>
+                        <button onclick="importSelectedFile()" id="import-btn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            Import to KAI
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    LOG.info('DRIVE', 'Drive picker modal injected');
+}
+
+// Open Drive Picker
+function openDrivePicker() {
+    injectDriveModal();
+    const modal = document.getElementById('drive-picker-modal');
+    if (modal) {
+        modal.classList.add('opacity-100');
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modal.querySelector('.transform')?.classList.remove('translate-y-4');
+
+        // Check if already authenticated
+        if (driveTokens.access_token) {
+            showDriveFilesList();
+            refreshDriveFiles();
+        }
+    }
+}
+(window as any).openDrivePicker = openDrivePicker;
+
+// Close Drive Picker
+function closeDrivePicker() {
+    const modal = document.getElementById('drive-picker-modal');
+    if (modal) {
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modal.querySelector('.transform')?.classList.add('translate-y-4');
+    }
+    selectedDriveFile = null;
+}
+(window as any).closeDrivePicker = closeDrivePicker;
+
+// Initialize Drive OAuth
+async function initDriveAuth() {
+    try {
+        const authReq = document.getElementById('drive-auth-required');
+        const loading = document.getElementById('drive-loading');
+        if (authReq) authReq.classList.add('hidden');
+        if (loading) loading.classList.remove('hidden');
+
+        // Get auth URL from backend
+        const response = await fetch(`${API_URL}/drive/auth`);
+        const data = await response.json();
+
+        if (data.error) {
+            showDriveError(data.error);
+            return;
+        }
+
+        // Store state for callback verification
+        localStorage.setItem('drive_oauth_state', data.state);
+        // Clear any old tokens so we can detect new ones
+        localStorage.removeItem('drive_tokens');
+
+        // Open OAuth popup
+        const popup = window.open(data.auth_url, 'Drive OAuth', 'width=500,height=600,popup=yes');
+
+        // Poll for tokens in localStorage (since popup.closed is blocked by COOP)
+        let attempts = 0;
+        const maxAttempts = 120; // 60 seconds max
+
+        const checkTokens = setInterval(() => {
+            attempts++;
+
+            // Check if tokens appeared in localStorage
+            const savedTokens = localStorage.getItem('drive_tokens');
+            if (savedTokens) {
+                clearInterval(checkTokens);
+                try {
+                    driveTokens = JSON.parse(savedTokens);
+                    LOG.info('DRIVE', 'OAuth successful, tokens received');
+                    showMemoryToast('✅ Google Drive connected!', 'save');
+                    showDriveFilesList();
+                    refreshDriveFiles();
+                } catch (e) {
+                    LOG.error('DRIVE', 'Failed to parse tokens', e);
+                    showDriveError('Failed to process authentication');
+                }
+                return;
+            }
+
+            // Timeout after max attempts
+            if (attempts >= maxAttempts) {
+                clearInterval(checkTokens);
+                if (authReq) authReq.classList.remove('hidden');
+                if (loading) loading.classList.add('hidden');
+                LOG.warn('DRIVE', 'OAuth timeout - user may have closed popup');
+            }
+        }, 500);
+
+    } catch (error) {
+        LOG.error('DRIVE', 'Auth failed', error);
+        showDriveError('Failed to connect to Google Drive');
+    }
+}
+(window as any).initDriveAuth = initDriveAuth;
+
+// Show files list view
+function showDriveFilesList() {
+    const authReq = document.getElementById('drive-auth-required');
+    const filesList = document.getElementById('drive-files-list');
+    const loading = document.getElementById('drive-loading');
+    const footer = document.getElementById('drive-footer');
+    const status = document.getElementById('drive-status');
+
+    if (authReq) authReq.classList.add('hidden');
+    if (loading) loading.classList.add('hidden');
+    if (filesList) filesList.classList.remove('hidden');
+    if (footer) footer.classList.remove('hidden');
+    if (status) status.textContent = 'Connected • Select a file';
+}
+
+// Refresh Drive files
+async function refreshDriveFiles() {
+    try {
+        const loading = document.getElementById('drive-loading');
+        const filesList = document.getElementById('drive-files-list');
+        if (loading) loading.classList.remove('hidden');
+        if (filesList) filesList.classList.add('hidden');
+
+        const response = await fetch(`${API_URL}/drive/files`, {
+            headers: { 'X-Drive-Token': driveTokens.access_token || '' }
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            // Token may be expired, try refresh
+            if (data.error.includes('expired') && driveTokens.refresh_token) {
+                await refreshDriveToken();
+                return refreshDriveFiles();
+            }
+            showDriveError(data.error);
+            return;
+        }
+
+        driveFiles = data.files || [];
+        renderDriveFiles();
+
+        if (loading) loading.classList.add('hidden');
+        if (filesList) filesList.classList.remove('hidden');
+
+    } catch (error) {
+        LOG.error('DRIVE', 'Failed to load files', error);
+        showDriveError('Failed to load files');
+    }
+}
+(window as any).refreshDriveFiles = refreshDriveFiles;
+
+// Render Drive files
+function renderDriveFiles() {
+    const grid = document.getElementById('drive-files-grid');
+    if (!grid) return;
+
+    if (driveFiles.length === 0) {
+        grid.innerHTML = `
+            <div class="text-center py-12 text-white/40">
+                <i data-lucide="folder-open" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                <p>No compatible files found</p>
+                <p class="text-xs mt-1">Supported: PDF, DOCX, XLSX, CSV, TXT</p>
+            </div>
+        `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        return;
+    }
+
+    grid.innerHTML = driveFiles.map(file => {
+        const icon = getFileIcon(file.mimeType);
+        const size = formatFileSize(file.size || 0);
+        const date = new Date(file.modifiedTime).toLocaleDateString();
+
+        return `
+            <div class="drive-file-item p-3 rounded-lg border border-white/10 hover:border-blue-500/50 hover:bg-blue-500/5 cursor-pointer transition-all flex items-center gap-3 ${selectedDriveFile?.id === file.id ? 'border-blue-500 bg-blue-500/10' : ''}"
+                 onclick="selectDriveFile('${file.id}')">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br ${icon.bg} flex items-center justify-center text-white flex-shrink-0">
+                    ${icon.svg}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-white truncate">${file.name}</div>
+                    <div class="text-xs text-white/40">${size} • ${date}</div>
+                </div>
+                <div class="w-5 h-5 rounded-full border-2 border-white/20 flex items-center justify-center flex-shrink-0 ${selectedDriveFile?.id === file.id ? 'bg-blue-500 border-blue-500' : ''}">
+                    ${selectedDriveFile?.id === file.id ? '<i data-lucide="check" class="w-3 h-3 text-white"></i>' : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// Select a file
+function selectDriveFile(fileId: string) {
+    selectedDriveFile = driveFiles.find(f => f.id === fileId);
+    renderDriveFiles();
+
+    const importBtn = document.getElementById('import-btn') as HTMLButtonElement;
+    const selectedInfo = document.getElementById('selected-file-info');
+
+    if (selectedDriveFile && importBtn) {
+        importBtn.disabled = false;
+        if (selectedInfo) {
+            selectedInfo.innerHTML = `
+                <i data-lucide="file" class="w-4 h-4 text-blue-400"></i>
+                <span class="text-sm text-white/70">${selectedDriveFile.name}</span>
+            `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+    } else if (importBtn) {
+        importBtn.disabled = true;
+        if (selectedInfo) selectedInfo.innerHTML = '';
+    }
+}
+(window as any).selectDriveFile = selectDriveFile;
+
+// Import selected file
+async function importSelectedFile() {
+    if (!selectedDriveFile) return;
+
+    const importBtn = document.getElementById('import-btn') as HTMLButtonElement;
+    if (importBtn) {
+        importBtn.disabled = true;
+        importBtn.innerHTML = '<div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Importing...';
+    }
+
+    try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+            showDriveError('Please log in first');
+            return;
+        }
+
+        const response = await fetch(`${API_URL}/drive/import`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': currentUser.uid
+            },
+            body: JSON.stringify({
+                drive_file_id: selectedDriveFile.id,
+                access_token: driveTokens.access_token,
+                user_id: currentUser.uid
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            showDriveError(data.error);
+            return;
+        }
+
+        // Save imported file to context system
+        const isImage = data.mime_type?.startsWith('image/') || false;
+        const fileId = `drive_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+        const importedFile: ImportedFile = {
+            id: fileId,
+            filename: data.filename || selectedDriveFile?.name || 'unknown',
+            fileType: data.file_type || 'unknown',
+            mimeType: data.mime_type || '',
+            size: data.size || 0,
+            extractedText: data.extracted_text || '',
+            isImage: isImage,
+            importedAt: new Date(),
+            driveFileId: selectedDriveFile?.id
+        };
+
+        // For images, use Vision API to analyze
+        if (isImage && selectedDriveFile?.id) {
+            try {
+                showMemoryToast('🔍 Analyzing image with Vision AI...', 'info');
+                const visionResponse = await fetch(`${API_URL}/vision/analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        drive_file_id: selectedDriveFile.id,
+                        access_token: driveTokens.access_token,
+                        prompt: 'Describe this image in detail. Extract any text visible (OCR). Note any important elements.'
+                    })
+                });
+                const visionData = await visionResponse.json();
+                if (visionData.analysis) {
+                    importedFile.visionAnalysis = visionData.analysis;
+                    importedFile.extractedText = visionData.analysis;
+                }
+            } catch (e) {
+                LOG.warn('VISION', 'Vision analysis failed', e);
+            }
+        }
+
+        // Add to imported files
+        addImportedFile(importedFile);
+
+        // Auto-set as active context
+        setActiveFileContext(fileId);
+
+        // Success!
+        const filename = data.filename || selectedDriveFile?.name || 'file';
+        closeDrivePicker();
+        showMemoryToast(`✅ Imported "${filename}" - ready to chat about it!`, 'save');
+        LOG.info('DRIVE', 'File imported and saved to context', data);
+
+    } catch (error) {
+        LOG.error('DRIVE', 'Import failed', error);
+        showDriveError('Failed to import file');
+    } finally {
+        if (importBtn) {
+            importBtn.disabled = false;
+            importBtn.innerHTML = '<i data-lucide="download" class="w-4 h-4"></i> Import to KAI';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+    }
+}
+(window as any).importSelectedFile = importSelectedFile;
+
+// Refresh token
+async function refreshDriveToken() {
+    if (!driveTokens.refresh_token) return;
+
+    try {
+        const response = await fetch(`${API_URL}/drive/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: driveTokens.refresh_token })
+        });
+
+        const data = await response.json();
+        if (data.access_token) {
+            driveTokens.access_token = data.access_token;
+            localStorage.setItem('drive_tokens', JSON.stringify(driveTokens));
+        }
+    } catch (error) {
+        LOG.error('DRIVE', 'Token refresh failed', error);
+    }
+}
+
+// Show error message
+function showDriveError(message: string) {
+    const loading = document.getElementById('drive-loading');
+    const authReq = document.getElementById('drive-auth-required');
+    if (loading) loading.classList.add('hidden');
+    if (authReq) authReq.classList.remove('hidden');
+
+    showMemoryToast(`Drive Error: ${message}`, 'info');
+}
+
+// Helper: Get file icon based on MIME type
+function getFileIcon(mimeType: string): { svg: string; bg: string } {
+    if (mimeType.includes('pdf')) return { svg: '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/></svg>', bg: 'from-red-500 to-red-600' };
+    if (mimeType.includes('document') || mimeType.includes('word')) return { svg: '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/></svg>', bg: 'from-blue-500 to-blue-600' };
+    if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return { svg: '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/></svg>', bg: 'from-green-500 to-green-600' };
+    if (mimeType.includes('presentation')) return { svg: '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/></svg>', bg: 'from-orange-500 to-orange-600' };
+    return { svg: '<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/></svg>', bg: 'from-gray-500 to-gray-600' };
+}
+
+// Helper: Format file size
+function formatFileSize(bytes: number): string {
+    if (bytes === 0) return 'Unknown size';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// NOTE: Drive feature temporarily disabled for hackathon polish
+// Uncomment to re-enable Google Drive integration
+// setTimeout(() => {
+//     injectDriveButton();
+// }, 2000);
+
+// LOG.info('DRIVE', 'Google Drive module initialized');
+LOG.info('DRIVE', 'Google Drive module DISABLED for hackathon polish');
+
 // ========== 🦴 SKELETON LOADERS - BEAST MODE ==========
 const Skeleton = {
     // Generate a single message skeleton
@@ -2337,6 +2997,17 @@ function analyzeInputStyle(text: string): string {
 
     isProcessing = true;
 
+    // 🧠 SMART LOADING: Detect if query needs web search for smarter indicator
+    const queryLower = queryStr.toLowerCase();
+    const needsWebSearch = (
+        queryLower.includes('price') || queryLower.includes('today') ||
+        queryLower.includes('weather') || queryLower.includes('news') ||
+        queryLower.includes('current') || queryLower.includes('latest') ||
+        queryLower.includes('now') || queryLower.includes('live')
+    );
+    const loadingMessage = needsWebSearch ? '🔍 Searching the web...' : 'Neural processing...';
+    const loadingLabel = needsWebSearch ? 'KAI_WEB_SEARCH' : 'KAI_PROCESSING';
+
     // 🦴 SKELETON: Show premium typing indicator
     let typingSkeletonId = 'typing-skeleton-' + Date.now();
     if (messagesList) {
@@ -2345,14 +3016,14 @@ function analyzeInputStyle(text: string): string {
                 <div class="skeleton-message-header">
                     <div class="skeleton skeleton-avatar skeleton-pulse"></div>
                     <div class="flex items-center gap-2">
-                        <span class="text-[10px] font-mono text-indigo-400 uppercase tracking-widest">KAI_PROCESSING</span>
+                        <span class="text-[10px] font-mono text-indigo-400 uppercase tracking-widest">${loadingLabel}</span>
                     </div>
                 </div>
                 <div class="skeleton-typing">
                     <div class="skeleton-typing-dot"></div>
                     <div class="skeleton-typing-dot"></div>
                     <div class="skeleton-typing-dot"></div>
-                    <span class="ml-3 text-xs font-mono text-white/40 uppercase tracking-widest">Neural processing...</span>
+                    <span class="ml-3 text-xs font-mono text-white/40 uppercase tracking-widest">${loadingMessage}</span>
                 </div>
                 <div class="mt-3 space-y-2">
                     <div class="skeleton skeleton-line skeleton-line-long"></div>
@@ -2371,9 +3042,17 @@ function analyzeInputStyle(text: string): string {
         // 🎭 BEAST MODE: Analyze input style for adaptive responses
         const styleHint = analyzeInputStyle(queryStr);
 
+        // 📄 FILE CONTEXT: Inject active imported file content
+        let finalQuery = queryStr;
+        const fileContext = getActiveFileContext();
+        if (fileContext) {
+            finalQuery = fileContext + '\n\n---\n\nUser Question: ' + queryStr;
+            LOG.info('FILES', 'Injecting active file context into query');
+        }
+
         // Include attachments in request
         const requestBody: any = {
-            query: queryStr,
+            query: finalQuery,
             session_id: currentChatId,
             uid: auth?.currentUser?.uid,
             user_preferences: userPrefs,
@@ -2531,12 +3210,18 @@ function analyzeInputStyle(text: string): string {
         }
 
         // 🔥 RENDER SOURCE CARDS BELOW RESPONSE (BEAST MODE)
-        if (data.type === 'web_search' && data.sources && data.sources.length > 0) {
-            const sourceCardsHtml = (window as any).renderSourceCards(data.sources);
+        // Handle both 'web_search' and 'realtime_search' types from backend
+        const isSearchResponse = data.type === 'web_search' ||
+            data.type === 'realtime_search' ||
+            (data.metadata && data.metadata.type === 'realtime_search');
+        const sources = data.sources || (data.metadata && data.metadata.sources) || [];
+
+        if (isSearchResponse && sources.length > 0) {
+            const sourceCardsHtml = (window as any).renderSourceCards(sources);
             if (sourceCardsHtml) {
                 // Insert AFTER the streamBlock for separate visual placement
                 streamBlock.insertAdjacentHTML('afterend', sourceCardsHtml);
-                LOG.info('SEARCH', `Added ${data.sources.length} beast mode source cards`);
+                LOG.info('SEARCH', `Added ${sources.length} beast mode source cards`);
             }
         }
 

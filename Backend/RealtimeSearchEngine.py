@@ -247,6 +247,19 @@ def RealtimeSearchEngine(prompt):
     if not clean_query:
         clean_query = prompt
     
+    # 🚀 SPEED: Simple in-memory cache (5 min TTL)
+    import time as _time
+    cache_key = clean_query[:100]  # Limit key length
+    if not hasattr(RealtimeSearchEngine, '_cache'):
+        RealtimeSearchEngine._cache = {}
+    
+    # Check cache (5 minute TTL)
+    if cache_key in RealtimeSearchEngine._cache:
+        cached, timestamp = RealtimeSearchEngine._cache[cache_key]
+        if _time.time() - timestamp < 300:  # 5 min TTL
+            print(f"[RealtimeSearch] ⚡ CACHE HIT - returning cached result")
+            return cached
+    
     sources = []  # Collect sources for UI cards
     
     # === GEMINI WITH SEARCH GROUNDING (BEAST MODE) ===
@@ -318,11 +331,14 @@ Be direct and informative. Use markdown formatting."""
                     print(f"[RealtimeSearch] ✅ Gemini grounding response with {len(sources)} sources")
                     
                     # Return structured response with sources
-                    return {
+                    result = {
                         "text": f"🔍 **{clean_query}**\n\n{result_text}",
                         "sources": sources,
                         "engine": "gemini"
                     }
+                    # 🚀 CACHE: Save result for 5 min
+                    RealtimeSearchEngine._cache[cache_key] = (result, _time.time())
+                    return result
                 else:
                     print(f"[RealtimeSearch] ⚠️ Empty Gemini response with key {idx+1}")
                     
@@ -341,45 +357,119 @@ Be direct and informative. Use markdown formatting."""
     except Exception as e:
         print(f"[RealtimeSearch] ⚠️ Gemini grounding error: {e}, falling back to DuckDuckGo")
     
-    # === FALLBACK: DuckDuckGo Direct Search ===
+    # === FALLBACK: DuckDuckGo Direct Search with Retries ===
     try:
         # Try new package first, then old package
+        ddgs_module = None
         try:
             from ddgs import DDGS
+            ddgs_module = "ddgs"
             print(f"[RealtimeSearch] Using new ddgs package")
         except ImportError:
-            from duckduckgo_search import DDGS
-            print(f"[RealtimeSearch] Using old duckduckgo_search package")
+            try:
+                from duckduckgo_search import DDGS
+                ddgs_module = "duckduckgo_search"
+                print(f"[RealtimeSearch] Using old duckduckgo_search package")
+            except ImportError:
+                ddgs_module = None
+                print(f"[RealtimeSearch] ⚠️ No DuckDuckGo package installed")
+        
+        if ddgs_module:
+            # Try with minimal retries for speed (reduced from 3 to 2)
+            for attempt in range(2):
+                try:
+                    with DDGS() as ddgs:
+                        # Use API backend first (faster)
+                        results = list(ddgs.text(clean_query, max_results=4, backend="api"))
+                        
+                        if not results and attempt == 0:
+                            # Only try HTML backend on first fail
+                            results = list(ddgs.text(clean_query, max_results=5, backend="html"))
+                        
+                        if results:
+                            print(f"[RealtimeSearch] 📋 DuckDuckGo: {len(results)} results (attempt {attempt+1})")
+                            
+                            response_text = f"🔍 **Web Search Results for: {clean_query}**\n\n"
+                            
+                            for i, r in enumerate(results, 1):
+                                title = r.get('title', 'No title')
+                                body = r.get('body', 'No description')
+                                href = r.get('href', '')
+                                
+                                response_text += f"**{i}. {title}**\n"
+                                response_text += f"{body}\n\n"
+                                
+                                # Add to sources for UI cards
+                                sources.append({
+                                    "title": title,
+                                    "url": href
+                                })
+                            
+                            result = {
+                                "text": response_text,
+                                "sources": sources,
+                                "engine": "duckduckgo"
+                            }
+                            # 🚀 CACHE: Save result for 5 min
+                            RealtimeSearchEngine._cache[cache_key] = (result, _time.time())
+                            return result
+                        else:
+                            print(f"[RealtimeSearch] ⚠️ No results on attempt {attempt+1}, retrying...")
+                            import time
+                            time.sleep(0.3)  # Quick retry
+                except Exception as ddg_err:
+                    print(f"[RealtimeSearch] ⚠️ DDG attempt {attempt+1} failed: {ddg_err}")
+                    import time
+                    time.sleep(0.3)  # Quick retry
+        
+        # === FALLBACK 2: Use requests to scrape DuckDuckGo directly ===
+        print(f"[RealtimeSearch] 🔄 Trying direct web scrape fallback...")
+        try:
+            import requests
+            from bs4 import BeautifulSoup
             
-        with DDGS() as ddgs:
-            results = list(ddgs.text(clean_query, max_results=5))
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
             
-            if results:
-                print(f"[RealtimeSearch] 📋 DuckDuckGo: {len(results)} results")
+            # Use DuckDuckGo HTML
+            url = f"https://html.duckduckgo.com/html/?q={clean_query.replace(' ', '+')}"
+            resp = requests.get(url, headers=headers, timeout=10)
+            
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                results = soup.find_all('div', class_='result')[:5]
                 
-                response_text = f"🔍 **Web Search Results for: {clean_query}**\n\n"
-                
-                for i, r in enumerate(results, 1):
-                    title = r.get('title', 'No title')
-                    body = r.get('body', 'No description')
-                    href = r.get('href', '')
+                if results:
+                    response_text = f"🔍 **Web Search Results for: {clean_query}**\n\n"
                     
-                    response_text += f"**{i}. {title}**\n"
-                    response_text += f"{body}\n\n"
+                    for i, result in enumerate(results, 1):
+                        title_elem = result.find('a', class_='result__a')
+                        snippet_elem = result.find('a', class_='result__snippet')
+                        
+                        title = title_elem.get_text(strip=True) if title_elem else 'No title'
+                        snippet = snippet_elem.get_text(strip=True) if snippet_elem else 'No description'
+                        href = title_elem.get('href', '') if title_elem else ''
+                        
+                        response_text += f"**{i}. {title}**\n"
+                        response_text += f"{snippet}\n\n"
+                        
+                        sources.append({"title": title, "url": href})
                     
-                    # Add to sources for UI cards
-                    sources.append({
-                        "title": title,
-                        "url": href
-                    })
-                
-                return {
-                    "text": response_text,
-                    "sources": sources,
-                    "engine": "duckduckgo"
-                }
-            else:
-                return {"text": f"No search results found for '{clean_query}'.", "sources": [], "engine": "none"}
+                    print(f"[RealtimeSearch] ✅ Direct scrape: {len(results)} results")
+                    result = {
+                        "text": response_text,
+                        "sources": sources,
+                        "engine": "duckduckgo_html"
+                    }
+                    # 🚀 CACHE: Save result for 5 min
+                    RealtimeSearchEngine._cache[cache_key] = (result, _time.time())
+                    return result
+        except Exception as scrape_err:
+            print(f"[RealtimeSearch] ⚠️ Direct scrape failed: {scrape_err}")
+        
+        # If all else fails
+        return {"text": f"I couldn't find real-time data for '{clean_query}'. All search methods are temporarily unavailable. Please try again in a moment.", "sources": [], "engine": "none"}
                 
     except Exception as e:
         print(f"[RealtimeSearch] ❌ All search methods failed: {e}")

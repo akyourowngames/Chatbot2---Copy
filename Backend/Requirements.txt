@@ -73,6 +73,10 @@ rich
 # ===== Firebase/Cloud =====
 firebase-admin
 google-cloud-firestore
+google-cloud-storage
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
 
 # ===== Security & Auth =====
 pydantic>=2.0.0
