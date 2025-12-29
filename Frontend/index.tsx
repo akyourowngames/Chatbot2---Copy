@@ -2172,6 +2172,7 @@ function renderSpotifyPlayer(container: HTMLElement, spotify: any) {
     const playerId = `spotify-player-${Date.now()}`;
     const trackName = spotify.name || 'Track';
     const artistName = spotify.artists || '';
+    const externalUrl = spotify.external_url || spotify.embed_url.replace('/embed/', '/');
 
     const html = `
     <div class="mt-4 rounded-xl overflow-hidden spotify-player-card bg-[#0d0d14] border border-indigo-500/20 max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -2179,25 +2180,63 @@ function renderSpotifyPlayer(container: HTMLElement, spotify: any) {
         <div class="flex items-center justify-between px-3 py-2 bg-black/40 border-b border-white/5">
             <div class="flex items-center gap-2">
                 <svg class="w-4 h-4 text-[#1DB954]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-                <div class="text-xs text-white/60 font-mono truncate max-w-[250px]">${trackName}${artistName ? ` • ${artistName}` : ''}</div>
+                <div class="text-xs text-white/60 font-mono truncate max-w-[200px]">${trackName}${artistName ? ` • ${artistName}` : ''}</div>
+            </div>
+            <a href="${externalUrl}" target="_blank" class="text-[10px] px-2 py-1 bg-[#1DB954]/20 hover:bg-[#1DB954]/40 rounded text-[#1DB954] transition-colors">
+                Open in Spotify
+            </a>
+        </div>
+        <!-- Spotify Embed with fallback -->
+        <div id="${playerId}-container" class="relative">
+            <iframe 
+                id="${playerId}"
+                style="border-radius:0 0 12px 12px" 
+                src="${spotify.embed_url}" 
+                width="100%" 
+                height="152" 
+                frameBorder="0" 
+                allowfullscreen="" 
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                loading="lazy">
+            </iframe>
+            <!-- Fallback shown if embed fails -->
+            <div id="${playerId}-fallback" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-4 text-center">
+                <svg class="w-8 h-8 text-[#1DB954] mb-2" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                <div class="text-xs text-white/60 mb-2">Embed unavailable</div>
+                <a href="${externalUrl}" target="_blank" class="px-3 py-1.5 bg-[#1DB954] hover:bg-[#1ed760] rounded-full text-xs text-black font-bold transition-colors">
+                    Play on Spotify
+                </a>
             </div>
         </div>
-        <!-- Spotify Embed -->
-        <iframe 
-            style="border-radius:0 0 12px 12px" 
-            src="${spotify.embed_url}" 
-            width="100%" 
-            height="152" 
-            frameBorder="0" 
-            allowfullscreen="" 
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-            loading="lazy">
-        </iframe>
     </div>`;
 
     const wrapper = document.createElement('div');
     wrapper.innerHTML = html;
     container.appendChild(wrapper);
+
+    // Add error handler for iframe
+    setTimeout(() => {
+        const iframe = document.getElementById(playerId) as HTMLIFrameElement;
+        const fallback = document.getElementById(`${playerId}-fallback`);
+        if (iframe && fallback) {
+            iframe.onerror = () => {
+                iframe.classList.add('hidden');
+                fallback.classList.remove('hidden');
+            };
+            // Also check if iframe loaded after timeout (for 504 errors)
+            setTimeout(() => {
+                try {
+                    // If we can't access contentWindow, it might have failed
+                    if (!iframe.contentWindow?.document) {
+                        iframe.classList.add('hidden');
+                        fallback.classList.remove('hidden');
+                    }
+                } catch (e) {
+                    // Cross-origin error is expected, embed loaded fine
+                }
+            }, 5000);
+        }
+    }, 100);
 }
 
 function renderPDFPreview(container: HTMLElement, pdfUrl: string, title: string = "Document") {

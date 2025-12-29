@@ -3070,8 +3070,9 @@ def chat():
                  user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
                  images = enhanced_image_gen.generate_with_style(clean_prompt, style=detected_style, num_images=1, user_id=user_id)
                  if images:
-                     # Helper to convert to URL path relative to server root
-                     img_url = f"/data/Images/{os.path.basename(images[0])}"
+                     # Use direct URL from Pollinations (no local file system needed)
+                     img_url = images[0]  # Already a full URL from generate_pollinations
+                     print(f"[IMAGE] Generated image URL: {img_url[:80]}...")
                      response_text = f"Here is your **{detected_style}** image of {clean_prompt}:\n![Generated Image]({img_url})"
                  else:
                      response_text = "I tried to generate the image, but something went wrong."
