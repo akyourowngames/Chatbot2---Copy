@@ -1920,8 +1920,46 @@ function formatMessage(text: string) {
         if (href && !href.startsWith('http') && !href.startsWith('data:') && !href.startsWith('//')) {
             href = BASE_URL + href;
         }
-        return `<div class="my-3 rounded-lg overflow-hidden border border-white/10 bg-black/20 inline-block">
-            <img src="${href}" alt="${text}" title="${title || ''}" class="max-w-full h-auto max-h-[400px] object-contain block" loading="lazy" />
+        // Unique ID for this image container
+        const imgId = `gen-img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const isPollinations = href.includes('pollinations.ai');
+
+        return `<div id="${imgId}" class="my-3 rounded-lg overflow-hidden border border-white/10 bg-black/20 inline-block relative group">
+            <!-- Loading state -->
+            <div id="${imgId}-loader" class="flex items-center justify-center p-8 min-w-[200px] min-h-[150px] bg-gradient-to-br from-indigo-900/20 to-black">
+                <div class="flex flex-col items-center gap-3">
+                    <div class="w-8 h-8 border-2 border-indigo-500/50 border-t-indigo-400 rounded-full animate-spin"></div>
+                    <span class="text-[10px] font-mono text-indigo-300/60 uppercase tracking-widest">${isPollinations ? 'GENERATING...' : 'LOADING...'}</span>
+                </div>
+            </div>
+            <!-- Image (hidden until loaded) -->
+            <img 
+                id="${imgId}-img"
+                src="${href}" 
+                alt="${text}" 
+                title="${title || ''}" 
+                class="max-w-full h-auto max-h-[400px] object-contain block hidden" 
+                loading="lazy"
+                onload="document.getElementById('${imgId}-loader')?.classList.add('hidden'); this.classList.remove('hidden'); document.getElementById('${imgId}-error')?.classList.add('hidden');"
+                onerror="document.getElementById('${imgId}-loader')?.classList.add('hidden'); document.getElementById('${imgId}-error')?.classList.remove('hidden'); if(typeof lucide !== 'undefined') lucide.createIcons();"
+            />
+            <!-- Error state with retry -->
+            <div id="${imgId}-error" class="hidden flex flex-col items-center justify-center p-6 min-w-[200px] min-h-[150px] bg-gradient-to-br from-red-900/10 to-black">
+                <i data-lucide="image-off" class="w-8 h-8 text-red-400/60 mb-3"></i>
+                <span class="text-xs text-red-300/80 mb-3">Image failed to load</span>
+                <div class="flex gap-2">
+                    <button onclick="(function(){ const img = document.getElementById('${imgId}-img'); const loader = document.getElementById('${imgId}-loader'); const error = document.getElementById('${imgId}-error'); if(img && loader && error){ error.classList.add('hidden'); loader.classList.remove('hidden'); img.src = '${href}' + '&retry=' + Date.now(); } })()" class="px-3 py-1.5 text-xs bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/30 rounded text-indigo-200 transition-all">
+                        <i data-lucide="refresh-cw" class="w-3 h-3 inline mr-1"></i>Retry
+                    </button>
+                    <a href="${href}" target="_blank" class="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 border border-white/10 rounded text-white/70 transition-all">
+                        <i data-lucide="external-link" class="w-3 h-3 inline mr-1"></i>Open
+                    </a>
+                </div>
+            </div>
+            <!-- View Full button overlay (visible on hover when loaded) -->
+            <a href="${href}" target="_blank" class="absolute bottom-2 right-2 px-2 py-1 text-[9px] bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded border border-white/10 text-white/70 hover:text-white opacity-0 group-hover:opacity-100 transition-all font-mono uppercase tracking-wider">
+                View Full
+            </a>
         </div>`;
     };
 
