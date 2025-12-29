@@ -1973,8 +1973,8 @@
       0.02205830253660679
     ],
     "created_at": "2025-12-25T16:48:35.258566",
-    "last_accessed": "2025-12-29T19:41:16.305848",
-    "access_count": 126,
+    "last_accessed": "2025-12-29T21:32:35.951293",
+    "access_count": 128,
     "category": "preference",
     "importance": 0.9,
     "source": "contextual"
@@ -2765,8 +2765,8 @@
       0.03461505472660065
     ],
     "created_at": "2025-12-27T21:36:50.229856",
-    "last_accessed": "2025-12-29T19:41:16.305848",
-    "access_count": 18,
+    "last_accessed": "2025-12-29T21:32:35.951293",
+    "access_count": 20,
     "category": "general",
     "importance": 0.4,
     "source": "contextual"

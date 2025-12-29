@@ -5,14 +5,6 @@
     },
     {
         "role": "assistant",
-        "content": "Hey Krish, how's it going?"
-    },
-    {
-        "role": "user",
-        "content": "[USER CONTEXT: The user's name is Krish Verma. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhi kai"
-    },
-    {
-        "role": "assistant",
         "content": "Hey Krish, what's up?"
     },
     {
@@ -54,5 +46,13 @@
     {
         "role": "assistant",
         "content": "Glad you think so, Krish. Molecular science is indeed fascinating, and it's the foundation of many cool things in our world, from biology to chemistry to technology."
+    },
+    {
+        "role": "user",
+        "content": "\n[\ud83e\udde0 MEMORY CONTEXT - What you remember about this user]:\n\u2022 [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n\u2022 [personal] hey i am krish man, i am just testing you and gonna deploy yu to production in few days\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 2 relevant items]\n[USER CONTEXT: The user's name is Krish. Call them 'Krish' casually. About the user: hi i like you! Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhi bud how are yu?"
+    },
+    {
+        "role": "assistant",
+        "content": "Hey Krish, I'm doing great, thanks for asking! Just chillin' and ready to chat with you. What's on your mind, my friend?"
     }
 ]

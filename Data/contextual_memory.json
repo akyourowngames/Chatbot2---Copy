@@ -94,8 +94,8 @@
       "category": "preference",
       "importance": 0.9,
       "timestamp": "2025-12-25T16:48:34.195407",
-      "last_accessed": "2025-12-28T10:56:15.000083",
-      "access_count": 17,
+      "last_accessed": "2025-12-29T21:32:40.026525",
+      "access_count": 18,
       "confidence": 1.0,
       "cloud_synced": true
     },
@@ -116,8 +116,8 @@
       "category": "general",
       "importance": 0.4,
       "timestamp": "2025-12-27T21:36:49.288882",
-      "last_accessed": "2025-12-28T10:55:53.122592",
-      "access_count": 1,
+      "last_accessed": "2025-12-29T21:32:39.736024",
+      "access_count": 2,
       "confidence": 1.0,
       "cloud_synced": true
     },
@@ -127,8 +127,8 @@
       "category": "general",
       "importance": 0.4,
       "timestamp": "2025-12-27T21:36:50.282494",
-      "last_accessed": "2025-12-28T10:55:53.171657",
-      "access_count": 1,
+      "last_accessed": "2025-12-29T21:32:39.991410",
+      "access_count": 2,
       "confidence": 1.0,
       "cloud_synced": true
     },
@@ -1540,10 +1540,15 @@
       "timestamp": "2025-12-29T19:41:17.041430",
       "user": "[USER CONTEXT: The user's name is Krish Verma. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\noh! its interesting",
       "assistant": "Glad you think so, Krish. Molecular science is indeed fascinating, and it's the foundation of many cool things in our world, from biology to chemistry to technology."
+    },
+    {
+      "timestamp": "2025-12-29T21:32:39.701082",
+      "user": "\n[🧠 MEMORY CONTEXT - What you remember about this user]:\n• [personal] nothing just wanna chat with yu??\ni am a true ddevil yu knowthat\n• [personal] hey i am krish man, i am just testing you and gonna deploy yu to production in few days\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 2 relevant items]\n[USER CONTEXT: The user's name is Krish. Call them 'Krish' casually. About the user: hi i like you! Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhi bud how are yu?",
+      "assistant": "Hey Krish, I'm doing great, thanks for asking! Just chillin' and ready to chat with you. What's on your mind, my friend?"
     }
   ],
   "relationships": {},
   "stats": {
-    "total_interactions": 276
+    "total_interactions": 277
   }
 }

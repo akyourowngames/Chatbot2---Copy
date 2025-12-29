@@ -54,7 +54,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     from Backend.ResponseCache import get_cached_response, cache_response
-    CACHE_AVAILABLE = True
+    # DISABLED: Response cache was causing "Here's the information you requested" bug  
+    # on Render due to corrupted cache entries. Disabling until root cause fixed.
+    CACHE_AVAILABLE = False  # Was True
+    print("[CACHE] Response cache DISABLED - was causing generic responses bug")
 except ImportError:
     print("Response cache not available")
     CACHE_AVAILABLE = False
@@ -384,24 +387,17 @@ def ChatBot(Query: str, use_cache: bool = True, force_model: str = None) -> str:
         
         # Use appropriate provider
         if provider == "gemini":
-            # Get raw Gemini response
-            raw_answer = _call_gemini(conversation_messages, model_name)
-            
-            # Apply social intelligence to Gemini responses too!
-            from Backend.SocialIntelligence import social_intelligence
-            Answer = social_intelligence.process_response(
-                user_input=Query,
-                llm_response=raw_answer,
-                user_id="default",  # TODO: Pass actual user_id from API
-                history=messages
-            )
+            # Get raw Gemini response - DO NOT apply SocialIntelligence
+            # FIX: SocialIntelligence was causing "Here's the information you requested" bug
+            # by making extra LLM calls that fail silently on Render
+            Answer = _call_gemini(conversation_messages, model_name)
         else:
             Answer = ChatCompletion(
                 messages=conversation_messages,
                 model=model_name,
                 text_only=True,
                 user_id="default",  # TODO: Pass actual user_id from API
-                apply_social_intelligence=True  # 🔥 ENABLE SOCIAL INTELLIGENCE
+                apply_social_intelligence=False  # DISABLED: Causing generic response bug on Render
             )
         
         # ===== 7. RESPONSE ENHANCEMENT (DISABLED IN FAST_MODE) =====

@@ -93,7 +93,7 @@ for i, key in enumerate(GROQ_API_KEYS):
             # max_retries=0 disables SDK auto-retry so we can fallback to Gemini immediately
             client = Groq(api_key=key, max_retries=0)
             GROQ_CLIENTS.append({"client": client, "key_index": i, "rate_limited_until": 0})
-            print(f"[LLM] Groq Key #{i+1} initialized ✓")
+            print(f"[LLM] Groq Key #{i+1} initialized")
         except Exception as e:
             print(f"[LLM] Groq Key #{i+1} failed: {e}")
 
@@ -135,7 +135,7 @@ def mark_key_rate_limited(client_info, attempt: int = 0):
 # Legacy single client for backward compatibility
 groq_client = GROQ_CLIENTS[0]["client"] if GROQ_CLIENTS else None
 
-print(f"[LLM] 🚀 Multi-Key System: {len(GROQ_CLIENTS)} Groq keys active!")
+print(f"[LLM] Multi-Key System: {len(GROQ_CLIENTS)} Groq keys active!")
 
 # ==================== GEMINI MULTI-KEY ROTATION ====================
 GEMINI_API_KEYS = [
@@ -185,7 +185,7 @@ def mark_gemini_key_rate_limited(key_info, attempt: int = 0):
     key_info["rate_limit_attempt"] = attempt + 1
     logger.warning(f"[LLM] Gemini Key #{key_info['idx']+1} rate-limited for {wait_seconds:.0f}s (attempt {attempt + 1})")
 
-print(f"[LLM] 🌟 Gemini Multi-Key: {len(GEMINI_KEYS)} keys active!")
+print(f"[LLM] Gemini Multi-Key: {len(GEMINI_KEYS)} keys active!")
 
 # Initialize first Gemini key
 gemini_available = False
@@ -232,7 +232,7 @@ def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.
         simple_keywords = ["hi", "hello", "thanks", "bye", "ok", "yes", "no", "what time", "date"]
         if any(kw in user_query.lower() for kw in simple_keywords):
             model = "llama-3.1-8b-instant"
-            print(f"[LLM] ⚡ Using faster 8B model for simple query")
+            print(f"[LLM] Using faster 8B model for simple query")
 
     # ==================== MEMORY INJECTION ====================
     memory_context = ""
