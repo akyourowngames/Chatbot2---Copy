@@ -234,30 +234,35 @@ def DuckDuckGoSearch(query, return_list=False):
         pass
     return [] if return_list else None
 
-def RealtimeSearchEngine(prompt):
+def RealtimeSearchEngine(prompt, clear_cache=False):
     """
-    🚀 BEAST MODE: Gemini with Google Search Grounding for REAL-TIME web access.
+    BEAST MODE: Gemini with Google Search Grounding for REAL-TIME web access.
     Uses Gemini 2.0 Flash with search grounding to get live, intelligent answers.
     Falls back to DuckDuckGo if Gemini fails.
     """
-    print(f"[RealtimeSearch] 🔍 Query: {prompt}")
+    print(f"[RealtimeSearch] Query: {prompt}")
     
     # Clean the query
     clean_query = prompt.lower().replace("search for", "").replace("@search", "").strip()
     if not clean_query:
         clean_query = prompt
     
-    # 🚀 SPEED: Simple in-memory cache (5 min TTL)
+    # SPEED: Simple in-memory cache (5 min TTL)
     import time as _time
     cache_key = clean_query[:100]  # Limit key length
     if not hasattr(RealtimeSearchEngine, '_cache'):
         RealtimeSearchEngine._cache = {}
     
+    # Allow manual cache clearing
+    if clear_cache:
+        RealtimeSearchEngine._cache = {}
+        print("[RealtimeSearch] Cache cleared")
+    
     # Check cache (5 minute TTL)
     if cache_key in RealtimeSearchEngine._cache:
         cached, timestamp = RealtimeSearchEngine._cache[cache_key]
         if _time.time() - timestamp < 300:  # 5 min TTL
-            print(f"[RealtimeSearch] ⚡ CACHE HIT - returning cached result")
+            print(f"[RealtimeSearch] CACHE HIT - returning cached result")
             return cached
     
     sources = []  # Collect sources for UI cards
@@ -294,17 +299,35 @@ def RealtimeSearchEngine(prompt):
                     tools="google_search_retrieval"  # Correct syntax for grounding
                 )
                 
-                # Create the search prompt
-                search_prompt = f"""Search the web for the latest information about: {clean_query}
+                # Detect query type for better search context
+                query_lower = clean_query.lower()
+                query_type = "general"
+                if any(w in query_lower for w in ["price", "cost", "rate", "value", "worth"]):
+                    query_type = "price/financial"
+                elif any(w in query_lower for w in ["news", "latest", "update", "happening"]):
+                    query_type = "news"
+                elif any(w in query_lower for w in ["weather", "forecast", "temperature"]):
+                    query_type = "weather"
+                elif any(w in query_lower for w in ["score", "match", "game", "won"]):
+                    query_type = "sports"
+                
+                # Create the search prompt with specific context
+                search_prompt = f"""You are a real-time search assistant. Search the web for CURRENT, FACTUAL information about:
 
-Provide a comprehensive, well-structured answer with:
-- Current facts and data
-- Recent news or updates  
-- Key details the user should know
+**Query**: {clean_query}
+**Query Type**: {query_type}
 
-Be direct and informative. Use markdown formatting."""
+IMPORTANT INSTRUCTIONS:
+1. This is a {query_type} query - provide actual DATA, not grammar or language explanations
+2. Include NUMBERS, DATES, and SPECIFIC FACTS
+3. For prices: show actual current prices with currency
+4. For news: show recent headlines with dates
+5. Format your response in clear markdown
+6. Be direct - the user wants FACTS, not definitions
 
-                print(f"[RealtimeSearch] 🌐 Using Gemini key {idx+1}/{len(gemini_keys)} with Google Search Grounding...")
+Provide a comprehensive answer with real-time data."""
+
+                print(f"[RealtimeSearch] Using Gemini key {idx+1}/{len(gemini_keys)} with Google Search Grounding...")
                 
                 response = model.generate_content(search_prompt)
                 

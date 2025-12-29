@@ -25,9 +25,9 @@ class VisionService:
         
         if self.api_keys:
             self._configure_genai(self.api_keys[0])
-            print(f"[VisionService] ✓ Online with {len(self.api_keys)} Gemini Keys")
+            print(f"[VisionService] Online with {len(self.api_keys)} Gemini Keys")
         else:
-            print("[VisionService] ⚠ No Gemini API keys found!")
+            print("[VisionService] WARNING: No Gemini API keys found!")
 
     def _load_api_keys(self) -> List[str]:
         keys = []
@@ -66,7 +66,7 @@ class VisionService:
             
         self.current_key_idx = (self.current_key_idx + 1) % len(self.api_keys)
         new_key = self.api_keys[self.current_key_idx]
-        print(f"[VisionService] ♻ Rotating to Key #{self.current_key_idx + 1}...")
+        print(f"[VisionService] Rotating to Key #{self.current_key_idx + 1}...")
         self._configure_genai(new_key)
         return True
 
@@ -77,6 +77,8 @@ class VisionService:
         # Try up to (Number of keys * 2) or max 5 attempts to find a working key/model
         max_attempts = max(3, len(self.api_keys) * 2)
         errors = []
+        
+        print(f"[VisionService] Analyzing image: {image_source[:100]}...")
         
         # Prepare Image Once
         image_part = self._prepare_image(image_source)
@@ -91,6 +93,7 @@ class VisionService:
                     response = model.generate_content([prompt, image_part])
                     
                     if response.text:
+                        print(f"[VisionService] Analysis complete using {model_name}")
                         return {
                             "success": True, 
                             "description": response.text, 
@@ -128,13 +131,27 @@ class VisionService:
         import PIL.Image
         import io
         
+        print(f"[VisionService] Preparing image from: {image_source[:80]}...")
+        
         try:
-            if image_source.startswith(("http", "https")):
-                headers = {"User-Agent": "Mozilla/5.0"} 
-                content = requests.get(image_source, headers=headers, timeout=10).content
+            # Handle URLs (Firebase Storage, etc.)
+            if image_source.startswith(("http://", "https://")):
+                print(f"[VisionService] Downloading image from URL...")
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"} 
+                response = requests.get(image_source, headers=headers, timeout=15)
+                response.raise_for_status()
+                content = response.content
+                print(f"[VisionService] Downloaded {len(content)} bytes")
                 return PIL.Image.open(io.BytesIO(content))
             else:
+                # Local file path
+                if not os.path.exists(image_source):
+                    print(f"[VisionService] ERROR: File not found: {image_source}")
+                    return None
                 return PIL.Image.open(image_source)
+        except requests.exceptions.RequestException as e:
+            print(f"[VisionService] URL Download Error: {e}")
+            return None
         except Exception as e:
             print(f"[VisionService] Image Load Error: {e}")
             return None

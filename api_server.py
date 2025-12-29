@@ -2291,22 +2291,37 @@ def chat():
                 from Backend.VisionService import get_vision_service
                 vision = get_vision_service()
                 
-                # Build full file path
+                # Build full file path - try local first, then fall back to URL
                 full_path = _os.path.join(DATA_DIR, 'Uploads', file_name)
+                image_source = None
+                
                 if _os.path.exists(full_path):
+                    # Local file exists (development mode)
+                    image_source = full_path
+                    print(f"[VISION] Using local file: {full_path}")
+                elif file_url and file_url.startswith(('http://', 'https://')):
+                    # Use Firebase Storage URL directly (cloud/Render mode)
+                    image_source = file_url
+                    print(f"[VISION] Using URL: {file_url[:80]}...")
+                
+                if image_source:
                     # Improved prompt for structured output
                     vision_prompt = (query or "Describe this image in detail.") + "\n(Format: Structured Markdown with Bold Headers and Bullet Points)"
-                    result = vision.analyze(full_path, vision_prompt)
+                    result = vision.analyze(image_source, vision_prompt)
                     if result.get('success'):
                         attachment_context += f"\n\n[IMAGE ANALYSIS - {file_name}]:\n{result.get('description', 'Image analyzed.')}"
                         print(f"[VISION] Analyzed {file_name}: {result.get('description', '')[:100]}...")
                     else:
-                        attachment_context += f"\n\n[IMAGE: {file_name}] - Attached but analysis unavailable."
+                        error_msg = result.get('error', 'Unknown error')
+                        attachment_context += f"\n\n[IMAGE: {file_name}] - Analysis failed: {error_msg}"
+                        print(f"[VISION] Analysis failed for {file_name}: {error_msg}")
                 else:
-                    print(f"[VISION] File not found: {full_path}")
-                    attachment_context += f"\n\n[IMAGE: {file_name}] - File attached."
+                    print(f"[VISION] No valid image source for: {file_name} (local: {full_path}, url: {file_url})")
+                    attachment_context += f"\n\n[IMAGE: {file_name}] - File attached but could not be analyzed."
             except Exception as ve:
                 print(f"[VISION] Error processing {file_name}: {ve}")
+                import traceback
+                traceback.print_exc()
                 attachment_context += f"\n\n[IMAGE: {file_name}] - Attached (analysis failed)."
         else:
             # Non-image attachments
