@@ -31,7 +31,7 @@ class EnhancedImageGenerator:
                              user_id: str = None) -> List[str]:
         """
         Generate images using Pollinations AI (Free, no API key needed)
-        Uses default model for best reliability.
+        Uses default model or specified model.
         
         Args:
             prompt: Image description
@@ -45,37 +45,50 @@ class EnhancedImageGenerator:
             List of image URLs
         """
         images = []
+        import urllib.parse
         
         for i in range(num_images):
             try:
-                # Clean prompt - remove special chars that break URL
-                safe_prompt = prompt.replace('"', '').replace("'", "").replace('\n', ' ').strip()
-                encoded_prompt = requests.utils.quote(safe_prompt)
+                # Clean prompt
+                if not prompt: prompt = "abstract art"
+                safe_prompt = str(prompt).replace('"', '').replace("'", "").replace('\n', ' ').strip()
+                encoded_prompt = urllib.parse.quote(safe_prompt)
                 
-                # Generate unique seed for variety
+                # Generate unique seed
                 seed = int(datetime.now().timestamp()) + i
                 
-                # Simple Pollinations URL with minimal params (more reliable)
-                # Don't specify model - let Pollinations use their default
-                direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true"
+                # Construct URL
+                # If model is specified, add it. If not, don't add parameter (use default)
+                model_param = f"&model={model}" if model else ""
+                
+                # Simple reliable URL construction
+                direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true{model_param}"
                 
                 print(f"[ImageGen] Generating image {i+1}/{num_images} with Pollinations...")
-                print(f"[ImageGen] URL: {direct_url[:100]}...")
+                print(f"[ImageGen] URL: {direct_url}")
                 
                 images.append(direct_url)
                     
             except Exception as e:
                 print(f"[ImageGen] Error generating image {i+1}: {e}")
+                # Fallbck to simple random abstract image if meaningful generation fails
+                fallback_url = f"https://image.pollinations.ai/prompt/abstract%20art?seed={datetime.now().timestamp()}"
+                print(f"[ImageGen] Using fallback URL due to error")
+                images.append(fallback_url)
+                
                 import traceback
                 traceback.print_exc()
         
         # Log action
-        if images and action_history:
-            action_history.log_action(
-                action_type="image_gen",
-                params={"prompt": prompt, "num_images": num_images, "width": width, "height": height},
-                description=f"Generate image: {prompt[:30]}..."
-            )
+        try:
+            if images and action_history:
+                action_history.log_action(
+                    action_type="image_gen",
+                    params={"prompt": prompt, "num_images": num_images},
+                    description=f"Generate image: {prompt[:30]}..."
+                )
+        except Exception as log_err:
+            print(f"[ImageGen] Logging failed: {log_err}")
         
         print(f"[ImageGen] Generated {len(images)} image URL(s)")
         return images
