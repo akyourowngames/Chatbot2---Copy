@@ -27,17 +27,18 @@ class EnhancedImageGenerator:
         self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
     
     def generate_pollinations(self, prompt: str, num_images: int = 1, 
-                             width: int = 1024, height: int = 1024, model: str = "sdxl",
+                             width: int = 1024, height: int = 1024, model: str = None,
                              user_id: str = None) -> List[str]:
         """
-        Generate images using Prodia API (Free, reliable, uses Stable Diffusion XL)
+        Generate images using Pollinations AI (Free, no API key needed)
+        Uses default model for best reliability.
         
         Args:
             prompt: Image description
             num_images: Number of images to generate
-            width: Image width (ignored, uses standard SDXL sizes)
-            height: Image height (ignored, uses standard SDXL sizes)
-            model: Model to use (default: sdxl)
+            width: Image width
+            height: Image height
+            model: Model to use (None = use Pollinations default)
             user_id: Optional user ID for user-specific storage
             
         Returns:
@@ -45,48 +46,23 @@ class EnhancedImageGenerator:
         """
         images = []
         
-        # Prodia API endpoint (free, no API key needed for basic use)
-        prodia_url = "https://api.prodia.com/generate"
-        
         for i in range(num_images):
             try:
-                # Clean prompt
+                # Clean prompt - remove special chars that break URL
                 safe_prompt = prompt.replace('"', '').replace("'", "").replace('\n', ' ').strip()
+                encoded_prompt = requests.utils.quote(safe_prompt)
                 
                 # Generate unique seed for variety
-                seed = int(datetime.now().timestamp() * 1000) + i
+                seed = int(datetime.now().timestamp()) + i
                 
-                print(f"[ImageGen] Generating image {i+1}/{num_images} with Prodia SDXL...")
+                # Simple Pollinations URL with minimal params (more reliable)
+                # Don't specify model - let Pollinations use their default
+                direct_url = f"{self.pollinations_api}{encoded_prompt}?width={width}&height={height}&seed={seed}&nologo=true"
                 
-                # Use Prodia's direct URL generation (similar to Pollinations)
-                # Prodia offers a simpler URL-based API
-                prodia_direct = f"https://images.prodia.xyz/job/{safe_prompt.replace(' ', '-')[:50]}-{seed}.png"
+                print(f"[ImageGen] Generating image {i+1}/{num_images} with Pollinations...")
+                print(f"[ImageGen] URL: {direct_url[:100]}...")
                 
-                # Actually, let's use a more reliable approach with picsum for now as fallback
-                # and try the Lexica.art search API which returns real AI images
-                
-                # Use Lexica.art - free AI image search/generation
-                lexica_search = f"https://lexica.art/api/v1/search?q={requests.utils.quote(safe_prompt)}"
-                
-                try:
-                    response = requests.get(lexica_search, timeout=10)
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('images') and len(data['images']) > 0:
-                            # Get a relevant image from Lexica
-                            img_index = i % len(data['images'])
-                            img_url = data['images'][img_index].get('src', '')
-                            if img_url:
-                                print(f"[ImageGen] Found Lexica image: {img_url[:60]}...")
-                                images.append(img_url)
-                                continue
-                except Exception as lex_err:
-                    print(f"[ImageGen] Lexica failed: {lex_err}")
-                
-                # Fallback: Use Unsplash Source for relevant images (not AI but works)
-                unsplash_url = f"https://source.unsplash.com/1024x1024/?{requests.utils.quote(safe_prompt.split()[0] if safe_prompt else 'art')}"
-                print(f"[ImageGen] Using Unsplash fallback: {unsplash_url[:60]}...")
-                images.append(unsplash_url)
+                images.append(direct_url)
                     
             except Exception as e:
                 print(f"[ImageGen] Error generating image {i+1}: {e}")
@@ -97,7 +73,7 @@ class EnhancedImageGenerator:
         if images and action_history:
             action_history.log_action(
                 action_type="image_gen",
-                params={"prompt": prompt, "num_images": num_images},
+                params={"prompt": prompt, "num_images": num_images, "width": width, "height": height},
                 description=f"Generate image: {prompt[:30]}..."
             )
         
