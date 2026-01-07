@@ -43,7 +43,7 @@ try {
 }
 
 // 📡 API Configuration
-const USE_CLOUD_API = true; // Set to true for production (Render), false for local dev
+const USE_CLOUD_API = false; // Set to true for production (Render), false for local dev
 // Dynamic BASE_URL: uses same host as frontend (works for both localhost and mobile access)
 const getBaseUrl = () => {
     if (USE_CLOUD_API) return 'https://kai-api-nxxv.onrender.com';

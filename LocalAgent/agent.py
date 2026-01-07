@@ -33,6 +33,7 @@ from .executors.system_control import SystemControlExecutor
 from .executors.system_status import SystemStatusExecutor
 from .executors.write_notepad import WriteNotepadExecutor
 from .executors.file_manager import FileManagerExecutor
+from .executors.screenshot import ScreenshotExecutor
 
 
 # ==================== LOGGING SETUP ====================
@@ -73,7 +74,9 @@ class KaiLocalAgent:
             "system_status": SystemStatusExecutor(),
             "write_notepad": WriteNotepadExecutor(),
             "file_manager": FileManagerExecutor(),
+            "screenshot": ScreenshotExecutor(),
         }
+
         
         # Running state
         self.running = False

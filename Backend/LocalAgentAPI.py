@@ -73,9 +73,30 @@ def _get_firestore():
                 return _firestore_db
             else:
                 print("[LOCAL_AGENT] ⚠️ Firebase storage returned but db is None")
+        
+        # Fallback 2: Try loading credentials from file directly
+        if _firestore_db is None and not firebase_admin._apps:
+            cred_file_paths = [
+                'kai-g-80f9c-firebase-adminsdk-fbsvc-d577c79d28.json',
+                os.path.join(os.path.dirname(__file__), '..', 'kai-g-80f9c-firebase-adminsdk-fbsvc-d577c79d28.json'),
+                'firebase-credentials.json',
+                os.path.join(os.path.dirname(__file__), '..', 'firebase-credentials.json'),
+            ]
+            
+            for cred_path in cred_file_paths:
+                if os.path.exists(cred_path):
+                    try:
+                        cred = credentials.Certificate(cred_path)
+                        firebase_admin.initialize_app(cred)
+                        _firestore_db = firestore.client()
+                        print(f"[LOCAL_AGENT] ✅ Firebase initialized from file: {cred_path}")
+                        return _firestore_db
+                    except Exception as e:
+                        print(f"[LOCAL_AGENT] ⚠️ Failed to init from {cred_path}: {e}")
                 
     except Exception as e:
         print(f"[LOCAL_AGENT] ⚠️ Firebase not available: {e}")
+
     
     return _firestore_db
 
@@ -85,21 +106,38 @@ def _load_devices_from_firestore():
     try:
         db = _get_firestore()
         if db:
-            # Query all devices across all users
-            # Structure: users/{user_id}/data/devices/{device_id}
-            users_ref = db.collection('users')
-            for user_doc in users_ref.stream():
-                devices_ref = user_doc.reference.collection('data').document('devices').collections()
-                # Alternative: direct devices subcollection under user
-                user_devices_ref = db.collection('users').document(user_doc.id).collection('devices')
-                for device_doc in user_devices_ref.stream():
+            # PRIORITY 1: Query top-level devices collection (fast path)
+            # This is where devices are saved with full data including user_id
+            try:
+                devices_ref = db.collection('devices')
+                for device_doc in devices_ref.stream():
                     device_data = device_doc.to_dict()
-                    device_data['user_id'] = user_doc.id
-                    devices[device_doc.id] = device_data
-            print(f"[LOCAL_AGENT] Loaded {len(devices)} devices from Firestore")
+                    if device_data:
+                        devices[device_doc.id] = device_data
+                print(f"[LOCAL_AGENT] ✅ Loaded {len(devices)} devices from top-level Firestore collection")
+            except Exception as e:
+                print(f"[LOCAL_AGENT] ⚠️ Top-level devices query failed: {e}")
+            
+            # PRIORITY 2: Also check user-nested collections (backup)
+            if len(devices) == 0:
+                try:
+                    users_ref = db.collection('users')
+                    for user_doc in users_ref.stream():
+                        user_devices_ref = db.collection('users').document(user_doc.id).collection('devices')
+                        for device_doc in user_devices_ref.stream():
+                            if device_doc.id not in devices:  # Don't overwrite
+                                device_data = device_doc.to_dict()
+                                device_data['user_id'] = user_doc.id
+                                devices[device_doc.id] = device_data
+                    print(f"[LOCAL_AGENT] Loaded {len(devices)} devices from user subcollections")
+                except Exception as e:
+                    print(f"[LOCAL_AGENT] ⚠️ User subcollection query failed: {e}")
+        else:
+            print("[LOCAL_AGENT] ⚠️ Firestore not available - devices will only persist in memory")
     except Exception as e:
         print(f"[LOCAL_AGENT] Error loading devices from Firestore: {e}")
     return devices
+
 
 def _save_device_to_firestore(device_id: str, device_data: dict):
     """Save a single device to Firestore."""

@@ -15,14 +15,32 @@ class GoalInferenceEngine:
         self.system_prompt = """You are a goal inference system. Your job is to understand what the user wants to achieve from their message.
 
 Analyze the user's query and determine:
-1. PRIMARY GOAL: What does the user fundamentally want? (create something, get information, control system, have conversation)
-2. OUTPUT TYPE: What kind of output do they expect? (image, document, action, data, conversation)
+1. PRIMARY GOAL: What does the user fundamentally want?
+2. OUTPUT TYPE: What kind of output do they expect?
 3. ENTITIES: Extract key entities (app names, topics, parameters)
 4. COMPLEXITY: Is this simple, multi-step, or unclear?
 
+PRIMARY GOAL Categories:
+- create_visual: Generate images, art, designs
+- get_information: Search, lookup, research facts
+- control_system: DIRECT OS interaction (opening apps, system settings, file operations ON THE USER'S PC)
+- automation_required: OS-level automation needed (typing in apps, clicking, running commands)
+- manage_media: Play music, videos
+- conversation: Chat, discuss, explain
+- unclear: Ambiguous request
+
+IMPORTANT DISTINCTION:
+- "search for python" → get_information (web search, no OS control)
+- "open chrome" → control_system (needs to launch app on PC)
+- "open chrome and search python" → automation_required (multi-step OS interaction)
+- "write a poem" → conversation (just text response)
+- "write a poem in notepad" → automation_required (needs to open notepad AND type)
+- "increase volume" → control_system (OS-level control)
+- "delete files in downloads" → automation_required (file system operation)
+
 Return JSON ONLY in this exact format:
 {
-  "primary_goal": "create_visual|get_information|control_system|manage_media|conversation|unclear",
+  "primary_goal": "create_visual|get_information|control_system|automation_required|manage_media|conversation|unclear",
   "output_type": "image|document|action|data|conversation|music|video|multiple",
   "entities": {
     "target": "extracted entity if any",
@@ -36,9 +54,13 @@ Examples:
 - "I need something cool for my startup poster" → primary_goal: create_visual, output_type: image
 - "what's the weather" → primary_goal: get_information, output_type: data
 - "open notepad" → primary_goal: control_system, output_type: action
+- "write hello in notepad" → primary_goal: automation_required, output_type: action, complexity: multi_step
 - "play some music" → primary_goal: manage_media, output_type: music
 - "help me with something" → primary_goal: unclear, complexity: unclear
+- "close all chrome windows" → primary_goal: control_system, output_type: action
+- "increase volume to 80%" → primary_goal: control_system, output_type: action
 """
+
     
     def infer_goal(self, query: str, history: List[Dict[str, str]] = None) -> Dict:
         """

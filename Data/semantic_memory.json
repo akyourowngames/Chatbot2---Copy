@@ -1973,8 +1973,8 @@
       0.02205830253660679
     ],
     "created_at": "2025-12-25T16:48:35.258566",
-    "last_accessed": "2026-01-07T17:11:45.444332",
-    "access_count": 257,
+    "last_accessed": "2026-01-07T20:32:47.569043",
+    "access_count": 298,
     "category": "preference",
     "importance": 0.9,
     "source": "contextual"
@@ -3697,8 +3697,8 @@
       0.03978795000891839
     ],
     "created_at": "2026-01-07T13:59:31.384853",
-    "last_accessed": "2026-01-07T17:25:20.587563",
-    "access_count": 94,
+    "last_accessed": "2026-01-07T20:32:47.569053",
+    "access_count": 164,
     "category": "preference",
     "importance": 0.85,
     "source": "contextual"
@@ -3977,8 +3977,8 @@
       0.0
     ],
     "created_at": "2026-01-07T16:13:55.717062",
-    "last_accessed": "2026-01-07T17:25:20.587570",
-    "access_count": 5,
+    "last_accessed": "2026-01-07T20:30:37.804312",
+    "access_count": 10,
     "category": "general",
     "importance": 0.30000000000000004,
     "source": "contextual"
@@ -4117,8 +4117,8 @@
       0.0
     ],
     "created_at": "2026-01-07T16:13:56.592712",
-    "last_accessed": "2026-01-07T17:25:20.587573",
-    "access_count": 13,
+    "last_accessed": "2026-01-07T20:32:47.569056",
+    "access_count": 83,
     "category": "general",
     "importance": 0.30000000000000004,
     "source": "contextual"

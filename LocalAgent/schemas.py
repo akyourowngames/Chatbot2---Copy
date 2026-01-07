@@ -97,22 +97,14 @@ COMMAND_SCHEMA = {
         },
         "description": "Sandboxed file operations within Kai directories only"
     },
-    # "create_file": {
-    #     "required_params": ["path", "content"],
-    #     "optional_params": ["overwrite"],
-    #     "description": "Create a file in allowed directories"
-    # },
-    # "run_script": {
-    #     "required_params": ["script_id"],
-    #     "optional_params": [],
-    #     "description": "Run a predefined whitelisted script"
-    # },
-    # "screenshot": {
-    #     "required_params": [],
-    #     "optional_params": ["region"],
-    #     "description": "Take a screenshot"
-    # },
+    "screenshot": {
+        "required_params": [],
+        "optional_params": ["region"],
+        "allowed_values": {},
+        "description": "Take a screenshot of the current screen"
+    },
 }
+
 
 
 def validate_command(command: str, params: Dict[str, Any]) -> Tuple[bool, str]:

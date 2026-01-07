@@ -71,7 +71,11 @@ class FirebaseStorage:
                     os.path.join(os.path.dirname(__file__), '..', cred_path),
                     os.path.join(os.path.dirname(__file__), '..', 'Config', 'firebase-credentials.json'),
                     os.path.join(os.path.dirname(__file__), '..', 'firebase-credentials.json'),
+                    # Add project-specific credential files
+                    os.path.join(os.path.dirname(__file__), '..', 'kai-g-80f9c-firebase-adminsdk-fbsvc-d577c79d28.json'),
+                    'kai-g-80f9c-firebase-adminsdk-fbsvc-d577c79d28.json',
                 ]
+
                 
                 found = False
                 for path in possible_paths:
