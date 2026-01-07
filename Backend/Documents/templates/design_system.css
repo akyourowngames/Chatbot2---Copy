@@ -1,0 +1,426 @@
+/*
+ * Kai Document Design System
+ * ==========================
+ * Professional typography, colors, and layout for all document types.
+ * Print-optimized with @page rules.
+ */
+
+/* === CSS VARIABLES === */
+:root {
+    /* Brand Colors */
+    --primary: #2563EB;
+    --primary-dark: #1E40AF;
+    --primary-light: #3B82F6;
+    --accent: #F59E0B;
+    --accent-light: #FCD34D;
+    
+    /* Neutrals */
+    --text-primary: #1F2937;
+    --text-secondary: #6B7280;
+    --text-muted: #9CA3AF;
+    --bg-white: #FFFFFF;
+    --bg-light: #F9FAFB;
+    --bg-subtle: #F3F4F6;
+    --border: #E5E7EB;
+    
+    /* Status Colors */
+    --success: #10B981;
+    --warning: #F59E0B;
+    --error: #EF4444;
+    
+    /* Typography */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-serif: 'Merriweather', Georgia, serif;
+    --font-mono: 'Fira Code', 'JetBrains Mono', monospace;
+    
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+    --space-3xl: 4rem;
+}
+
+/* === BASE STYLES === */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    line-height: 1.6;
+    background: var(--bg-white);
+}
+
+/* === TYPOGRAPHY === */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    line-height: 1.25;
+    margin-bottom: var(--space-md);
+    color: var(--text-primary);
+}
+
+h1 {
+    font-size: 2.5rem;
+    letter-spacing: -0.025em;
+}
+
+h2 {
+    font-size: 1.875rem;
+    color: var(--primary-dark);
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: var(--space-sm);
+    margin-top: var(--space-xl);
+}
+
+h3 {
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin-top: var(--space-lg);
+}
+
+h4 {
+    font-size: 1.25rem;
+}
+
+p {
+    margin-bottom: var(--space-md);
+    text-align: justify;
+}
+
+a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+strong {
+    font-weight: 600;
+}
+
+/* === DOCUMENT CONTAINER === */
+.document {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: var(--space-xl);
+    background: var(--bg-white);
+}
+
+/* === COVER PAGE === */
+.cover-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: var(--space-3xl);
+    background: linear-gradient(135deg, var(--bg-white) 0%, var(--bg-subtle) 100%);
+    page-break-after: always;
+}
+
+.cover-page .title {
+    font-size: 3rem;
+    color: var(--primary-dark);
+    margin-bottom: var(--space-md);
+    max-width: 80%;
+}
+
+.cover-page .tagline {
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: var(--space-2xl);
+    max-width: 70%;
+}
+
+.cover-page .subtitle {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2xl);
+}
+
+.cover-page .meta {
+    margin-top: var(--space-3xl);
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.cover-page .author {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.cover-page .date {
+    margin-top: var(--space-sm);
+}
+
+.cover-page .brand-accent {
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+    border-radius: 2px;
+    margin: var(--space-xl) 0;
+}
+
+/* === SECTIONS === */
+.section {
+    margin-bottom: var(--space-xl);
+    page-break-inside: avoid;
+}
+
+.section-content {
+    padding-left: var(--space-md);
+}
+
+/* === BULLET LISTS === */
+ul.bullet-list {
+    list-style: none;
+    padding-left: var(--space-lg);
+    margin-bottom: var(--space-md);
+}
+
+ul.bullet-list li {
+    position: relative;
+    padding-left: var(--space-lg);
+    margin-bottom: var(--space-sm);
+}
+
+ul.bullet-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.6em;
+    width: 8px;
+    height: 8px;
+    background: var(--primary);
+    border-radius: 50%;
+}
+
+/* === TABLES === */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-lg) 0;
+    font-size: 0.9rem;
+}
+
+thead {
+    background: var(--primary);
+    color: white;
+}
+
+th, td {
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    border: 1px solid var(--border);
+}
+
+th {
+    font-weight: 600;
+}
+
+tbody tr:nth-child(even) {
+    background: var(--bg-subtle);
+}
+
+tbody tr:hover {
+    background: var(--bg-light);
+}
+
+/* === HIGHLIGHTS / CALLOUTS === */
+.highlight-box {
+    background: linear-gradient(135deg, var(--bg-subtle) 0%, var(--bg-light) 100%);
+    border-left: 4px solid var(--primary);
+    padding: var(--space-lg);
+    margin: var(--space-lg) 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.highlight-box .highlight-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: var(--space-sm);
+}
+
+.highlight-box .highlight-item::before {
+    content: "→";
+    color: var(--primary);
+    font-weight: bold;
+    margin-right: var(--space-sm);
+}
+
+/* === METRICS GRID === */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-md);
+    margin: var(--space-lg) 0;
+}
+
+.metric-card {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: var(--space-lg);
+    text-align: center;
+    border: 1px solid var(--border);
+}
+
+.metric-card .metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.metric-card .metric-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-top: var(--space-xs);
+}
+
+/* === TEAM SECTION === */
+.team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-md);
+    margin: var(--space-lg) 0;
+}
+
+.team-member {
+    background: var(--bg-subtle);
+    border-radius: 8px;
+    padding: var(--space-md);
+    text-align: center;
+}
+
+.team-member .name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.team-member .role {
+    font-size: 0.875rem;
+    color: var(--primary);
+}
+
+/* === TECH STACK BADGES === */
+.tech-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin: var(--space-md) 0;
+}
+
+.tech-badge {
+    background: var(--primary-light);
+    color: white;
+    padding: var(--space-xs) var(--space-md);
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* === TWO COLUMN LAYOUT === */
+.two-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-xl);
+    margin: var(--space-lg) 0;
+}
+
+@media (max-width: 600px) {
+    .two-column {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* === CODE BLOCKS === */
+pre, code {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+}
+
+pre {
+    background: var(--text-primary);
+    color: #E5E7EB;
+    padding: var(--space-lg);
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: var(--space-md) 0;
+}
+
+code {
+    background: var(--bg-subtle);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+}
+
+/* === FOOTER === */
+.document-footer {
+    margin-top: var(--space-3xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+/* === PRINT STYLES === */
+@media print {
+    body {
+        font-size: 11pt;
+    }
+    
+    .document {
+        max-width: none;
+        padding: 0;
+    }
+    
+    .cover-page {
+        min-height: auto;
+        padding: 2in 1in;
+    }
+    
+    h2 {
+        page-break-after: avoid;
+    }
+    
+    .section {
+        page-break-inside: avoid;
+    }
+    
+    table {
+        page-break-inside: avoid;
+    }
+    
+    .highlight-box {
+        page-break-inside: avoid;
+    }
+}
+
+@page {
+    size: A4;
+    margin: 1in;
+}
+
+@page :first {
+    margin-top: 0;
+}

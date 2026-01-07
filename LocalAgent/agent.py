@@ -3,14 +3,16 @@ Kai Local Agent - Main Agent Module
 =====================================
 The core agent that:
 - Registers with the Kai cloud API
-- Polls for tasks
+- Connects via WebSocket (preferred) or polls for tasks (fallback)
 - Executes commands via whitelisted executors
 - Reports results back
 
-Run with: python -m LocalAgent.agent [--register TOKEN] [--api URL]
+Run with: python -m LocalAgent.agent [--register TOKEN] [--api URL] [--ws]
 """
 
 import argparse
+import asyncio
+import json
 import logging
 import signal
 import sys
@@ -327,6 +329,149 @@ class KaiLocalAgent:
         
         logger.info("Agent stopped.")
     
+    def run_websocket(self, ws_url: Optional[str] = None):
+        """
+        Run agent in WebSocket mode (preferred, real-time).
+        Falls back to polling if WebSocket fails.
+        """
+        if not is_registered():
+            logger.error("Device not registered. Run with --register TOKEN first.")
+            return
+        
+        # Derive WebSocket URL from API URL
+        if not ws_url:
+            # Convert http(s)://host:port/api/v1 -> ws(s)://host:8766
+            api_url = self.api_url
+            if api_url.startswith("https://"):
+                ws_host = api_url.replace("https://", "").split("/")[0].split(":")[0]
+                ws_url = f"wss://{ws_host}:8766"
+            elif api_url.startswith("http://"):
+                ws_host = api_url.replace("http://", "").split("/")[0].split(":")[0]
+                ws_url = f"ws://{ws_host}:8766"
+            else:
+                ws_url = "ws://localhost:8766"
+        
+        self.running = True
+        logger.info("=" * 50)
+        logger.info("Kai Local Agent started (WebSocket Mode)")
+        logger.info(f"Device: {self.config.get('device_name')}")
+        logger.info(f"WebSocket URL: {ws_url}")
+        logger.info("Press Ctrl+C to stop")
+        logger.info("=" * 50)
+        
+        asyncio.run(self._websocket_loop(ws_url))
+        
+    async def _websocket_loop(self, ws_url: str):
+        """Main WebSocket connection loop with auto-reconnect."""
+        import websockets
+        
+        reconnect_delay = 1  # Start with 1 second
+        max_reconnect_delay = 30  # Max 30 seconds between retries
+        
+        while self.running:
+            try:
+                logger.info(f"Connecting to {ws_url}...")
+                async with websockets.connect(ws_url) as websocket:
+                    # Send auth message
+                    creds = get_credentials()
+                    if not creds:
+                        logger.error("No credentials found!")
+                        return
+                        
+                    device_id, auth_token = creds
+                    await websocket.send(json.dumps({
+                        "type": "auth",
+                        "device_id": device_id,
+                        "auth_token": auth_token
+                    }))
+                    
+                    # Wait for auth response
+                    response = await asyncio.wait_for(websocket.recv(), timeout=10)
+                    resp_data = json.loads(response)
+                    
+                    if resp_data.get("type") == "auth_success":
+                        logger.info(f"✅ Connected: {resp_data.get('message')}")
+                        reconnect_delay = 1  # Reset delay on success
+                    else:
+                        logger.error(f"Auth failed: {resp_data.get('message')}")
+                        return
+                    
+                    # Start heartbeat task
+                    heartbeat_task = asyncio.create_task(self._heartbeat_loop(websocket))
+                    
+                    try:
+                        # Main message loop
+                        async for message in websocket:
+                            await self._handle_ws_message(websocket, message)
+                    finally:
+                        heartbeat_task.cancel()
+                        
+            except websockets.exceptions.ConnectionClosed as e:
+                logger.warning(f"Connection closed: {e}")
+            except asyncio.TimeoutError:
+                logger.warning("Connection timeout")
+            except ConnectionRefusedError:
+                logger.warning(f"Connection refused - server may be offline")
+            except Exception as e:
+                logger.error(f"WebSocket error: {e}")
+            
+            if self.running:
+                logger.info(f"Reconnecting in {reconnect_delay}s...")
+                await asyncio.sleep(reconnect_delay)
+                reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
+        
+        logger.info("WebSocket agent stopped.")
+    
+    async def _heartbeat_loop(self, websocket):
+        """Send periodic heartbeat to keep connection alive."""
+        while True:
+            try:
+                await asyncio.sleep(30)
+                await websocket.send(json.dumps({"type": "heartbeat"}))
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                break
+    
+    async def _handle_ws_message(self, websocket, message: str):
+        """Handle incoming WebSocket message (task from server)."""
+        try:
+            data = json.loads(message)
+            msg_type = data.get("type")
+            
+            if msg_type == "task":
+                task_id = data.get("task_id")
+                command = data.get("command")
+                params = data.get("params", {})
+                
+                logger.info(f"📥 Task received: {command} ({task_id[:8]}...)")
+                
+                # Execute command
+                result = self.execute_command(command, params)
+                
+                # Send result back via WebSocket
+                await websocket.send(json.dumps({
+                    "type": "result",
+                    "task_id": task_id,
+                    "status": result.get("status", "error"),
+                    "result": result
+                }))
+                logger.info(f"📤 Result sent: {result.get('status')}")
+                
+            elif msg_type == "heartbeat_ack":
+                pass  # Heartbeat acknowledged
+                
+            elif msg_type == "pong":
+                pass  # Ping response
+                
+            elif msg_type == "result_ack":
+                logger.info(f"✓ Result acknowledged: {data.get('task_id', '')[:8]}...")
+                
+        except json.JSONDecodeError:
+            logger.warning("Invalid JSON message received")
+        except Exception as e:
+            logger.error(f"Message handling error: {e}")
+    
     def stop(self):
         """Stop the agent loop."""
         self.running = False
@@ -358,6 +503,11 @@ def main():
         action="store_true",
         help="Show registration status and exit"
     )
+    parser.add_argument(
+        "--ws",
+        action="store_true",
+        help="Use WebSocket mode (real-time, preferred)"
+    )
     
     args = parser.parse_args()
     
@@ -383,7 +533,7 @@ def main():
         success = agent.register(args.register, args.name)
         if not success:
             sys.exit(1)
-        print("\nYou can now run the agent with: python -m LocalAgent.agent")
+        print("\nYou can now run the agent with: python -m LocalAgent.agent --ws")
         return
     
     # Default: run the agent
@@ -400,8 +550,17 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Run the agent
-    agent.run()
+    # Run the agent (WebSocket or polling mode)
+    if args.ws:
+        try:
+            agent.run_websocket()
+        except ImportError:
+            print("WebSocket mode requires 'websockets' package.")
+            print("Install with: pip install websockets")
+            print("Falling back to polling mode...")
+            agent.run()
+    else:
+        agent.run()
 
 
 if __name__ == "__main__":

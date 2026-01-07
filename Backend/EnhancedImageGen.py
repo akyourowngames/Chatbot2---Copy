@@ -32,7 +32,7 @@ class EnhancedImageGenerator:
                              width: int = 1024, height: int = 1024, model: str = None,
                              user_id: str = None) -> List[str]:
         """
-        Generate images using Pollinations AI with Bearer token authentication
+        Generate images using Pollinations AI
         
         Args:
             prompt: Image description
@@ -54,46 +54,41 @@ class EnhancedImageGenerator:
                 # Clean and encode prompt
                 if not prompt: prompt = "abstract art"
                 safe_prompt = str(prompt).strip()
+                
+                # URL encode the prompt
                 encoded_prompt = urllib.parse.quote(safe_prompt)
                 
-                # Generate seed
+                # Generate seed for variety
                 seed = int(datetime.now().timestamp() * 1000) + i
                 
-                # Use gen.pollinations.ai API endpoint with Bearer token
-                if self.pollinations_api_key:
-                    # Make authenticated request to gen.pollinations.ai
-                    api_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
-                    headers = {
-                        "Authorization": f"Bearer {self.pollinations_api_key}"
-                    }
-                    params = {
-                        "model": model or "flux",
-                        "width": width,
-                        "height": height,
-                        "seed": seed,
-                        "nologo": "true"
-                    }
+                # Use the simple image.pollinations.ai endpoint - no auth needed!
+                # Format: https://image.pollinations.ai/prompt/{prompt}?width={w}&height={h}&seed={s}&nologo=true
+                api_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+                params = {
+                    "width": width,
+                    "height": height,
+                    "seed": seed,
+                    "nologo": "true",
+                    "model": model or "flux"
+                }
+                
+                print(f"[ImageGen] Calling Pollinations: {safe_prompt[:50]}...")
+                
+                # Make the request (no auth headers needed for this endpoint)
+                response = requests.get(api_url, params=params, timeout=60)
+                
+                if response.status_code == 200 and response.content:
+                    # Save image to file
+                    filename = f"pollinations_{seed}.png"
+                    filepath = os.path.join(self.output_dir, filename)
+                    with open(filepath, 'wb') as f:
+                        f.write(response.content)
                     
-                    print(f"[ImageGen] Calling Pollinations API with Bearer auth...")
-                    
-                    # Make the request
-                    response = requests.get(api_url, headers=headers, params=params, timeout=30)
-                    
-                    if response.status_code == 200:
-                        # Save image to file
-                        filename = f"pollinations_{seed}.png"
-                        filepath = os.path.join(self.output_dir, filename)
-                        with open(filepath, 'wb') as f:
-                            f.write(response.content)
-                        
-                        # Return relative path for serving
-                        images.append(f"/data/Images/{filename}")
-                        print(f"[ImageGen] ✓ Image saved: {filename}")
-                    else:
-                        print(f"[ImageGen] ✗ API error {response.status_code}: {response.text[:100]}")
+                    # Return relative path for serving
+                    images.append(f"/data/Images/{filename}")
+                    print(f"[ImageGen] ✓ Image saved: {filename}")
                 else:
-                    # No API key - cannot use the API
-                    print("[ImageGen] ✗ No API key configured - image generation requires authentication")
+                    print(f"[ImageGen] ✗ API error {response.status_code}: {response.text[:100] if response.text else 'No response'}")
                     
             except Exception as e:
                 print(f"[ImageGen] Error: {e}")
@@ -113,6 +108,7 @@ class EnhancedImageGenerator:
         
         print(f"[ImageGen] Generated {len(images)} image(s)")
         return images
+
         
 
     def generate_variations(self, image_url: str, num_variations: int = 3, user_id: str = None) -> List[str]:

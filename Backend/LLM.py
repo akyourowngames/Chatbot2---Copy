@@ -223,69 +223,9 @@ def ChatCompletion(messages, system_prompt=None, text_only=True, model="llama-3.
             user_query = msg.get('content', '')
             break
     
-    # ==================== PROJECT INTELLIGENCE MODE DETECTION ====================
-    # Auto-detect project requests and return structured plan instead of chat response
-    project_keywords = ['build', 'create', 'make', 'develop', 'project', "let's work on", 'help me build', 'build me']
-    has_project_keyword = any(kw in user_query.lower() for kw in project_keywords)
-    
-    if has_project_keyword and len(user_query) > 15:
-        try:
-            from Backend.ProjectIntelligence import project_intelligence
-            import json
-            
-            # Detect project intent
-            detection = project_intelligence.detect_project_intent(user_query, [])
-            
-            print(f"[PROJECT MODE] Detection: {detection.get('is_project')} (confidence: {detection.get('confidence')})")
-            
-            # If confident it's a project, generate full plan
-            if detection.get('is_project') and detection.get('confidence', 0) >= 0.6:
-                print("[PROJECT MODE] Generating project plan...")
-                
-                # Get project type
-                classification = project_intelligence.classify_project_type(user_query)
-                project_type = classification.get("type", "software_web")
-                
-                # Extract constraints
-                constraints = project_intelligence.extract_constraints(user_query, {})
-                
-                # Decompose project
-                decomposition = project_intelligence.decompose_project(user_query, project_type, constraints)
-                
-                # Generate executable plan
-                plan = project_intelligence.generate_plan(decomposition)
-                
-                # Create response with HIDDEN JSON for frontend to parse
-                tasks_preview = "\n".join([f"{i}. {t.get('text', 'Task')}" for i, t in enumerate(plan.get('tasks', [])[:5], 1)])
-                more_tasks = f"\n...and {len(plan.get('tasks', [])) - 5} more tasks!" if len(plan.get('tasks', [])) > 5 else ""
-                
-                response_text = f"""🚀 **PROJECT MODE ACTIVATED**
-
-I've created a structured plan for: **{plan.get('title', 'Your Project')}**
-
-**Project Type:** {plan.get('project_type', 'Unknown').replace('_', ' ').title()}
-**Tech Stack:** {', '.join(plan.get('tech_stack', [])[:5])}
-**Tasks:** {len(plan.get('tasks', []))} steps | **Milestones:** {len(plan.get('milestones', []))} phases
-
-**📋 First Steps:**
-{tasks_preview}{more_tasks}
-
-**Current Phase:** {plan.get('current_phase', 'Planning')}
-
-I've broken your project into 5 layers: Concept → System → Features → Execution → Validation
-
-Ready to start? I can help with any specific part!
-
-<!--PROJECT_CANVAS:{json.dumps(plan)}-->"""
-                
-                print(f"[PROJECT MODE] Plan generated with {len(plan.get('tasks', []))} tasks")
-                return response_text
-                
-        except Exception as e:
-            print(f"[PROJECT MODE] Detection failed: {e}")
-            import traceback
-            traceback.print_exc()
-            # Fall through to normal chat if project detection fails
+    # ==================== PROJECT MODE REMOVED ====================
+    # Project intelligence has been removed - all project-like queries
+    # are now handled by the goal inference pipeline in api_server.py
     
     # ==================== NORMAL CHAT FLOW CONTINUES ====================
     

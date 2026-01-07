@@ -237,7 +237,31 @@ print(f"[LOCAL_AGENT] Loaded {len(_registered_devices)} registered devices (Fire
 local_agent_bp = Blueprint('local_agent', __name__, url_prefix='/agent')
 
 
-# ==================== AUTH HELPERS ====================
+# Blueprint-level CORS handler for ALL /agent/* endpoints
+@local_agent_bp.after_request
+def add_cors_headers(response):
+    """Add CORS headers to all agent API responses."""
+    origin = request.headers.get('Origin', 'http://localhost:3000')
+    allowed_origins = ['http://localhost:3000', 'https://kai2010.netlify.app', 'https://kai-frontend.onrender.com']
+    
+    if origin in allowed_origins or origin.startswith('http://localhost:') or origin.endswith('.netlify.app') or origin.endswith('.onrender.com'):
+        response.headers['Access-Control-Allow-Origin'] = origin
+    else:
+        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-User-ID'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
+
+
+# Blueprint-level OPTIONS handler for preflight requests
+@local_agent_bp.before_request
+def handle_preflight():
+    """Handle CORS preflight OPTIONS requests."""
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        return response, 200
 
 def generate_auth_token():
     """Generate a secure auth token for device authentication."""
@@ -852,20 +876,34 @@ def queue_task():
             "created_at": datetime.now().isoformat()
         }
         
-        # Add to device's task queue
-        if device_id not in _pending_tasks:
-            _pending_tasks[device_id] = []
-        _pending_tasks[device_id].append(task)
+        # TRY WEBSOCKET FIRST (instant delivery)
+        ws_sent = False
+        try:
+            from Backend.AgentWebSocket import is_agent_connected, send_task_sync
+            if is_agent_connected(device_id):
+                ws_sent = send_task_sync(device_id, task_id, command, params)
+                if ws_sent:
+                    print(f"[LOCAL_AGENT] ⚡ Task sent via WebSocket to {device_id[:8]}...")
+        except Exception as ws_err:
+            print(f"[LOCAL_AGENT] WebSocket push failed: {ws_err}")
+        
+        # FALLBACK: Add to polling queue if WS failed
+        if not ws_sent:
+            if device_id not in _pending_tasks:
+                _pending_tasks[device_id] = []
+            _pending_tasks[device_id].append(task)
+            print(f"[LOCAL_AGENT] Task queued for polling: {device_id[:8]}...")
         
         # Audit log
-        log_command(user_id, device_id, command, params, "queued")
+        log_command(user_id, device_id, command, params, "queued" if not ws_sent else "sent_ws")
         
-        print(f"[LOCAL_AGENT] Task queued for {device_id[:8]}...: {command} (by user {user_id[:8] if user_id else 'internal'}...)")
+        print(f"[LOCAL_AGENT] Task {'sent' if ws_sent else 'queued'} for {device_id[:8]}...: {command} (by user {user_id[:8] if user_id else 'internal'}...)")
         
         return jsonify({
             "success": True,
             "task_id": task_id,
-            "message": f"Task '{command}' queued for device"
+            "delivery": "websocket" if ws_sent else "polling",
+            "message": f"Task '{command}' {'sent' if ws_sent else 'queued'} for device"
         })
         
     except Exception as e:

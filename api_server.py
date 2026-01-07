@@ -28,6 +28,14 @@ from Backend.YouTubePlayer import youtube_player
 
 app = Flask(__name__)
 
+# Register Local Agent API blueprint for device management endpoints
+try:
+    from Backend.LocalAgentAPI import local_agent_bp
+    app.register_blueprint(local_agent_bp)
+    print("[INIT] ✅ Local Agent API endpoints registered (/agent/*)")
+except Exception as e:
+    print(f"[INIT] ⚠️ Local Agent API not loaded: {e}")
+
 # ==================== CORS SANITIZER (ONLY CORS HANDLER) ====================
 # Allowed origins for CORS (add more as needed)
 ALLOWED_ORIGINS = [
@@ -165,14 +173,7 @@ except ImportError as e:
     SECURITY_ENABLED = False
     rate_limit = lambda *args, **kwargs: lambda f: f  # No-op decorator
 
-# ==================== LOCAL AGENT API ====================
-try:
-    from Backend.LocalAgentAPI import register_local_agent_api
-    register_local_agent_api(app)
-    LOCAL_AGENT_ENABLED = True
-except ImportError as e:
-    print(f"[WARN] Local Agent API not available: {e}")
-    LOCAL_AGENT_ENABLED = False
+# NOTE: LocalAgentAPI blueprint registered at app creation (line 32-37)
 
 # Imports for Vision + File Upload (Optional - may not be available in cloud deployment)
 try:
@@ -2234,6 +2235,7 @@ def chat():
     
     # === ATTACHMENT HANDLING (NEW) ===
     # Process any attached files (images get vision analysis)
+    import os as _os  # Use _os to avoid scoping issues with later imports
     attachment_context = ""
     for attachment in attachments:
         file_name = attachment.get('name', '')
@@ -2242,16 +2244,17 @@ def chat():
         file_type_api = attachment.get('type', 'unknown')
         
         # Robust extension detection
-        ext = os.path.splitext(file_name)[1].lower().lstrip('.')
+        ext = _os.path.splitext(file_name)[1].lower().lstrip('.')
         
         print(f"[ATTACHMENT] Processing: {file_name} (type: {file_type_api}, ext: {ext})")
+        
         
 
         # --- PDF PROCESSING (Smart OCR) ---
         if ext == 'pdf':
             try:
                 import pdfplumber
-                full_path = os.path.join(DATA_DIR, 'Uploads', file_name)
+                full_path = _os.path.join(DATA_DIR, 'Uploads', file_name)
                 pdf_text = ""
                 has_images = False
                 
@@ -2360,8 +2363,21 @@ def chat():
                     print(f"[VISION] Using URL: {file_url[:80]}...")
                 
                 if image_source:
-                    # Improved prompt for structured output
-                    vision_prompt = (query or "Describe this image in detail.") + "\n(Format: Structured Markdown with Bold Headers and Bullet Points)"
+                    # Improved prompt for comprehensive, detailed analysis
+                    base_query = query or "Describe this image"
+                    vision_prompt = f"""{base_query}
+
+Provide a COMPREHENSIVE and DETAILED analysis of this image. Include:
+
+1. **Main Subject/Focus**: What is the primary subject or focus of this image?
+2. **Visual Elements**: Describe colors, composition, style, lighting, and artistic techniques
+3. **Details & Objects**: List all notable objects, text, symbols, or elements visible
+4. **Context & Setting**: Describe the environment, background, or setting
+5. **Mood & Atmosphere**: What emotions or atmosphere does this image convey?
+6. **Purpose/Intent**: What appears to be the purpose of this image? (e.g., advertisement, art, logo, infographic, etc.)
+
+Format your response with **Bold Headers** and clear sections. Be thorough and descriptive - aim for 150-300 words."""
+                    
                     result = vision.analyze(image_source, vision_prompt)
                     if result.get('success'):
                         attachment_context += f"\n\n[IMAGE ANALYSIS - {file_name}]:\n{result.get('description', 'Image analyzed.')}"
@@ -2747,9 +2763,26 @@ def chat():
                 from Backend.SmartTrigger import smart_trigger
                 trigger_type, command, _ = smart_trigger.detect(original_query)
 
-        
+        # === VISION ANALYSIS GUARD ===
+        # If user uploaded image attachments and wants analysis (not generation), skip image generation trigger
+        # This prevents "analyze image" from generating new images when user uploaded an image
+        if trigger_type == "image" and attachments:
+            has_image_attachments = any(
+                att.get('type') == 'image' or 
+                att.get('name', '').lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'))
+                for att in attachments
+            )
+            analysis_keywords = ['analyze', 'describe', 'what is', "what's", 'explain', 'look at', 'tell me about', 
+                                'identify', 'recognize', 'read', 'extract', 'ocr', 'transcribe', 'caption']
+            wants_analysis = any(kw in original_query_lower for kw in analysis_keywords)
+            
+            if has_image_attachments and (wants_analysis or not any(v in original_query_lower for v in ['generate', 'create', 'make', 'draw'])):
+                print(f"[GUARD] 🛡️ Skipping image generation - user has image attachment and wants analysis, not generation")
+                trigger_type = None  # Let it fall through to ChatBot with vision context
+
 
         response_text = ""
+        
         
         # 1. MUSIC/MEDIA COMMANDS
         # 1. MUSIC COMMANDS - YOUTUBE (Spotify Removed)
@@ -3011,6 +3044,12 @@ def chat():
                  if device_id not in _pending_tasks:
                      _pending_tasks[device_id] = []
                  _pending_tasks[device_id].append(task)
+
+                 # Push task to WebSocket
+                 try:
+                     from Backend.AgentWebSocket import send_task_sync
+                     send_task_sync(device_id, task_id, task['command'], task['params'])
+                 except Exception: pass
                  
                  # Audit log
                  log_command(current_user_id or "anonymous", device_id, "system_status", {}, "queued")
@@ -3066,6 +3105,13 @@ def chat():
                  if device_id not in _pending_tasks:
                      _pending_tasks[device_id] = []
                  _pending_tasks[device_id].append(task)
+                 
+                 # Push task to WebSocket
+                 try:
+                     from Backend.AgentWebSocket import send_task_sync
+                     send_task_sync(device_id, task_id, task['command'], task['params'])
+                 except Exception: pass
+
                  log_command(current_user_id or "anonymous", device_id, "open_app", {"app": command}, "queued")
                  
                  max_wait, start_time, result_data = 10, time_module.time(), None
@@ -3112,6 +3158,13 @@ def chat():
                  if device_id not in _pending_tasks:
                      _pending_tasks[device_id] = []
                  _pending_tasks[device_id].append(task)
+                 
+                 # Push task to WebSocket
+                 try:
+                     from Backend.AgentWebSocket import send_task_sync
+                     send_task_sync(device_id, task_id, task['command'], task['params'])
+                 except Exception: pass
+
                  log_command(current_user_id or "anonymous", device_id, "close_app", {"app": command}, "queued")
                  
                  max_wait, start_time, result_data = 10, time_module.time(), None
@@ -3173,6 +3226,13 @@ def chat():
                  if device_id not in _pending_tasks:
                      _pending_tasks[device_id] = []
                  _pending_tasks[device_id].append(task)
+                 
+                 # Push task to WebSocket
+                 try:
+                     from Backend.AgentWebSocket import send_task_sync
+                     send_task_sync(device_id, task_id, task['command'], task['params'])
+                 except Exception: pass
+
                  log_command(current_user_id or "anonymous", device_id, "system_control", params, "queued")
                  
                  # Wait for result
@@ -3275,6 +3335,13 @@ def chat():
                  if device_id not in _pending_tasks:
                      _pending_tasks[device_id] = []
                  _pending_tasks[device_id].append(task)
+                 
+                 # Push task to WebSocket
+                 try:
+                     from Backend.AgentWebSocket import send_task_sync
+                     send_task_sync(device_id, task_id, task['command'], task['params'])
+                 except Exception: pass
+
                  log_command(current_user_id or "anonymous", device_id, "file_manager", params, "queued")
                  
                  # Wait for result
@@ -4487,13 +4554,33 @@ Say 'Watch {title}' to start streaming!"""
                      current_user_id = user_id if user_id != 'anonymous' else None
                      device_id, device_info = get_first_online_device(current_user_id)
                      
+                     # ALSO CHECK WEBSOCKET CONNECTED DEVICES (prefer these)
+                     try:
+                         from Backend.AgentWebSocket import get_connected_agents, send_task_sync
+                         connected_devices = get_connected_agents()
+                         if connected_devices:
+                             # Use the first connected device (real-time)
+                             device_id = list(connected_devices.keys())[0]
+                             device_info = _registered_devices.get(device_id, {'name': 'Connected Device', 'last_seen': datetime.now().isoformat()})
+                             print(f"[APP->AGENT] Using WebSocket-connected device: {device_id[:8]}...")
+                     except Exception as ws_check_err:
+                         print(f"[APP->AGENT] WebSocket check error: {ws_check_err}")
+                     
                      if not device_id:
                          response_text = "🔌 No PC is connected to your account. Pair a device first."
                      else:
-                         # Check if online
+                         # Check if online via WebSocket OR polling (heartbeat)
                          from datetime import datetime
                          last_seen = datetime.fromisoformat(device_info.get('last_seen', '2000-01-01'))
                          is_online = (datetime.now() - last_seen).total_seconds() < 60
+                         
+                         # Also check WebSocket connection
+                         try:
+                             from Backend.AgentWebSocket import is_agent_connected
+                             ws_connected = is_agent_connected(device_id)
+                             is_online = is_online or ws_connected
+                         except:
+                             ws_connected = False
                          
                          if not is_online:
                              response_text = f"🔴 Your PC '{device_info.get('name')}' is offline. Start the Local Agent to connect."
@@ -4501,14 +4588,29 @@ Say 'Watch {title}' to start streaming!"""
                              # Queue open_app task
                              task_id = str(uuid.uuid4())
                              task = {"task_id": task_id, "command": "open_app", "params": {"app": app_name}, "user_id": current_user_id or "anonymous", "created_at": datetime.now().isoformat()}
-                             if device_id not in _pending_tasks:
-                                 _pending_tasks[device_id] = []
-                             _pending_tasks[device_id].append(task)
+                             
+                             # TRY WEBSOCKET PUSH FIRST (instant delivery)
+                             ws_sent = False
+                             try:
+                                 from Backend.AgentWebSocket import is_agent_connected, send_task_sync
+                                 if is_agent_connected(device_id):
+                                     ws_sent = send_task_sync(device_id, task_id, "open_app", {"app": app_name})
+                                     if ws_sent:
+                                         print(f"[APP->AGENT] ⚡ Task sent via WebSocket: open_app({app_name})")
+                             except Exception as ws_err:
+                                 print(f"[APP->AGENT] WebSocket send error: {ws_err}")
+                             
+                             # FALLBACK to polling queue if WS failed
+                             if not ws_sent:
+                                 if device_id not in _pending_tasks:
+                                     _pending_tasks[device_id] = []
+                                 _pending_tasks[device_id].append(task)
+                                 print(f"[APP->AGENT] Task queued for polling: open_app({app_name})")
                              
                              # Audit log
-                             log_command(current_user_id or "anonymous", device_id, "open_app", {"app": app_name}, "queued")
+                             log_command(current_user_id or "anonymous", device_id, "open_app", {"app": app_name}, "sent_ws" if ws_sent else "queued")
                              
-                             print(f"[APP->AGENT] Task queued: open_app({app_name}) - {task_id[:8]}... (user: {current_user_id[:8] if current_user_id else 'anon'})")
+                             print(f"[APP->AGENT] Task {'sent' if ws_sent else 'queued'}: open_app({app_name}) - {task_id[:8]}... (user: {current_user_id[:8] if current_user_id else 'anon'})")
                              
                              # Wait for result (up to 15 seconds)
                              max_wait, start_time, result_data = 15, time_module.time(), None
@@ -5245,17 +5347,86 @@ What would you like me to do?"""
              try:
                  from Backend.DocumentGenerator import document_generator
                  from datetime import datetime
+                 import re
                  
-                 # Extract topic
-                 topic = command.replace("generate", "").replace("create", "").replace("pdf", "").replace("document", "").replace("about", "").replace("report", "").replace("on", "").strip()
+                 # ===================== SMART TOPIC & TYPE EXTRACTION =====================
+                 cmd_lower = command.lower()
+                 
+                 # Detect document type from command
+                 # Priority: expo/submission > pitch > technical/guide > report (default)
+                 document_type = "professional_report"  # Default
+                 
+                 if any(kw in cmd_lower for kw in ["expo", "submission", "conference", "hackathon"]):
+                     document_type = "expo_submission"
+                 elif any(kw in cmd_lower for kw in ["pitch", "investor", "funding", "startup"]):
+                     document_type = "pitch_document"
+                 elif any(kw in cmd_lower for kw in ["technical", "guide", "whitepaper", "documentation", "tutorial"]):
+                     document_type = "technical_guide"
+                 
+                 print(f"[PDF] Detected document type: {document_type}")
+                 
+                 # Smart topic extraction using regex
+                 # Pattern: "create/generate [a] [pdf/document/report/etc] [about/on/for] <TOPIC>"
+                 topic_patterns = [
+                     r"(?:create|generate|make|write)\s+(?:a\s+)?(?:pdf|document|report|submission|pitch|guide)\s+(?:about|on|for|regarding)\s+(.+?)$",
+                     r"(?:pdf|document|report|submission)\s+(?:about|on|for|regarding)\s+(.+?)$",
+                     r"(?:about|on|for|regarding)\s+(.+?)$",
+                     r"expo\s+submission\s+(?:for|about)?\s*(.+?)$",
+                     r"pitch\s+(?:document|deck)\s+(?:for|about)?\s*(.+?)$",
+                 ]
+                 
+                 topic = None
+                 for pattern in topic_patterns:
+                     match = re.search(pattern, cmd_lower, re.IGNORECASE)
+                     if match:
+                         topic = match.group(1).strip()
+                         # Clean up common trailing words
+                         topic = re.sub(r'\s+(?:please|now|thanks|asap)$', '', topic, flags=re.IGNORECASE)
+                         break
+                 
+                 # Fallback: Remove known keywords and use remainder
                  if not topic:
-                     topic = "General Topic"
+                     topic = re.sub(r'\b(create|generate|make|write|a|an|the|pdf|document|report|guide|about|on|for|submission|expo|pitch|technical)\b', '', cmd_lower, flags=re.IGNORECASE)
+                     topic = re.sub(r'\s+', ' ', topic).strip()
                  
-                 # ========== ENHANCED PDF GENERATION: Web Scraping + Gemini ==========
-                 print(f"[PDF] ========== STARTING ENHANCED PDF GENERATION ==========")
-                 ai_content = ""
-                 web_research = ""
+                 if not topic or len(topic) < 3:
+                     topic = "General Overview"
                  
+                 print(f"[PDF] Extracted topic: '{topic}'")
+                 print(f"[PDF] ========== STARTING {document_type.upper()} GENERATION =========")
+                 
+                 # ===================== NEW TEMPLATE SYSTEM (FAST PATH) =====================
+                 # Use the new template-based system directly - skip old web research + Gemini
+                 # The content_generator will use LLM to generate structured content
+                 
+                 pdf_result = document_generator.generate(
+                     topic=topic.title(),
+                     document_type=document_type,
+                     # Don't pass content - let the generator create it from topic
+                     additional_context=f"Create a professional {document_type.replace('_', ' ')} about {topic}."
+                 )
+                 
+                 if pdf_result.get("success"):
+                     pdf_filename = pdf_result.get("filename", "document.pdf")
+                     pdf_url = pdf_result.get("url", f"/data/Documents/{pdf_filename}")
+                     pdf_title = pdf_result.get("title", f"Report on {topic.title()}")
+                     
+                     print(f"[PDF] ✅ Generated: {pdf_title} ({pdf_result.get('format', 'unknown')})")
+                     
+                     return jsonify({
+                         "response": f"📄 Generated PDF: **{pdf_title}**",
+                         "type": "pdf",
+                         "title": pdf_title,
+                         "url": pdf_url,
+                         "format": pdf_result.get("format", "pdf")
+                     }), 200
+                 else:
+                     # Fallback to expanded content generation if new system failed
+                     print(f"[PDF] ⚠️ New system failed: {pdf_result.get('error')}, using legacy...")
+                     ai_content = ""
+                     web_research = ""
+                 
+                 # ===================== LEGACY FALLBACK (only if new system fails) =====================
                  # Step 1: Web scraping for research content
                  print(f"[PDF] Step 1: Web research for '{topic}'")
                  try:
@@ -5577,12 +5748,18 @@ By developing a solid understanding of {topic} and staying current with developm
                  pdf_content = {
                      "title": doc_title,
                      "subtitle": doc_subtitle,
-                     "sections": sections
+                     "sections": sections,
+                     "document_type": "professional_report"
                  }
                  
-                 pdf_result = document_generator.generate_pdf(topic.title(), pdf_content)
+                 # Use new template-based generation system
+                 pdf_result = document_generator.generate(
+                     topic=topic.title(), 
+                     document_type="professional_report",
+                     content=pdf_content
+                 )
                  
-                 # generate_pdf now returns a dict with: filepath, url, filename, title
+                 # generate() returns: success, filepath, url, format, title
                  pdf_filename = pdf_result.get("filename", "document.pdf")
                  pdf_url = pdf_result.get("url", f"/data/Documents/{pdf_filename}")
                  pdf_title = pdf_result.get("title", f"Report on {topic.title()}")
@@ -5592,7 +5769,8 @@ By developing a solid understanding of {topic} and staying current with developm
                      "response": f"📄 Generated PDF: **{pdf_title}**",
                      "type": "pdf",
                      "title": pdf_title,
-                     "url": pdf_url  # Fixed: 'url' instead of 'pdf_path' for frontend
+                     "url": pdf_url,
+                     "format": pdf_result.get("format", "pdf")
                  }), 200
              except Exception as e:
                  print(f"[ERROR] Document generation failed: {e}")
@@ -7222,22 +7400,31 @@ def create_pdf():
         if current_section["content"] or current_section["data"]:
             sections.append(current_section)
         
+        # Use new template-based document generation
+        user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
+        document_type = data.get('document_type', 'professional_report')  # Can be: expo_submission, pitch_document, technical_guide, professional_report
+        
         pdf_content = {
             "title": title,
-            "subtitle": "Generated by KAI AI",
-            "sections": sections
+            "subtitle": "Generated by Kai AI",
+            "sections": sections,
+            "document_type": document_type
         }
         
-        user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
-        pdf_result = document_generator.generate_pdf(title, pdf_content, user_id=user_id)
+        pdf_result = document_generator.generate(
+            topic=title,
+            document_type=document_type,
+            content=pdf_content,
+            user_id=user_id
+        )
         
-        # generate_pdf returns a dict with: filepath, url, filename, title
         return jsonify({
             "status": "success",
             "message": "PDF created successfully",
             "filepath": pdf_result.get("filepath"),
             "filename": pdf_result.get("filename"),
-            "url": pdf_result.get("url", f"/data/Documents/{pdf_result.get('filename', 'document.pdf')}")
+            "url": pdf_result.get("url"),
+            "format": pdf_result.get("format", "pdf")
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -7293,22 +7480,30 @@ def create_report():
         topic = data.get('topic', 'Report')
         sections = data.get('sections', [])
         
-        # Build content dict for generate_pdf
-        pdf_content = {
-            "title": f"Report on {topic}",
-            "subtitle": "Generated by KAI AI",
-            "sections": sections if sections else [{"heading": "Introduction", "content": f"This report covers {topic}.", "type": "paragraph"}]
-        }
+        # Use new template-based document generation
+        document_type = data.get('document_type', 'professional_report')
         
         user_id = request.current_user.get('user_id') if hasattr(request, 'current_user') else None
-        pdf_result = document_generator.generate_pdf(topic, pdf_content, user_id=user_id)
+        
+        # Use the new generate() method - it can generate content from topic if sections is empty
+        pdf_result = document_generator.generate(
+            topic=topic,
+            document_type=document_type,
+            content={
+                "title": f"Report on {topic}",
+                "subtitle": "Generated by Kai AI",
+                "sections": sections if sections else None
+            } if sections else None,  # Let LLM generate if no sections provided
+            user_id=user_id
+        )
         
         return jsonify({
             "status": "success",
             "message": "Report created successfully",
             "filepath": pdf_result.get("filepath"),
             "filename": pdf_result.get("filename"),
-            "url": pdf_result.get("url", f"/data/Documents/{pdf_result.get('filename', 'document.pdf')}")
+            "url": pdf_result.get("url"),
+            "format": pdf_result.get("format", "pdf")
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -10950,6 +11145,20 @@ def start_api_server(port=5000, debug=False):
                  print(f"[ERROR] WebSocket server failed to start: {e}")
 
     threading.Thread(target=start_websocket_server_safely, daemon=True).start()
+
+    # ==================== AGENT WEBSOCKET SERVER ====================
+    def start_agent_websocket_safely():
+        try:
+            from Backend.AgentWebSocket import start_agent_websocket_server
+            start_agent_websocket_server(host="0.0.0.0", port=8766)
+            print("[WS-AGENT] ✅ Agent WebSocket server started on port 8766")
+        except ImportError:
+            print("[WS-AGENT] ⚠️ AgentWebSocket module not found")
+        except Exception as e:
+            print(f"[WS-AGENT] ⚠️ Failed to start: {e}")
+    
+    threading.Thread(target=start_agent_websocket_safely, daemon=True).start()
+
 
     # Force Network Binding
     # DEBUG: Print registered after_request functions to detect duplicates
