@@ -86,11 +86,8 @@ models/
 *.gguf
 *.ggml
 
-# Data files (user-specific)
-Data/conversation_log.json
-Data/memory.json
-Data/user_profile.json
-Data/watch_history.json
+# Data files (user-specific - EXCLUDE EVERYTHING)
+Data/
 
 # Local-only files (desktop version - not for web deployment)
 _local_only/
