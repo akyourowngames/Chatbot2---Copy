@@ -1,0 +1,26 @@
+{
+  "0c415fe84cc5b2f81aa7a31964b8f21e": {
+    "query": "[USER CONTEXT: The user's name is Krish Verma. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhi kai",
+    "response": "Hey Krish, how's your day going so far?",
+    "timestamp": 1767017451.0554154,
+    "last_accessed": 1767017451.0554154,
+    "access_count": 0,
+    "generation_time": 4.750858545303345
+  },
+  "944671d6dd8176a15b6b9a9191e7dc35": {
+    "query": "[USER CONTEXT: The user's name is Krish Verma. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\ncan you explain science at molecular level?",
+    "response": "At a molecular level, science is all about the tiny building blocks of matter, like atoms and molecules, and how they interact with each other. It's a pretty complex topic, but I'd be happy to break it down for you - what specific aspect of molecular science would you like to know more about?",
+    "timestamp": 1767017461.4583,
+    "last_accessed": 1767017461.4583,
+    "access_count": 0,
+    "generation_time": 1.1723952293395996
+  },
+  "e095d61107ba8c246cd79db34422f8d2": {
+    "query": "[USER CONTEXT: The user's name is Krish Verma. Be casual and friendly in your responses. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\noh! its interesting",
+    "response": "Glad you think so, Krish. Molecular science is indeed fascinating, and it's the foundation of many cool things in our world, from biology to chemistry to technology.",
+    "timestamp": 1767017477.0424256,
+    "last_accessed": 1767017477.0424256,
+    "access_count": 0,
+    "generation_time": 1.949082612991333
+  }
+}

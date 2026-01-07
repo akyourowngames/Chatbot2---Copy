@@ -1,0 +1,47 @@
+# Render Blueprint - KAI AI Assistant
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: kai-api
+    runtime: python
+    region: oregon  # or singapore for Asia
+    plan: free      # Change to 'starter' for production ($7/mo)
+    
+    # Build settings
+    buildCommand: pip install -r requirements-deploy.txt
+    startCommand: gunicorn api_server:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --keep-alive 5
+    
+    # Health check
+    healthCheckPath: /health
+    
+    # Environment variables (set these in Render dashboard)
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: GROQ_API_KEY
+        sync: false  # Legacy fallback
+      - key: GROQ_API_KEY_1
+        sync: false  # Set in Render dashboard
+      - key: GROQ_API_KEY_2
+        sync: false
+      - key: GROQ_API_KEY_3
+        sync: false
+      - key: GROQ_API_KEY_4
+        sync: false
+      - key: GROQ_API_KEY_5
+        sync: false
+      - key: GROQ_API_KEY_6
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GOOGLE_CX
+        sync: false
+      - key: FIREBASE_CREDENTIALS
+        sync: false
+      - key: ENCRYPTION_KEY
+        generateValue: true  # Auto-generate secure key
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://your-frontend.vercel.app,https://kai-frontend.onrender.com"

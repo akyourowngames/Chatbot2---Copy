@@ -1,0 +1,40 @@
+{
+    "manifest_version": 3,
+    "name": "KAI - AI Browser Assistant",
+    "version": "2.0.0",
+    "description": "AI-powered browser automation with chat, form filling, web scraping, workflows, and page analysis",
+    "permissions": [
+        "activeTab",
+        "storage",
+        "scripting",
+        "downloads"
+    ],
+    "host_permissions": [
+        "http://localhost:*/*",
+        "https://*.onrender.com/*",
+        "<all_urls>"
+    ],
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "scraper.js",
+                "smart-utils.js",
+                "workflow.js",
+                "content.js"
+            ],
+            "css": [
+                "content.css"
+            ],
+            "run_at": "document_end"
+        }
+    ]
+}

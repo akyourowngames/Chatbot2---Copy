@@ -1,0 +1,446 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Student View Homework</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <script type="text/javascript" src="assets/js/jquery.min.js"></script>
+    <script type="text/javascript">
+
+        var $j = jQuery.noConflict();
+        // extention check
+        function validate(file) {
+            var ext = file.split(".");
+            ext = ext[ext.length - 1].toLowerCase();
+            var arrayExtensions = ["jpg", "jpeg", "png", "bmp", "gif", "PNG", "xls", "pdf", "xlsx", "ppt", "pptx", "doc", "docx", "JPG"];
+
+            if (arrayExtensions.lastIndexOf(ext) == -1) {
+                ShowPopup("Wrong extension type.");
+                $j("#filestdupload").val("");
+            }
+        }
+
+        var counter;
+        function UploadFile() {
+            $("#status").show();
+            $("#loaded_n_total").show();
+            $("#progressBar").show();
+            var StudentID = $j("#StdIDs").html();
+            var ClassID = $j("#ClassIDs").html();
+            var SessionID = $j("#SessionID").html();
+            var UploadID = $j("#lbluploadid").html();
+
+
+
+            //alert(StudentID + '-' + ClassID + '-' + SessionID + '-' + UploadID);
+            var files = $j("#filestdupload").get(0).files;
+            counter = 0;
+
+            // Loop through files
+            for (var i = 0; i < files.length ; i++) {
+                var file = files[i];
+                var formdata = new FormData();
+                formdata.append("filestdupload", file);
+                var ajax = new XMLHttpRequest();
+                //ajax.upload.addEventListener("progress", progressHandler, false);
+                ajax.upload.addEventListener("progress", function (evt) {
+                    if (evt.lengthComputable) {
+                        var percentComplete = evt.loaded / evt.total;
+                        $j("#loaded_n_total").html("Uploaded " + event.loaded + " bytes of " + event.total);
+                        var percent = (event.loaded / event.total) * 100;
+                        $j("#progressBar").val(Math.round(percent));
+                        $j("#status").html(Math.round(percent) + "% uploaded... please wait");
+                    }
+                }, false);
+                ajax.addEventListener("load", completeHandler, false);
+                ajax.addEventListener("error", errorHandler, false);
+                ajax.addEventListener("abort", abortHandler, false);
+                ajax.open("POST", "FileUploadHandler.ashx?StudentID=" + StudentID + "&ClassID=" + ClassID + "&SessionID=" + SessionID + "&UploadID=" + UploadID + "");
+                ajax.send(formdata);
+            }
+            return false;
+        }
+
+        //function progressHandler(event) {
+        //    $j("#loaded_n_total").html("Uploaded " + event.loaded + " bytes of " + event.total);
+        //    var percent = (event.loaded / event.total) * 100;
+        //    $j("#progressBar").val(Math.round(percent));
+        //    $j("#status").html(Math.round(percent) + "% uploaded... please wait");
+        //}
+
+        function completeHandler(event) {
+            counter++
+            $j("#status").html(counter + " " + event.target.responseText);
+            ShowPopup(event.target.responseText);
+            return false;
+        }
+
+        function errorHandler(event) {
+            $j("#status").html("Upload Failed");
+        }
+
+        function abortHandler(event) {
+
+            $j("#status").html("Upload Aborted");
+        }
+    </script>
+    <style type="text/css">
+        a:hover {
+            color: #0056b3;
+            text-decoration: none !important;
+        }
+
+        .button {
+            background-color: #555555; /* Green */
+            border: none;
+            color: white;
+            padding: 10px 22px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 10px;
+        }
+
+        .button2 {
+            background-color: #008CBA;
+        }
+
+        .button4 {
+            background-color: #e7e7e7;
+            color: black;
+        }
+        /* Gray */
+        /* Blue */
+    </style>
+    <link href="../assets/vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+    <form method="post" action="./stdhomeworkview.aspx?uploadid=2699512" id="form1" enctype="multipart/form-data">
+<div class="aspNetHidden">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwULLTE1ODY1Mjg1MTIPZBYCZg8WAh4HZW5jdHlwZQUTbXVsdGlwYXJ0L2Zvcm0tZGF0YRYUZg9kFgRmDxYCHgNzcmMFQmh0dHBzOi8vcHRzZXZlcmVzdC5zcGVjaWFsc2Nob29scy5pbi8vdXBsb2FkTWVudS9zdGRJbWFnZS81MzE5LmpwZ2QCAQ8WAh4EVGV4dAWzAjxtYXJxdWVlIGJlaGF2aW9yPSJhbHRlcm5hdGUiIGRpcmVjdGlvbj0ibGVmdCIgc2Nyb2xsYW1vdW50PSIzIj48Yj48c3BhbiBzdHlsZT0iY29sb3I6IzExNTVDQyI+U3R1ZGVudCBOYW1lOiA8L3NwYW4+S1JJU0ggVkVSTUEmbmJzcDsmbmJzcDsmbmJzcDsmbmJzcDsmbmJzcDs8c3BhbiBzdHlsZT0iY29sb3I6IzExNTVDQyI+Q2xhc3M6IDwvc3Bhbj5YIFJvc2UmbmJzcDsmbmJzcDsmbmJzcDsmbmJzcDsmbmJzcDs8c3BhbiBzdHlsZT0iY29sb3I6IzExNTVDQyI+TGFzdCBsb2dpbjogPC9zcGFuPjE2IERlYyAyMDI1PC9iPjwvbWFycXVlZT5kAgEPDxYCHwIFBzI2OTk1MTJkZAICDw8WAh8CBRFNYXRoIHNhbXBsZSBwYXBlcmRkAgMPDxYCHwJlZGQCBA8PFgIfAgUQUGFzd2FyZCBlZHV4Nzg0NGRkAgUPDxYCHwIFCzEzIE5vdiAyMDI1ZGQCBw8PFgIfAgUoZWZhZGE1YzEtYjA2OC00ZmEzLWFkZjQtODgzZGIyZGM5NTE5LnBkZmRkAggPDxYCHgdWaXNpYmxlZ2RkAgsPDxYCHwJlZGQCDQ8PFgIfAmVkZGTh00edXEJHOziwXfWK4C8NSiqsXgr/kY/R0rLQjl5cMA==" />
+</div>
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="35F8D002" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEdAAReszAFrr/YaMXk7+GrDeortdILKKz9iBCM8rXKy8uQizzmltaUM7aEAN+g9cP/m10eZ2fg+z7CGxs+nyy5yfCrO1X7WGLZ5pZqjeh0B3GYn/aO5OUWJVqhT7hv63Z1UdI=" />
+</div>
+        <div id="wrapper" class="bs-example">
+            <!-- start header -->
+            
+
+
+
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+<link href="../assets/css/colorbox.css" rel="stylesheet" type="text/css" />
+<script src="../assets/scripts/jquery.colorbox-min.js" type="text/javascript"></script>
+<link rel="stylesheet" href="content/bootstrap.min.css">
+<link rel="stylesheet" href="content/font-awesome.min.css">
+
+<script src="content/popper.min.js"></script>
+<script src="content/bootstrap.min.js"></script>
+<style>
+    .bs-example {
+        margin: 1px;
+    }
+
+    #menu {
+        width: 40px;
+        height: 80px;
+        float: left;
+        padding: 0;
+    }
+
+    #menu2 {
+        height: 80px;
+        float: left;
+    }
+
+    #menu3 {
+        text-align: right;
+    }
+</style>
+<div class="bs-example">
+    <div>
+        <div id="menu">
+    <img class="adminlogo" src="../assets/images/pts.jpg" style="width: 80px; height: 80px;"/ >
+</div>
+<div id="menu3">
+<a href="#">
+ <img src="https://ptseverest.specialschools.in//uploadMenu/stdImage/5319.jpg" id="studentHeader2_stdImage" class="adminlogo" style="width: 80px; height: 80px;" /></a>
+     <a id="notificationpopup" href="notification.aspx">
+                <img src="../assets/images/adminNotification.gif" style="width: 40px; height: 40px;" alt="Notification" title="Notification" />
+                <span id="divUnreadmessage" class="notificationwarning" style="display:none"></span></a>
+                        <a href="stdstudentdetail.aspx"><img src="../assets/images/personal.png" style="width: 40px; height: 40px;" alt="Personal detail" title="Personal detail" /></a>
+                        <a id="forgotpasswordpopup" href="stdChangePassword.aspx" ><img src="../assets/images/changepass.png" style="width: 40px; height: 40px;" alt="Change Password" title="Change Password" /></a>
+                        <a href="../logout.aspx"> <img src="../assets/images/logout.png" style="width: 32px; height: 32px;" alt="Logout" title="Logout" /></a>
+</div>
+    </div>
+<div>
+    <nav class="navbar navbar-expand-sm navbar-light bg-light">
+        <a href="default.aspx" class="navbar-brand"><img src="../assets/images/home.png" style="width: 40px; height: 40px;" alt="Home" title="Home" /> &nbsp; Student Home</a>
+        <button type="button" class="navbar-toggler" data-toggle="collapse" data-target="#navbarCollapse">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div id="navbarCollapse" class="collapse navbar-collapse">
+            <ul class="nav navbar-nav">
+            
+            <li class="nav-item dropdown"><a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown" rel="ddsubmenu10">Attendance</a>
+                     <div class="dropdown-menu">                        
+                         <a href="stdattendance.aspx"  class="dropdown-item">Regular Attendance</a>
+                         <a href="stdattendanceperiodwise.aspx"  class="dropdown-item">Period-Wise Attendance</a>
+                     </div>
+            </li>
+            <li class="nav-item dropdown"><a href="stdweeklyhomework.aspx" class="nav-link dropdown-toggle" data-toggle="dropdown" rel="ddsubmenu10">School Work</a>
+                     <div class="dropdown-menu">                        
+                         <a href="stdnoticeboard.aspx"  class="dropdown-item">Classwork</a>
+                         <a href="stdweeklyhomework.aspx"  class="dropdown-item">Homework</a>
+                          <a href="stdnotebook.aspx"  class="dropdown-item">NoteBook</a>   
+                          <a href="stdClassTest.aspx"  class="dropdown-item">Class Test</a>   
+                          <a href="stdActivity.aspx"  class="dropdown-item">Class Activity</a>   
+                         <a href="stdAchievement.aspx"  class="dropdown-item">Achievement</a>                           
+                          <a href="stdHolidayHomeWork.aspx"  class="dropdown-item">Holday Home Work</a>
+                     </div>
+            </li>
+            <li class="nav-item dropdown"><a href="stdcoursematerial.aspx" class="nav-link dropdown-toggle" data-toggle="dropdown" rel="ddsubmenu2">Download</a>                
+                    <div class="dropdown-menu">                        
+                            <a href="stdassignment.aspx" class="dropdown-item">Assignment</a>
+                            <a href="stdquestionBank.aspx" class="dropdown-item">Question Bank</a>
+                            <a href="stdexamschedule.aspx" class="dropdown-item">Exam Schedule</a>
+                            <a href="stdsyllabus.aspx" class="dropdown-item">Syllabus</a>
+                            <a href="stdcoursematerial.aspx" class="dropdown-item">Course Material</a>
+                            <a href="stdstudymaterial.aspx" class="dropdown-item">Study Material</a>
+                            <a href="stdcircular.aspx" class="dropdown-item">Circulars</a>                        
+                     </div>
+            </li>
+            <li class="nav-item dropdown"><a href="stdviewMessage.aspx"  class="nav-link">Message</a>
+                
+            </li>
+           
+            <li class="nav-item dropdown"><a href="stdclasstimetable.aspx" class="nav-link" >Time Table</a>
+                                
+            </li>
+            <li class="nav-item dropdown"><a href="stdeventcallender.aspx" class="nav-link">Calendar</a>
+
+                   
+            </li>
+            
+            <li class="nav-item dropdown"><a href="stdsnapgallery.aspx" class="nav-link dropdown-toggle" data-toggle="dropdown" rel="ddsubmenu21">Gallery</a>
+            <div class="dropdown-menu">
+                        <a href="stdsnapgallery.aspx" class="dropdown-item">Photo</a>
+                        <a href="stdVideogallery.aspx" class="dropdown-item">Video</a>
+                     </div>
+            </li>            
+            <li class="nav-item"><a href="stdresult.aspx" class="nav-link">Result</a></li>
+            <li class="nav-item dropdown"><a href="javascript:void(0);"  class="nav-link dropdown-toggle" data-toggle="dropdown">School</a>
+                    <div class="dropdown-menu dropdown-menu-right">                     
+                       <a href="https://www.facebook.com/epsshalimargarden/" class="dropdown-item" target="_blank">Facebook</a>
+                       <a href="https://www.youtube.com/channel/UCRoy5EdGlo1aQknubUaaxgw" class="dropdown-item" target="_blank"> Youtube</a>
+                       <a href="http://everestpublicschool.com/" class="dropdown-item" target="_blank">School website</a>
+                    </div>
+            </li>
+            <li class="nav-item"><a href="stdMiscellaneous.aspx" class="nav-link">Mail</a></li>
+            <li class="nav-item dropdown"><a href="#"  class="nav-link dropdown-toggle" data-toggle="dropdown">More</a>
+             <div class="dropdown-menu dropdown-menu-right">
+                     <a href="trackbus.aspx"class="dropdown-item"><img src="http://maps.google.com/mapfiles/ms/icons/bus.png" height="16px" /> &nbsp; Bus Tracking</a>
+                          
+                     <a href="stdcontactus.aspx" class="dropdown-item">Contact Us</a>
+                     <a href="stdfeedback.aspx" class="dropdown-item">Feedback</a>
+                    </div>
+            </li>           
+            <li class="nav navbar-nav"><a href="stdFeeOnlineV3.aspx" class="nav-link">Online Fee</a></li>
+            <li class="nav-item"><a href="stdAudio.aspx" class="nav-link">Audio</a></li>
+            <li class="nav-item"><a href="stdOnlineExam.aspx" class="nav-link">Online Exam</a></li>
+            <li class="nav-item"><a href="stdOnlineClass.aspx" class="nav-link">Online Class</a></li>
+            </ul>
+          
+               
+        </div>
+    </nav>
+</div>
+</div>
+<div>
+
+<div  class="bs-example marquee" style=" height: 22px; background: lightyellow; border: 1px solid #CC3300; margin-top:13px; color: Black;">
+    <marquee behavior="alternate" direction="left" scrollamount="3"><b><span style="color:#1155CC">Student Name: </span>KRISH VERMA&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#1155CC">Class: </span>X Rose&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#1155CC">Last login: </span>16 Dec 2025</b></marquee>
+</div>
+<script type="text/javascript">
+    jQuery.ajaxSetup({ cache: false });
+    $(document).ready(function () {
+        //Forgot Password Start
+        $("#forgotpasswordpopup").colorbox({ width: "400px", height: "280px", scrolling: false, iframe: true });
+        $("#notificationpopup").colorbox({ width: "800px", height: "480px", scrolling: false, iframe: true });
+        //Forgot Password End
+        $(".desc_inline").colorbox({ inline: true, width: "50%" });
+
+        fngetNotification();
+
+        setInterval(function () {
+            fngetNotification();
+        }, 5000);
+    });
+
+    function fngetNotification() {
+        $.post("../Services/hndcommon.ashx/").success(function (data) {
+            if (data.total > 0) {
+                $("#divUnreadmessage").html('');
+                $("#divUnreadmessage").html(data.total);
+                $("#divUnreadmessage").show();
+            }
+            else if (data.total == 0) {
+                $("#divUnreadmessage").html('');
+                $("#divUnreadmessage").hide();
+            }
+        });
+    }
+</script>
+
+            <!-- end header -->
+            <!-- start content -->
+            <p style="color: #fff!important; background-color: #d40000!important; display: block; text-align: center; text-decoration: none; width: 100%; min-height: 15px; font-size: 16px; font-weight: bold; padding: 5px;">Student Homework</p>
+            <div id="content" class="bs-example" style="overflow-x: scroll; min-height: 400px">
+                <label id="SessionID" style="display: none;">9</label>
+                <label id="StdIDs" style="display: none;">2793117</label>
+                <label id="ClassIDs" style="display: none;">10147</label>
+
+                <div class="row">
+                    <div class="col-xl-6 col-sm-12 mb-6 card text-white  clearfix bg-primary o-hidden h-100">
+                        <div class="col-xl-6 col-sm-12 mb-6 card-body">
+
+                            <div class="col-xl-12 col-sm-12 mb-12">
+                                <strong><span class="style4">Homework Details</span></strong>
+                            </div>
+                            <div class="col-xl-12 col-sm-12 mb-12 o-hidden h-100" style="display: none">
+                                uploadid
+                       
+                                <span id="lbluploadid">2699512</span>
+                            </div>
+
+                            <div class="col-xl-12 col-sm-12 mb-12">
+                                <strong>Homework Title : </strong>
+
+                                <span id="lbltitle">Math sample paper</span>
+                            </div>
+                            <div class="col-xl-12 col-sm-12 mb-12">
+                                <strong>Subject Name : </strong>
+
+                                <span id="lblSubject"></span>
+                            </div>
+                            <div class="col-xl-12 col-sm-12 mb-12">
+                                <strong>Description : </strong>
+
+
+                                <span id="lbldescription">Pasward edux7844</span>
+                            </div>
+
+                            <div class="col-xl-12 col-sm-12 mb-12">
+                                <strong>Date of Creation : </strong>
+
+
+                                <span id="lbldateofcreation">13 Nov 2025</span>
+                            </div>
+                            <div class="col-xl-6 col-sm-12 mb-6">
+                                <strong>View/Download</strong>
+                                <br />
+                                <strong>
+                                    </strong>
+                                
+                                <input type="submit" name="btndwn" value="Download" id="btndwn" class="button button4" />
+                            </div>
+
+                        </div>
+                    </div>
+                    <div class="col-xl-6 col-sm-12 mb-6 card text-white  clearfix bg-success o-hidden h-100">
+                        <div class="col-xl-6 col-sm-12 mb-6 card-body">
+                            <div class="col-xl-12 col-sm-12 mb-12">
+                                <strong><span class="style4">Student Upload Details</span></strong>
+                            </div>
+                            <div class="col-xl-6 col-sm-12 mb-6">
+                                Upload File : 
+                   
+                        <input type="file" name="filestdupload" id="filestdupload" class="button button4" onChange="validate(this.value)" />
+                                <br />
+                                <!-- Progress Bar -->
+                                <progress id="progressBar" value="0" max="100" style="width: 100%; display: none"></progress>
+                                <p id="status" style="display: none"></p>
+                                <p id="loaded_n_total" style="display: none"></p>
+                                
+                                
+                            </div>
+                            <div class="col-xl-6 col-sm-12 mb-6">
+                                Upload Date :
+                   
+                        <span id="lblUploadDate"></span>
+                            </div>
+                            <div class="col-xl-6 col-sm-12 mb-6">
+                                Remarks :
+                                                       
+                            </div>
+                            <div class="col-xl-6 col-sm-12 mb-6">
+                                <span id="lblRemarks"></span>
+                            </div>
+                            <div class="col-xl-12 col-sm-12 mb-12">
+                                <input type="submit" name="btnSubmit" value="Submit" onclick="return UploadFile();" id="btnSubmit" class="button" />
+                                <input type="submit" name="btnBack" value="Back" id="btnBack" class="button button2" />
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+                <script src="http://ajax.aspnetcdn.com/ajax/jquery.ui/1.8.9/jquery-ui.js" type="text/javascript"></script>
+                <link href="http://ajax.aspnetcdn.com/ajax/jquery.ui/1.8.9/themes/start/jquery-ui.css" rel="stylesheet" type="text/css" />
+                
+                <script type="text/javascript">
+                    var $q = jQuery.noConflict();
+                    function ShowPopup(message) {
+                        $q(function () {
+                            $q("#dialog").html(message != '' ? message : null);
+                            $q("#dialog").dialog({
+                                title: "Homework Upload Menu",
+                                show: "blind",
+                                hide: "explode",
+                                buttons: {
+                                    Close: function () {
+                                        $q(this).dialog('close');
+                                    },
+                                },
+                                modal: true
+                            });
+                        });
+                    };
+                </script>
+
+                <div id="dialog" style="display: none">
+                    
+                </div>
+            </div>
+        </div>
+    </form>
+    <center>
+        
+    
+    <footer class="sticky-footer">
+        <div class="container my-auto">
+            <div class="copyright text-center my-auto">
+                <span>© Copyright 2011-2025 <a target="_blank" href="http://eagleeyesolution.co.in/">Eagle eye solution Pvt. Ltd. </a>. All rights reserved. Designed & Developed by <a target="_blank" href="http://eagleeyesolution.co.in/">Eagle eye solution</a>.</span>
+            </div>
+        </div>
+    </footer>
+    
+<!-- Scroll to Top Button-->
+    
+    <a class="scroll-to-top rounded" href="javascript:void();" style="font-size: 20px; padding: 15px;">
+        <i class="fas fa-angle-up"></i>
+    </a>
+<script src="../assets/js/sb-admin.js"></script>
+
+    </center>
+
+</body>
+</html>

@@ -1,0 +1,58 @@
+[
+    {
+        "role": "user",
+        "content": "\n[\ud83e\udde0 MEMORY CONTEXT - What you remember about this user]:\n\u2022 [preference] no what do i like more\n\nUse these memories to personalize your response naturally.\n\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is Krish. Call them 'KING' casually. About the user: hi i like you! Keep responses brief and concise. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhi bud"
+    },
+    {
+        "role": "assistant",
+        "content": "Hey KING, what's up?"
+    },
+    {
+        "role": "user",
+        "content": "\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is Krish. Call them 'KING' casually. About the user: hi i like you! Keep responses brief and concise. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nretry"
+    },
+    {
+        "role": "assistant",
+        "content": "Let's try again, KING!"
+    },
+    {
+        "role": "user",
+        "content": "\n[Previous sessions context: 1 relevant items]\n[USER CONTEXT: The user's name is Krish. Call them 'KING' casually. About the user: hi i like you! Keep responses brief and concise. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nhello kahe kaise ho tum"
+    },
+    {
+        "role": "assistant",
+        "content": "Namaste KING, I'm doing great, thanks!"
+    },
+    {
+        "role": "user",
+        "content": "\n[Previous sessions context: 2 relevant items]\n[USER CONTEXT: The user's name is Krish. Call them 'KING' casually. About the user: hi i like you! Keep responses brief and concise. IMPORTANT: Respond in English only.]\n\n[ADAPTIVE STYLE: The user sent a SHORT message. Keep your response brief and direct (1-3 sentences max unless critical info is needed).]\n\nso can you"
+    },
+    {
+        "role": "assistant",
+        "content": "Go ahead, KING, I'm listening!"
+    },
+    {
+        "role": "user",
+        "content": "[USER CONTEXT: The user's name is Krish. Call them 'KING' casually. About the user: hi i like you! Keep responses brief and concise. IMPORTANT: Respond in English only.]\n\nI\u2019m nervous about this expo submission. I don\u2019t even know how to present my idea properly."
+    },
+    {
+        "role": "assistant",
+        "content": "Don't worry, KING! I'm here to help. What's your idea about? Let's break it down and create a solid presentation together!"
+    },
+    {
+        "role": "user",
+        "content": "\u201cHow do I make my AI startup look professional to judges?"
+    },
+    {
+        "role": "assistant",
+        "content": "I tried to generate the image, but something went wrong."
+    },
+    {
+        "role": "user",
+        "content": "[USER CONTEXT: The user's name is Krish. Call them 'KING' casually. About the user: hi i like you! Keep responses brief and concise. IMPORTANT: Respond in English only.]\n\nI\u2019ve got this AI thing I\u2019m building, there\u2019s an expo, judges, slides, visuals, write\u2011ups\u2026 I\u2019m lost"
+    },
+    {
+        "role": "assistant",
+        "content": "Take a breath, KING! Let's focus on one thing at a time. What's the core message you want to convey about your AI project?"
+    }
+]

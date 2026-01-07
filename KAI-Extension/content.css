@@ -1,0 +1,250 @@
+/* KAI Extension - Content Styles */
+
+.kai-widget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 2147483647;
+    /* Maximum z-index */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.kai-orb {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.6);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: kai-pulse 2s infinite;
+}
+
+@keyframes kai-pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        box-shadow: 0 4px 20px rgba(99, 102, 241, 0.6);
+    }
+
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 30px rgba(99, 102, 241, 0.8);
+    }
+}
+
+.kai-orb:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 8px 35px rgba(99, 102, 241, 0.9) !important;
+}
+
+.kai-panel {
+    position: absolute;
+    bottom: 85px;
+    right: 0;
+    width: 400px;
+    max-height: 600px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 27, 75, 0.98));
+    border: 1px solid rgba(99, 102, 241, 0.5);
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    animation: kai-slide-up 0.3s ease-out;
+}
+
+@keyframes kai-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.kai-header {
+    padding: 18px 20px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+    border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kai-title {
+    color: #a5b4fc;
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+}
+
+.kai-close {
+    background: none;
+    border: none;
+    color: #818cf8;
+    cursor: pointer;
+    font-size: 28px;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.kai-close:hover {
+    color: #c7d2fe;
+}
+
+.kai-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    max-height: 350px;
+}
+
+.kai-message {
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 10px;
+    border-left: 3px solid #6366f1;
+    color: #e0e7ff;
+    font-size: 13px;
+    line-height: 1.5;
+    animation: kai-fade-in 0.3s ease-out;
+}
+
+@keyframes kai-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.kai-input-area {
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.kai-input {
+    width: 100%;
+    padding: 12px 14px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 10px;
+    color: #e0e7ff;
+    font-size: 14px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.kai-input:focus {
+    border-color: rgba(99, 102, 241, 0.8);
+}
+
+.kai-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.kai-btn {
+    padding: 12px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 10px;
+    color: #c7d2fe;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.kai-btn:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(139, 92, 246, 0.5));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.kai-btn:active {
+    transform: translateY(0);
+}
+
+/* Primary button - AI Fill */
+.kai-btn-primary {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 700;
+    grid-column: span 2;
+    position: relative;
+    overflow: hidden;
+}
+
+.kai-btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: kai-shimmer 2s infinite;
+}
+
+@keyframes kai-shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+.kai-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6) !important;
+    transform: translateY(-2px);
+}
+
+/* Header styling */
+.kai-header span {
+    color: #a5b4fc;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+/* Scrollbar styling */
+.kai-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.kai-messages::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.kai-messages::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.5);
+    border-radius: 10px;
+}
+
+.kai-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+}

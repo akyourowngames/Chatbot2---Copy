@@ -1,0 +1,97 @@
+# KAI OS - Beast Mode Dependencies
+# Install: pip install -r Requirements.txt
+
+# ===== Core =====
+python-dotenv
+requests
+flask
+flask-cors
+
+# ===== AI Models =====
+groq
+cohere
+openai
+google-generativeai
+python-pptx
+
+# ===== Media & Playback =====
+yt-dlp
+pygame
+edge-tts
+pyttsx3
+
+# ===== Automation =====
+AppOpener
+pywhatkit
+keyboard
+pyautogui==0.9.54
+pygetwindow==0.0.9
+pywin32==306
+
+# ===== Web & Scraping =====
+bs4
+beautifulsoup4
+lxml
+lxml_html_clean
+fake-useragent
+playwright
+aiohttp
+newspaper3k
+selenium
+webdriver-manager
+googlesearch-python
+
+# ===== Speech Recognition =====
+speechrecognition
+pyaudio
+noisereduce>=3.0.0
+openai-whisper>=20231117
+webrtcvad>=2.0.10
+ffmpeg-python>=0.2.0
+
+# ===== Vision & Gesture =====
+opencv-python==4.10.0.84
+mediapipe==0.10.14
+pillow>=10.0.0
+pytesseract>=0.3.10
+
+# ===== AI/ML =====
+transformers>=4.35.0
+torch>=2.0.0
+spacy
+numpy==1.26.4
+scipy
+pandas
+
+# ===== Translation =====
+mtranslate
+
+# ===== UI =====
+PyQt5
+rich
+
+# ===== Firebase/Cloud =====
+firebase-admin
+google-cloud-firestore
+google-cloud-storage
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+
+# ===== Security & Auth =====
+pydantic>=2.0.0
+bcrypt>=4.0.1
+cryptography>=41.0.0
+python-jose[cryptography]>=3.3.0
+websockets>=11.0
+
+# ===== System =====
+psutil
+
+# ===== Production Server =====
+gunicorn>=21.0.0  # Linux/Mac WSGI server
+waitress>=2.1.0   # Windows WSGI server
+
+# ===== Beast-Level Features =====
+youtube-transcript-api>=0.6.0  # YouTube video summarizer
+pdfplumber>=0.10.0  # PDF text extraction

@@ -1,0 +1,44 @@
+# KAI API - Minimal deployment dependencies
+# This excludes heavy local-only packages (torch, opencv, pyaudio, etc.)
+
+# ===== Core (Required) =====
+python-dotenv>=1.0.0
+requests>=2.31.0
+flask>=3.0.0
+flask-cors>=4.0.0
+gunicorn>=21.0.0
+
+# ===== AI Providers (Cloud APIs) =====
+groq>=0.4.0
+cohere>=4.0.0
+openai>=1.0.0
+google-generativeai>=0.8.3
+
+# ===== Web & Scraping (Lightweight) =====
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+aiohttp>=3.9.0
+duckduckgo-search>=4.0.0
+wikipedia>=1.4.0
+
+# ===== Firebase/Cloud =====
+firebase-admin>=6.0.0
+google-cloud-firestore>=2.14.0
+supabase>=2.0.0
+
+# ===== Security & Auth =====
+pydantic>=2.0.0
+bcrypt>=4.0.1
+cryptography>=41.0.0
+python-jose[cryptography]>=3.3.0
+websockets>=11.0
+
+# ===== System =====
+psutil>=5.9.0
+
+# ===== Document Generation =====
+reportlab>=4.0.0
+pillow>=10.0.0
+python-pptx>=0.6.21
+pdfplumber>=0.10.0
+youtube-transcript-api>=0.6.0

@@ -1,0 +1,6 @@
+# Netlify Redirects
+# Settings page redirect
+/settings/*  /settings/index.html  200
+
+# SPA fallback - serve index.html for client-side routing
+/*    /index.html   200

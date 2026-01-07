@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive - KAI OS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+
+        .container {
+            text-align: center;
+            padding: 40px;
+            max-width: 500px;
+        }
+
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.5);
+            }
+
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 30px 10px rgba(99, 102, 241, 0.2);
+            }
+        }
+
+        .icon svg {
+            width: 40px;
+            height: 40px;
+            color: white;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        h1.success {
+            color: #34d399;
+        }
+
+        h1.error {
+            color: #ef4444;
+        }
+
+        p {
+            font-size: 14px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .loader {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(99, 102, 241, 0.3);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .close-hint {
+            margin-top: 24px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="icon">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7.71 3.5L1.15 15l3.43 5.95h13.42L21.15 15H7.71z" />
+            </svg>
+        </div>
+        <div id="loading">
+            <div class="loader"></div>
+            <h1>Processing...</h1>
+            <p>Completing Google Drive connection</p>
+        </div>
+        <div id="success" style="display: none;">
+            <h1 class="success">✅ Google Drive Connected!</h1>
+            <p>Your Google Drive is now linked to KAI OS.</p>
+            <p class="close-hint">This window will close automatically...</p>
+        </div>
+        <div id="error" style="display: none;">
+            <h1 class="error">❌ Connection Failed</h1>
+            <p id="error-message">An error occurred while connecting.</p>
+            <p class="close-hint">Please close this window and try again.</p>
+        </div>
+    </div>
+
+    <script>
+        // Parse URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const success = params.get('success');
+        const tokensB64 = params.get('tokens');
+        const error = params.get('error');
+
+        const loadingEl = document.getElementById('loading');
+        const successEl = document.getElementById('success');
+        const errorEl = document.getElementById('error');
+        const errorMsgEl = document.getElementById('error-message');
+
+        function showSuccess() {
+            loadingEl.style.display = 'none';
+            successEl.style.display = 'block';
+
+            // Close window after 1.5 seconds
+            setTimeout(() => {
+                window.close();
+            }, 1500);
+        }
+
+        function showError(message) {
+            loadingEl.style.display = 'none';
+            errorEl.style.display = 'block';
+            if (message) {
+                errorMsgEl.textContent = message;
+            }
+        }
+
+        // Process the callback
+        (function () {
+            if (error) {
+                showError('Authorization failed: ' + error);
+                return;
+            }
+
+            if (success === 'true' && tokensB64) {
+                try {
+                    // Decode base64 tokens
+                    const tokensJson = atob(tokensB64.replace(/-/g, '+').replace(/_/g, '/'));
+                    const tokens = JSON.parse(tokensJson);
+
+                    // Store in localStorage (now on the frontend domain!)
+                    localStorage.setItem('drive_tokens', JSON.stringify(tokens));
+                    localStorage.removeItem('drive_oauth_state');
+
+                    console.log('[DRIVE] Tokens stored successfully');
+                    showSuccess();
+                } catch (e) {
+                    console.error('[DRIVE] Failed to process tokens:', e);
+                    showError('Failed to process authentication.');
+                }
+            } else {
+                showError('No authentication data received.');
+            }
+        })();
+    </script>
+</body>
+
+</html>

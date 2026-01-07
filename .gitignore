@@ -1,0 +1,98 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+eggs/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env.local
+.env.production
+*.local
+
+# Firebase/Cloud Credentials (NEVER commit these!)
+firebase-credentials.json
+*-firebase-adminsdk-*.json
+google-credentials.json
+service-account*.json
+
+# Logs
+logs/
+*.log
+startup.log
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+dist/
+backend_build/
+dist_final/
+build/
+*.spec
+
+# Temporary files
+temp_*/
+*.tmp
+*.temp
+scraped_data/
+
+# Screenshots (development)
+screenshot_*.png
+
+# Sensitive data
+*.ppn
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+tests/__pycache__/
+
+# Model files (large) - EXCLUDE ENTIRE DIRECTORY
+models/
+*.bin
+*.pt
+*.onnx
+*.safetensors
+*.gguf
+*.ggml
+
+# Data files (user-specific)
+Data/conversation_log.json
+Data/memory.json
+Data/user_profile.json
+Data/watch_history.json
+
+# Local-only files (desktop version - not for web deployment)
+_local_only/
+
+.env

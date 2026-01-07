@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Intelligence Mode - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .demo-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.2);
+        }
+
+        .input-group {
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 600;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: rgba(139, 92, 246, 0.6);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .status {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border-left: 4px solid #8b5cf6;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .status-content {
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Project Intelligence Mode</h1>
+            <p class="subtitle">Transform vague ideas into executable project plans</p>
+        </div>
+
+        <div class="demo-card">
+            <div class="input-group">
+                <label>Project Description</label>
+                <textarea id="projectDescription"
+                    placeholder="e.g., I want to build a smart AI-powered task management app with voice input"></textarea>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="detectProject()">🔍 Detect Project Intent</button>
+                <button class="btn-primary" onclick="generatePlan()">✨ Generate Plan</button>
+            </div>
+
+            <div id="status" class="status">
+                <div class="status-title" id="statusTitle"></div>
+                <div class="status-content" id="statusContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api/v1';
+
+        function showStatus(title, content) {
+            const status = document.getElementById('status');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusContent = document.getElementById('statusContent');
+
+            statusTitle.textContent = title;
+            statusContent.innerHTML = content;
+            status.classList.add('show');
+        }
+
+        async function detectProject() {
+            const description = document.getElementById('projectDescription').value;
+
+            if (!description) {
+                alert('Please enter a project description');
+                return;
+            }
+
+            showStatus('🔍 Detecting...', '<span class="loading"></span> Analyzing your project idea...');
+
+            try {
+                const response = await fetch(`${API_URL}/project/detect`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: description,
+                        history: []
+                    })
+                });
+
+                const result = await response.json();
+
+                const resultHTML = `
+                    <strong>Is Project:</strong> ${result.is_project ? '✅ Yes' : '❌ No'}<br>
+                    <strong>Confidence:</strong> ${(result.confidence * 100).toFixed(0)}%<br>
+                    <strong>Suggested Type:</strong> ${result.suggested_type || 'Unknown'}<br>
+                    <strong>Triggers:</strong> ${result.triggers.join(', ') || 'None'}
+                `;
+
+                showStatus('✅ Detection Complete', resultHTML);
+            } catch (error) {
+                showStatus('❌ Error', `Failed to detect: ${error.message}`);
+            }
+        }
+
+        async function generatePlan() {
+            const description = document.getElementById('projectDescription').value;
+
+            if (!description) {
+                alert('Please enter a project description');
+                return;
+            }
+
+            showStatus('✨ Generating Plan...', '<span class="loading"></span> Creating your project plan with 5-layer decomposition...');
+
+            try {
+                const response = await fetch(`${API_URL}/project/plan`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        description: description
+                    })
+                });
+
+                const result = await response.json();
+                const plan = result.plan;
+
+                const resultHTML = `
+                    <strong>Project ID:</strong> ${result.project_id}<br>
+                    <strong>Title:</strong> ${plan.title}<br>
+                    <strong>Type:</strong> ${plan.project_type}<br>
+                    <strong>Tech Stack:</strong> ${plan.tech_stack.join(', ')}<br>
+                    <strong>Milestones:</strong> ${plan.milestones.length}<br>
+                    <strong>Tasks:</strong> ${plan.tasks.length}<br>
+                    <br>
+                    <strong>Tasks Preview:</strong><br>
+                    ${plan.tasks.slice(0, 5).map(t => `• ${t.text}`).join('<br>')}
+                    ${plan.tasks.length > 5 ? `<br>...and ${plan.tasks.length - 5} more` : ''}
+                    <br><br>
+                    <em>💡 In the full Kai app, this would auto-launch the Project Canvas!</em>
+                `;
+
+                showStatus('✅ Plan Generated!', resultHTML);
+
+                console.log('Full plan:', plan);
+            } catch (error) {
+                showStatus('❌ Error', `Failed to generate plan: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+
+</html>
